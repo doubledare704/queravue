@@ -61,4 +61,3 @@ func (h *HistoryService) ClearHistory(ctx context.Context, req *queravuev1.Clear
 	}
 	return &queravuev1.ClearHistoryResponse{}, nil
 }
-

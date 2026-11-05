@@ -188,4 +188,3 @@ message RefreshSchemaRequest {
 
 // RefreshSchemaResponse is empty on success.
 message RefreshSchemaResponse {}
-

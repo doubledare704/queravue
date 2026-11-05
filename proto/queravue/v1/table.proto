@@ -194,4 +194,3 @@ message ApplyChangesResponse {
   // Detailed error message if the changes failed or were rejected.
   string error_message = 5;
 }
-

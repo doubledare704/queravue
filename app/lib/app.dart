@@ -86,8 +86,7 @@ class HomeScreen extends ConsumerWidget {
         primary(LogicalKeyboardKey.keyT): () => openQueryTab(ref),
         primary(LogicalKeyboardKey.keyW): () => closeQueryTab(ref),
         primary(LogicalKeyboardKey.keyY): () => showHistoryDialog(context, ref),
-        primary(LogicalKeyboardKey.keyY): () =>
-            showHistoryDialog(context, ref),
+        primary(LogicalKeyboardKey.keyY): () => showHistoryDialog(context, ref),
       },
       child: Focus(
         autofocus: true,

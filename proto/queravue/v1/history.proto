@@ -60,4 +60,3 @@ message ClearHistoryRequest {
 
 // ClearHistoryResponse is empty on success.
 message ClearHistoryResponse {}
-
