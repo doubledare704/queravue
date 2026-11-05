@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// HistoryService manages query execution history stored in core.
+service HistoryService {
+  // ListHistory returns executed queries matching search criteria, newest first.
+  rpc ListHistory(ListHistoryRequest) returns (ListHistoryResponse);
+
+  // ClearHistory removes query history entries.
+  rpc ClearHistory(ClearHistoryRequest) returns (ClearHistoryResponse);
+}
+
+// HistoryEntry records the execution of a single query statement.
+message HistoryEntry {
+  // Unique entry ID.
+  int64 id = 1;
+  // Connection ID the query was executed on.
+  string connection_id = 2;
+  // SQL text of the query. Never contains bound parameter values.
+  string query_text = 3;
+  // Timestamp when query execution began.
+  google.protobuf.Timestamp started_at = 4;
+  // Elapsed execution time.
+  google.protobuf.Duration duration = 5;
+  // Number of rows affected or returned by the query.
+  uint64 rows_affected = 6;
+  // Error message if execution failed, or empty on success.
+  string error = 7;
+}
+
+// ListHistoryRequest filters and paginates query history entries.
+message ListHistoryRequest {
+  // Optional connection ID filter; empty matches all connections.
+  string connection_id = 1;
+  // Optional text search string matched against query_text.
+  string search_query = 2;
+  // Maximum number of entries to return (default 50, capped at 500).
+  uint32 limit = 3;
+  // Number of entries to skip for pagination.
+  uint32 offset = 4;
+}
+
+// ListHistoryResponse returns matching history entries.
+message ListHistoryResponse {
+  // History entries ordered by started_at descending.
+  repeated HistoryEntry entries = 1;
+  // Total number of entries matching the filter criteria.
+  uint64 total_count = 2;
+}
+
+// ClearHistoryRequest specifies which history entries to remove.
+message ClearHistoryRequest {
+  // Optional connection ID; if empty, all history is cleared.
+  string connection_id = 1;
+}
+
+// ClearHistoryResponse is empty on success.
+message ClearHistoryResponse {}
+

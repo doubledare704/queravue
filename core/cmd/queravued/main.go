@@ -18,6 +18,7 @@ import (
 
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine/engines"
+	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/secrets"
 	"github.com/doubledare704/queravue/core/internal/server"
@@ -74,6 +75,21 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		return err
 	}
 
+	actualConfigDir := *configDir
+	if actualConfigDir == "" {
+		base, err := os.UserConfigDir()
+		if err != nil {
+			return fmt.Errorf("locate config dir: %w", err)
+		}
+		actualConfigDir = filepath.Join(base, "Queravue")
+	}
+
+	histStore, err := history.NewStore(filepath.Join(actualConfigDir, "history.db"), history.DefaultCap, log)
+	if err != nil {
+		return fmt.Errorf("open history store: %w", err)
+	}
+	defer func() { _ = histStore.Close() }()
+
 	spools, err := results.NewManager(results.DefaultBaseDir(), *spoolCap, log)
 	if err != nil {
 		return err
@@ -97,6 +113,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		Connections:     connSvc,
 		Sessions:        sessions,
 		Results:         spools,
+		History:         histStore,
 	})
 	if err != nil {
 		return err

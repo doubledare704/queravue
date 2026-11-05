@@ -6,6 +6,7 @@ import '../connections/application/connections_controller.dart';
 import '../connections/presentation/connection_actions.dart';
 import '../editor/application/editor_actions.dart';
 import '../editor/domain/query_models.dart';
+import '../history/presentation/history_dialog.dart';
 
 /// One palette entry.
 class PaletteCommand {
@@ -63,6 +64,12 @@ final paletteCommandsProvider = Provider<List<PaletteCommand>>((ref) {
       title: 'Cancel running statement',
       shortcut: 'Esc',
       run: (context, ref) => cancelActiveTab(ref),
+    ),
+    PaletteCommand(
+      id: 'history.open',
+      title: 'Query history',
+      shortcut: '⌘Y',
+      run: showHistoryDialog,
     ),
     for (final c in conns)
       PaletteCommand(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/connection_form_controller.dart';
+import '../application/connection_session.dart';
 import '../application/connections_controller.dart';
 import '../domain/models.dart';
 import 'connection_dialog.dart';
@@ -102,8 +103,10 @@ Future<void> confirmDeleteConnection(
   }
 }
 
-/// "Connect": tests the saved connection with its keychain password.
+/// "Connect": tests the saved connection and opens a session for schema browsing.
 Future<void> connectTo(WidgetRef ref, ConnectionProfile profile) async {
   ref.read(selectedConnectionProvider.notifier).select(profile.id);
+  ref.read(collapsedConnectionsProvider.notifier).expand(profile.id);
   await ref.read(connectionTestsProvider.notifier).connect(profile.id);
+  await ref.read(connectionSessionProvider(profile.id).notifier).connect();
 }

@@ -11,6 +11,7 @@ import 'features/connections/presentation/connection_sidebar.dart';
 import 'features/editor/application/editor_actions.dart';
 import 'features/editor/domain/query_models.dart';
 import 'features/editor/presentation/workspace.dart';
+import 'features/history/presentation/history_dialog.dart';
 import 'shared/shortcuts.dart';
 import 'shared/widgets/status_bar.dart';
 
@@ -84,6 +85,9 @@ class HomeScreen extends ConsumerWidget {
             cancelActiveTab(ref),
         primary(LogicalKeyboardKey.keyT): () => openQueryTab(ref),
         primary(LogicalKeyboardKey.keyW): () => closeQueryTab(ref),
+        primary(LogicalKeyboardKey.keyY): () => showHistoryDialog(context, ref),
+        primary(LogicalKeyboardKey.keyY): () =>
+            showHistoryDialog(context, ref),
       },
       child: Focus(
         autofocus: true,

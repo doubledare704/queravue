@@ -36,6 +36,8 @@ type Opener interface {
 type Session struct {
 	// ID identifies the session on the wire.
 	ID string
+	// ConnectionID is the ID of the saved connection profile.
+	ConnectionID string
 	// Conn is the live connection. Use it only inside a Begin/finish pair.
 	Conn engine.Conn
 	// Desc is the engine descriptor.
@@ -163,7 +165,7 @@ func (m *Manager) Open(ctx context.Context, connectionID string) (*Session, erro
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{ID: uuid.NewString(), Conn: conn, Desc: desc, now: m.now, lastUsed: m.now()}
+	s := &Session{ID: uuid.NewString(), ConnectionID: connectionID, Conn: conn, Desc: desc, now: m.now, lastUsed: m.now()}
 	switch desc.Family {
 	case "postgres":
 		s.Dialect = sqlsplit.Postgres

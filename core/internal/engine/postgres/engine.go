@@ -77,7 +77,7 @@ func New(v Variant) *Engine {
 				{Key: ParamPassword, Label: "Password", Kind: engine.FieldPassword},
 				{Key: ParamSSLMode, Label: "SSL mode", Kind: engine.FieldSelect, Default: "prefer", Options: SSLModes},
 			},
-			Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute},
+			Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector},
 		},
 	}
 }
