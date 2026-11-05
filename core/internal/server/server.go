@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/doubledare704/queravue/core/internal/api"
+	"github.com/doubledare704/queravue/core/internal/connections"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 )
 
@@ -29,6 +30,8 @@ type Config struct {
 	Logger *slog.Logger
 	// OnListening, if set, is called once the socket accepts connections.
 	OnListening func()
+	// Connections backs ConnectionService. Nil leaves the service unregistered.
+	Connections *connections.Service
 }
 
 // Serve listens on cfg.SocketPath and serves until ctx is cancelled, then
@@ -62,6 +65,9 @@ func Serve(ctx context.Context, cfg Config) error {
 	)
 	draining := make(chan struct{})
 	queravuev1.RegisterCoreServiceServer(srv, api.NewCoreService(draining))
+	if cfg.Connections != nil {
+		queravuev1.RegisterConnectionServiceServer(srv, api.NewConnectionService(cfg.Connections))
+	}
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(lis) }()

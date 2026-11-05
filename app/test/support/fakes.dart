@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
+import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
 import 'package:queravue/core_client/core_launcher.dart';
 
 class FakeCoreHandle implements CoreHandle {
@@ -97,6 +98,10 @@ class FakeCoreConnection implements CoreConnection {
     );
     return health$.stream;
   }
+
+  @override
+  ConnectionServiceClient get connectionService =>
+      throw UnimplementedError('use a fake ConnectionsRepository');
 
   @override
   Future<void> close() async {

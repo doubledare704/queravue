@@ -1,0 +1,295 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// ConnectionService manages saved connection profiles and tests them.
+// Profiles are stored by the core without secrets; passwords live in the OS
+// keychain and never travel back to the UI.
+service ConnectionService {
+  // ListEngines returns the engines this core supports, with the form fields
+  // the UI should render for each. The UI must build its connection form from
+  // this data and never special-case engine ids.
+  rpc ListEngines(ListEnginesRequest) returns (ListEnginesResponse);
+
+  // ListConnections returns all saved connections, ordered by folder then name.
+  rpc ListConnections(ListConnectionsRequest) returns (ListConnectionsResponse);
+
+  // GetConnection returns one saved connection. NOT_FOUND if the id is unknown.
+  rpc GetConnection(GetConnectionRequest) returns (GetConnectionResponse);
+
+  // CreateConnection saves a new connection. The core assigns the id and
+  // timestamps. INVALID_ARGUMENT if the engine is unknown or a required field
+  // is missing.
+  rpc CreateConnection(CreateConnectionRequest) returns (CreateConnectionResponse);
+
+  // UpdateConnection replaces a saved connection's settings. NOT_FOUND if the
+  // id is unknown.
+  rpc UpdateConnection(UpdateConnectionRequest) returns (UpdateConnectionResponse);
+
+  // DeleteConnection removes a saved connection and its keychain secret.
+  // Deleting an unknown id returns NOT_FOUND.
+  rpc DeleteConnection(DeleteConnectionRequest) returns (DeleteConnectionResponse);
+
+  // TestConnection connects, pings and reads the server version, then closes.
+  // Connection failures are reported in-band in the response, not as gRPC
+  // errors. Honours cancellation.
+  rpc TestConnection(TestConnectionRequest) returns (TestConnectionResponse);
+
+  // ParseConnectionString splits a URI or DSN into form fields. The password,
+  // if present, is returned separately so the UI can put it into the password
+  // field without ever storing it in params.
+  rpc ParseConnectionString(ParseConnectionStringRequest) returns (ParseConnectionStringResponse);
+}
+
+// ColorTag is the color dot shown next to a connection, e.g. red for prod.
+enum ColorTag {
+  // No color.
+  COLOR_TAG_UNSPECIFIED = 0;
+  // Red.
+  COLOR_TAG_RED = 1;
+  // Orange.
+  COLOR_TAG_ORANGE = 2;
+  // Yellow.
+  COLOR_TAG_YELLOW = 3;
+  // Green.
+  COLOR_TAG_GREEN = 4;
+  // Blue.
+  COLOR_TAG_BLUE = 5;
+  // Purple.
+  COLOR_TAG_PURPLE = 6;
+  // Gray.
+  COLOR_TAG_GRAY = 7;
+}
+
+// Connection is a saved connection profile. It never contains a password.
+message Connection {
+  // Core-assigned id. Empty on create.
+  string id = 1;
+  // Display name.
+  string name = 2;
+  // Engine id from ListEngines, e.g. "postgres".
+  string engine_id = 3;
+  // Engine-specific settings keyed by FieldSpec.key. Never holds secrets.
+  map<string, string> params = 4;
+  // Folder path in the sidebar tree, "/"-separated, e.g. "Work/Clients".
+  // Empty means the root.
+  string folder = 5;
+  // Color dot.
+  ColorTag color = 6;
+  // Production connections get safety rails (read-only MCP, confirmations).
+  bool production = 7;
+  // Output only: whether a password is stored in the keychain.
+  bool has_password = 8;
+  // Output only: creation time.
+  google.protobuf.Timestamp created_at = 9;
+  // Output only: last update time.
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// FieldKind tells the UI which input widget to render.
+enum FieldKind {
+  // Not set; render as text.
+  FIELD_KIND_UNSPECIFIED = 0;
+  // Single-line text.
+  FIELD_KIND_TEXT = 1;
+  // Integer, e.g. a port.
+  FIELD_KIND_INTEGER = 2;
+  // Secret; stored in the keychain, sent only in the password fields of
+  // requests, never in params.
+  FIELD_KIND_PASSWORD = 3;
+  // Local file path with a file picker.
+  FIELD_KIND_FILE = 4;
+  // Checkbox; value "true" or "false".
+  FIELD_KIND_BOOLEAN = 5;
+  // One of FieldSpec.options.
+  FIELD_KIND_SELECT = 6;
+}
+
+// FieldSpec describes one connection form field.
+message FieldSpec {
+  // Params key, e.g. "host".
+  string key = 1;
+  // Human label, e.g. "Host".
+  string label = 2;
+  // Widget kind.
+  FieldKind kind = 3;
+  // Whether the field must be non-empty to save.
+  bool required = 4;
+  // Default value for new connections.
+  string default_value = 5;
+  // Placeholder text.
+  string placeholder = 6;
+  // Allowed values for FIELD_KIND_SELECT.
+  repeated string options = 7;
+}
+
+// EngineInfo describes a supported engine.
+message EngineInfo {
+  // Stable id, e.g. "postgres", "cockroachdb", "sqlite".
+  string id = 1;
+  // Display name, e.g. "PostgreSQL".
+  string display_name = 2;
+  // Wire-compatible family, e.g. "postgres" for CockroachDB. Equals id for
+  // primary engines.
+  string family = 3;
+  // Form fields in display order.
+  repeated FieldSpec fields = 4;
+  // Whether ParseConnectionString accepts URIs for this engine.
+  bool supports_uri = 5;
+  // Engine capability names, e.g. "connect". Unknown names must be ignored.
+  repeated string capabilities = 6;
+  // Example URI shown as a placeholder, e.g. "postgres://user@host:5432/db".
+  string uri_example = 7;
+}
+
+// ServerInfo is what a successful test learned about the server.
+message ServerInfo {
+  // Product name, e.g. "PostgreSQL", "CockroachDB", "SQLite".
+  string product = 1;
+  // Version string, e.g. "17.11".
+  string version = 2;
+  // Full version banner if the server provides one.
+  string banner = 3;
+}
+
+// ErrorKind classifies a connection failure.
+enum ErrorKind {
+  // Unclassified failure.
+  ERROR_KIND_UNSPECIFIED = 0;
+  // Bad credentials or not permitted.
+  ERROR_KIND_AUTH = 1;
+  // Host unreachable, refused, DNS failure.
+  ERROR_KIND_NETWORK = 2;
+  // TLS handshake or certificate problem.
+  ERROR_KIND_TLS = 3;
+  // Database, file or other target does not exist.
+  ERROR_KIND_NOT_FOUND = 4;
+  // The operation exceeded its timeout.
+  ERROR_KIND_TIMEOUT = 5;
+  // The settings are invalid (missing field, bad port...).
+  ERROR_KIND_INVALID_CONFIG = 6;
+}
+
+// ConnectionError is a typed failure. The message never contains secrets.
+message ConnectionError {
+  // Failure class.
+  ErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+}
+
+// ListEnginesRequest is empty.
+message ListEnginesRequest {}
+
+// ListEnginesResponse lists supported engines.
+message ListEnginesResponse {
+  // Engines in display order.
+  repeated EngineInfo engines = 1;
+}
+
+// ListConnectionsRequest is empty.
+message ListConnectionsRequest {}
+
+// ListConnectionsResponse lists saved connections.
+message ListConnectionsResponse {
+  // Saved connections.
+  repeated Connection connections = 1;
+}
+
+// GetConnectionRequest selects a connection.
+message GetConnectionRequest {
+  // Connection id.
+  string id = 1;
+}
+
+// GetConnectionResponse holds one connection.
+message GetConnectionResponse {
+  // The connection.
+  Connection connection = 1;
+}
+
+// CreateConnectionRequest saves a new connection.
+message CreateConnectionRequest {
+  // Settings; id and output-only fields are ignored.
+  Connection connection = 1;
+  // Password to store in the keychain. Unset or empty stores none.
+  optional string password = 2;
+}
+
+// CreateConnectionResponse returns the saved connection.
+message CreateConnectionResponse {
+  // The saved connection with its new id.
+  Connection connection = 1;
+}
+
+// UpdateConnectionRequest replaces a connection's settings.
+message UpdateConnectionRequest {
+  // New settings; id selects the connection.
+  Connection connection = 1;
+  // New password. Unset keeps the stored one.
+  optional string password = 2;
+  // Remove the stored password. Ignored if password is set.
+  bool clear_password = 3;
+}
+
+// UpdateConnectionResponse returns the updated connection.
+message UpdateConnectionResponse {
+  // The updated connection.
+  Connection connection = 1;
+}
+
+// DeleteConnectionRequest selects a connection to delete.
+message DeleteConnectionRequest {
+  // Connection id.
+  string id = 1;
+}
+
+// DeleteConnectionResponse is empty.
+message DeleteConnectionResponse {}
+
+// TestConnectionRequest selects what to test. Either id, draft, or both:
+// with both, draft settings are tested and the password falls back to the
+// one stored for id (for testing while editing).
+message TestConnectionRequest {
+  // Saved connection id.
+  string id = 1;
+  // Unsaved settings to test.
+  Connection draft = 2;
+  // Password to use. Unset falls back to the keychain entry for id.
+  optional string password = 3;
+  // Timeout in milliseconds. 0 means the default (10000). The core clamps
+  // values to [1000, 60000].
+  uint32 timeout_ms = 4;
+}
+
+// TestConnectionResponse reports the test result.
+message TestConnectionResponse {
+  // Whether connect + ping succeeded.
+  bool ok = 1;
+  // Server details when ok.
+  ServerInfo server = 2;
+  // Time to establish the connection, in milliseconds.
+  uint32 connect_ms = 3;
+  // Ping round-trip latency, in milliseconds.
+  uint32 latency_ms = 4;
+  // Failure detail when not ok.
+  ConnectionError error = 5;
+}
+
+// ParseConnectionStringRequest asks the core to parse a URI or DSN.
+message ParseConnectionStringRequest {
+  // Engine id the string is for.
+  string engine_id = 1;
+  // The URI or DSN.
+  string connection_string = 2;
+}
+
+// ParseConnectionStringResponse holds the parsed fields.
+message ParseConnectionStringResponse {
+  // Params keyed by FieldSpec.key. Never holds the password.
+  map<string, string> params = 1;
+  // Password found in the string, if any.
+  optional string password = 2;
+}

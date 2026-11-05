@@ -11,9 +11,13 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/doubledare704/queravue/core/internal/connections"
+	"github.com/doubledare704/queravue/core/internal/engine/engines"
+	"github.com/doubledare704/queravue/core/internal/secrets"
 	"github.com/doubledare704/queravue/core/internal/server"
 	"github.com/doubledare704/queravue/core/internal/version"
 )
@@ -33,6 +37,8 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 	socket := fs.String("socket", getenv("QUERAVUE_SOCKET"), "Unix socket path (env QUERAVUE_SOCKET)")
 	token := fs.String("token", "", "auth token; prefer env QUERAVUE_TOKEN so it does not show in ps")
 	logLevel := fs.String("log-level", envOr(getenv, "QUERAVUE_LOG_LEVEL", "info"), "debug|info|warn|error (env QUERAVUE_LOG_LEVEL)")
+	configDir := fs.String("config-dir", getenv("QUERAVUE_CONFIG_DIR"), "directory for connections.json (env QUERAVUE_CONFIG_DIR; default: OS config dir/Queravue)")
+	secretsBackend := fs.String("secrets", envOr(getenv, "QUERAVUE_SECRETS", "keychain"), "keychain|memory (env QUERAVUE_SECRETS); memory is for tests")
 	stdinEOF := fs.Bool("exit-on-stdin-eof", false, "exit when stdin closes; set by the UI launcher")
 	showVersion := fs.Bool("version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
@@ -58,17 +64,23 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 	log := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: level}))
 	log.Info("starting", "version", version.Version, "pid", os.Getpid())
 
+	connSvc, err := newConnectionService(*configDir, *secretsBackend, log)
+	if err != nil {
+		return err
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	if *stdinEOF {
 		ctx = watchStdin(ctx, stdin, log)
 	}
 
-	err := server.Serve(ctx, server.Config{
+	err = server.Serve(ctx, server.Config{
 		SocketPath:      *socket,
 		Token:           *token,
 		ShutdownTimeout: 5 * time.Second,
 		Logger:          log,
+		Connections:     connSvc,
 	})
 	if err != nil {
 		return err
@@ -87,6 +99,32 @@ func watchStdin(parent context.Context, stdin io.Reader, log *slog.Logger) conte
 		log.Info("stdin closed; parent gone")
 	}()
 	return ctx
+}
+
+// newConnectionService builds the connection manager with all engines.
+func newConnectionService(configDir, secretsBackend string, log *slog.Logger) (*connections.Service, error) {
+	if configDir == "" {
+		base, err := os.UserConfigDir()
+		if err != nil {
+			return nil, fmt.Errorf("locate config dir: %w", err)
+		}
+		configDir = filepath.Join(base, "Queravue")
+	}
+	var store secrets.Store
+	switch secretsBackend {
+	case "keychain":
+		store = secrets.Keyring{}
+	case "memory":
+		store = secrets.NewMemory()
+	default:
+		return nil, fmt.Errorf("invalid --secrets %q: want keychain or memory", secretsBackend)
+	}
+	reg, err := engines.Registry()
+	if err != nil {
+		return nil, err
+	}
+	log.Info("config", "dir", configDir, "secrets", secretsBackend)
+	return connections.NewService(reg, connections.NewFileStore(configDir), store, connections.WithLogger(log)), nil
 }
 
 func envOr(getenv func(string) string, key, def string) string {

@@ -21,6 +21,8 @@ const (
 // Core-level capability names reported by Hello.
 const (
 	CapabilityHealth = "health"
+	// CapabilityConnections means ConnectionService is available.
+	CapabilityConnections = "connections"
 )
 
 // CoreService implements queravuev1.CoreServiceServer.
@@ -43,7 +45,7 @@ func (s *CoreService) Hello(_ context.Context, _ *queravuev1.HelloRequest) (*que
 	return &queravuev1.HelloResponse{
 		CoreVersion:     version.Version,
 		ProtocolVersion: version.ProtocolVersion,
-		Capabilities:    []string{CapabilityHealth},
+		Capabilities:    []string{CapabilityHealth, CapabilityConnections},
 	}, nil
 }
 

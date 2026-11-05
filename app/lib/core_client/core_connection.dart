@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:grpc/grpc.dart';
 
 import 'core_launcher.dart';
+import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
 
 export 'gen/queravue/v1/core.pb.dart' show HealthResponse;
@@ -30,6 +31,9 @@ abstract interface class CoreConnection {
   /// Streams heartbeats until cancelled or the core goes away.
   Stream<HealthResponse> health({int intervalMs});
 
+  /// Client for saved connections, authenticated with the core's token.
+  ConnectionServiceClient get connectionService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -41,7 +45,9 @@ typedef CoreConnector = Future<CoreConnection> Function(CoreHandle handle);
 class GrpcCoreConnection implements CoreConnection {
   GrpcCoreConnection._(this._channel, String token)
     : _client = CoreServiceClient(_channel),
-      _auth = CallOptions(metadata: {'authorization': 'Bearer $token'});
+      _auth = CallOptions(metadata: {'authorization': 'Bearer $token'}) {
+    connectionService = ConnectionServiceClient(_channel, options: _auth);
+  }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
   /// establishes it.
@@ -64,6 +70,9 @@ class GrpcCoreConnection implements CoreConnection {
   final ClientChannel _channel;
   final CoreServiceClient _client;
   final CallOptions _auth;
+
+  @override
+  late final ConnectionServiceClient connectionService;
 
   @override
   Future<CoreInfo> hello() async {

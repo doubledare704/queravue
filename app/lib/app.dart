@@ -1,9 +1,15 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core_client/core_providers.dart';
+import 'features/command_palette/command_palette.dart';
+import 'features/connections/presentation/connection_actions.dart';
+import 'features/connections/presentation/connection_details.dart';
+import 'features/connections/presentation/connection_sidebar.dart';
 import 'shared/widgets/status_bar.dart';
 
 /// Root widget.
@@ -52,20 +58,42 @@ class _QueravueAppState extends ConsumerState<QueravueApp> {
   }
 }
 
-/// Main window: an empty workspace for now, plus the status bar.
-class HomeScreen extends StatelessWidget {
+/// Main window: connection sidebar, workspace and status bar.
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  /// Cmd on macOS, Ctrl elsewhere.
+  static SingleActivator primary(LogicalKeyboardKey key) {
+    final mac = defaultTargetPlatform == TargetPlatform.macOS;
+    return SingleActivator(key, meta: mac, control: !mac);
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text(
-          'Queravue',
-          style: Theme.of(context).textTheme.headlineMedium,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return CallbackShortcuts(
+      bindings: {
+        primary(LogicalKeyboardKey.keyN): () =>
+            showConnectionDialog(context, ref),
+        primary(LogicalKeyboardKey.keyK): () =>
+            showCommandPalette(context, ref),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(width: 260, child: ConnectionSidebar()),
+              VerticalDivider(
+                width: 1,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+              const Expanded(child: ConnectionDetails()),
+            ],
+          ),
+          bottomNavigationBar: const StatusBar(),
         ),
       ),
-      bottomNavigationBar: const StatusBar(),
     );
   }
 }
