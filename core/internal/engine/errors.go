@@ -24,6 +24,12 @@ const (
 	KindNotFound
 	KindTimeout
 	KindInvalidConfig
+	// KindSQL: the server rejected a statement (syntax error, constraint...).
+	KindSQL
+	// KindCanceled: the statement was cancelled by the caller.
+	KindCanceled
+	// KindConnectionLost: the connection broke while a statement ran.
+	KindConnectionLost
 )
 
 // String implements fmt.Stringer.
@@ -41,6 +47,12 @@ func (k Kind) String() string {
 		return "timeout"
 	case KindInvalidConfig:
 		return "invalid_config"
+	case KindSQL:
+		return "sql"
+	case KindCanceled:
+		return "canceled"
+	case KindConnectionLost:
+		return "connection_lost"
 	default:
 		return "unknown"
 	}
@@ -57,6 +69,10 @@ type Error struct {
 	// Err is the underlying cause, kept for errors.Is/As. Its text is not
 	// used in Error() so a driver cannot leak secrets through it.
 	Err error
+	// Position is where in the statement text the server located the error:
+	// a 1-based character (rune) offset, or 0 if unknown. Only set for
+	// KindSQL errors.
+	Position int
 }
 
 // Error implements error.

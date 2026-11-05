@@ -6,6 +6,8 @@ import 'package:grpc/grpc.dart';
 import 'core_launcher.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
+import 'gen/queravue/v1/query.pbgrpc.dart';
+import 'gen/queravue/v1/session.pbgrpc.dart';
 
 export 'gen/queravue/v1/core.pb.dart' show HealthResponse;
 export 'gen/queravue/v1/core.pbenum.dart' show HealthStatus;
@@ -34,6 +36,12 @@ abstract interface class CoreConnection {
   /// Client for saved connections, authenticated with the core's token.
   ConnectionServiceClient get connectionService;
 
+  /// Client for live sessions, authenticated with the core's token.
+  SessionServiceClient get sessionService;
+
+  /// Client for running statements and reading results.
+  QueryServiceClient get queryService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -47,6 +55,8 @@ class GrpcCoreConnection implements CoreConnection {
     : _client = CoreServiceClient(_channel),
       _auth = CallOptions(metadata: {'authorization': 'Bearer $token'}) {
     connectionService = ConnectionServiceClient(_channel, options: _auth);
+    sessionService = SessionServiceClient(_channel, options: _auth);
+    queryService = QueryServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -73,6 +83,12 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final ConnectionServiceClient connectionService;
+
+  @override
+  late final SessionServiceClient sessionService;
+
+  @override
+  late final QueryServiceClient queryService;
 
   @override
   Future<CoreInfo> hello() async {

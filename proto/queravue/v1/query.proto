@@ -1,0 +1,369 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// QueryService runs statements on a session and serves their results.
+//
+// Every statement gets a result_id. Its rows are spooled to disk by the core
+// in pages, so Execute only streams the first window of rows; the UI reads
+// the rest with FetchRows and CopyRange. Results live until CloseResult or
+// until their session closes.
+service QueryService {
+  // Execute splits `text` into statements according to `mode`, runs them one
+  // after another on the session and streams events: the plan, then for each
+  // statement StatementStarted, Columns, the first window of Rows, Progress
+  // updates and a Summary. Execution stops at the first failing statement
+  // (an Error event). Rows past the first window are never sent on this
+  // stream. Cancelling the call cancels the running statement.
+  // FAILED_PRECONDITION if the session is already running a statement.
+  rpc Execute(ExecuteRequest) returns (stream ExecuteResponse);
+
+  // FetchRows returns rows [offset, offset+limit) of a spooled result. It
+  // may return fewer rows if the result is shorter or still being spooled.
+  // NOT_FOUND if the result is unknown or closed.
+  rpc FetchRows(FetchRowsRequest) returns (FetchRowsResponse);
+
+  // Cancel stops the statement currently running on a session, on the server
+  // as well as in the core. Succeeds if nothing is running.
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  // CloseResult discards a result and deletes its spool file. Closing an
+  // unknown result succeeds.
+  rpc CloseResult(CloseResultRequest) returns (CloseResultResponse);
+
+  // CopyRange formats a row range of a result as text and streams it in
+  // chunks, so large copies never load the range into memory. Honours
+  // cancellation. NOT_FOUND if the result is unknown or closed.
+  rpc CopyRange(CopyRangeRequest) returns (stream CopyRangeResponse);
+}
+
+// ExecuteMode selects which statements of the text run.
+enum ExecuteMode {
+  // Not set. Treated as STATEMENT_AT_CURSOR.
+  EXECUTE_MODE_UNSPECIFIED = 0;
+  // Run the statement containing cursor_offset.
+  EXECUTE_MODE_STATEMENT_AT_CURSOR = 1;
+  // Run every statement inside `selection`.
+  EXECUTE_MODE_SELECTION = 2;
+  // Run every statement in the text.
+  EXECUTE_MODE_ALL = 3;
+}
+
+// TextRange is a half-open range [start, end) of the editor text. All offsets
+// in this contract are UTF-16 code units, as used by Dart strings.
+message TextRange {
+  // First code unit of the range.
+  uint32 start = 1;
+  // One past the last code unit of the range.
+  uint32 end = 2;
+}
+
+// ValueKind is the general kind of a column, for alignment and formatting.
+enum ValueKind {
+  // Unknown; values arrive as text.
+  VALUE_KIND_UNSPECIFIED = 0;
+  // Boolean.
+  VALUE_KIND_BOOL = 1;
+  // 64-bit integer.
+  VALUE_KIND_INT = 2;
+  // 64-bit floating point.
+  VALUE_KIND_FLOAT = 3;
+  // Exact decimal, carried as a string.
+  VALUE_KIND_DECIMAL = 4;
+  // Text.
+  VALUE_KIND_TEXT = 5;
+  // Binary data.
+  VALUE_KIND_BYTES = 6;
+  // Timestamp with time zone.
+  VALUE_KIND_TIMESTAMPTZ = 7;
+  // JSON document, carried as text.
+  VALUE_KIND_JSON = 8;
+  // UUID, carried as its canonical text form.
+  VALUE_KIND_UUID = 9;
+  // Array of values.
+  VALUE_KIND_ARRAY = 10;
+}
+
+// Column describes one result column.
+message Column {
+  // Column name as reported by the server.
+  string name = 1;
+  // Engine-native type name, e.g. "int4", "numeric", "TEXT".
+  string type_name = 2;
+  // General kind of the values in this column.
+  ValueKind kind = 3;
+}
+
+// ArrayValue is a (possibly nested) array.
+message ArrayValue {
+  // Elements in order.
+  repeated Value values = 1;
+}
+
+// Value is one cell. Types without a dedicated case (dates without time
+// zone, intervals, ranges, geometry, unknown types...) arrive as text_value.
+message Value {
+  // The cell content. Unset is treated as NULL.
+  oneof kind {
+    // SQL NULL.
+    google.protobuf.NullValue null_value = 1;
+    // Boolean.
+    bool bool_value = 2;
+    // Integer.
+    int64 int_value = 3;
+    // Floating point.
+    double double_value = 4;
+    // Exact decimal in its text form, e.g. "12345678901234567890.12".
+    string decimal_value = 5;
+    // Text, and the fallback for unknown types.
+    string text_value = 6;
+    // Binary data.
+    bytes bytes_value = 7;
+    // Timestamp with time zone. Infinite values arrive as text_value.
+    google.protobuf.Timestamp timestamp_value = 8;
+    // JSON text.
+    string json_value = 9;
+    // UUID in canonical form.
+    string uuid_value = 10;
+    // Array.
+    ArrayValue array_value = 11;
+  }
+}
+
+// Row is one result row; values line up with the result's columns.
+message Row {
+  // One value per column.
+  repeated Value values = 1;
+}
+
+// RowBatch is a group of rows. The core uses it as the on-disk page format of
+// its result spool; it is part of the contract so UI test fixtures can build
+// pages with the same type.
+message RowBatch {
+  // Rows in order.
+  repeated Row rows = 1;
+}
+
+// StatementRange locates one statement in the executed text.
+message StatementRange {
+  // Zero-based position of the statement among those that run.
+  uint32 index = 1;
+  // Where the statement sits in the request text.
+  TextRange range = 2;
+}
+
+// ExecuteRequest is the input of Execute.
+message ExecuteRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Full editor text.
+  string text = 2;
+  // Caret position in `text`, used by STATEMENT_AT_CURSOR.
+  uint32 cursor_offset = 3;
+  // Which statements to run.
+  ExecuteMode mode = 4;
+  // Selected range, used by SELECTION.
+  TextRange selection = 5;
+  // Bind parameters for a single statement. Reserved for later use; the
+  // current UI sends none.
+  repeated Value params = 6;
+}
+
+// QueryErrorKind classifies a statement failure.
+enum QueryErrorKind {
+  // Unclassified failure.
+  QUERY_ERROR_KIND_UNSPECIFIED = 0;
+  // The server rejected the statement (syntax error, constraint, ...).
+  QUERY_ERROR_KIND_SQL = 1;
+  // The statement was cancelled.
+  QUERY_ERROR_KIND_CANCELED = 2;
+  // The connection was lost.
+  QUERY_ERROR_KIND_CONNECTION = 3;
+  // The session's engine cannot execute statements.
+  QUERY_ERROR_KIND_UNSUPPORTED = 4;
+}
+
+// StatementPlan lists the statements an Execute call is about to run. It is
+// the first event, so the UI can highlight them.
+message StatementPlan {
+  // Statements in execution order. Empty if the text holds no statement.
+  repeated StatementRange statements = 1;
+}
+
+// StatementStarted announces a statement and its result id.
+message StatementStarted {
+  // Index into the plan.
+  uint32 statement_index = 1;
+  // Id of the (future) result; use it with FetchRows, CopyRange, CloseResult.
+  string result_id = 2;
+}
+
+// Columns carries the column metadata of a statement that returns rows.
+message Columns {
+  // Index into the plan.
+  uint32 statement_index = 1;
+  // Result columns.
+  repeated Column columns = 2;
+}
+
+// RowsWindow carries the first window of rows of a result.
+message RowsWindow {
+  // Index into the plan.
+  uint32 statement_index = 1;
+  // Row index of rows[0]; always 0 on this stream.
+  uint64 offset = 2;
+  // At most one page of rows.
+  repeated Row rows = 3;
+}
+
+// Progress reports spooling progress, at most about ten times per second.
+message Progress {
+  // Index into the plan.
+  uint32 statement_index = 1;
+  // Rows written to the spool so far; rows below this can be fetched.
+  uint64 rows_spooled = 2;
+  // True once the server has sent all rows or reading stopped (truncated).
+  bool done = 3;
+}
+
+// Summary ends a statement.
+message Summary {
+  // Index into the plan.
+  uint32 statement_index = 1;
+  // Rows affected by INSERT/UPDATE/DELETE; 0 for statements that return rows.
+  uint64 rows_affected = 2;
+  // Rows in the spool when the statement finished.
+  uint64 rows_spooled = 3;
+  // Wall time of the statement.
+  google.protobuf.Duration duration = 4;
+  // Server notices and warnings raised by the statement.
+  repeated string notices = 5;
+  // True if reading stopped at the spool size cap; rows_spooled is then
+  // less than the full result.
+  bool truncated = 6;
+  // True if the statement returned a result set (even an empty one).
+  bool has_rows = 7;
+}
+
+// ExecuteError ends an Execute call with a failed statement.
+message ExecuteError {
+  // Index into the plan; unset values mean the failure was not tied to one
+  // statement.
+  uint32 statement_index = 1;
+  // Failure class.
+  QueryErrorKind kind = 2;
+  // Human-readable message. Never contains secrets.
+  string message = 3;
+  // Offset of the error inside the request text, if the server reported one.
+  optional uint32 position = 4;
+  // Elapsed time until the failure.
+  google.protobuf.Duration duration = 5;
+}
+
+// ExecuteResponse is one event of an Execute stream.
+message ExecuteResponse {
+  // The event.
+  oneof event {
+    // First event: the statements that will run.
+    StatementPlan plan = 1;
+    // A statement starts.
+    StatementStarted started = 2;
+    // Column metadata.
+    Columns columns = 3;
+    // First window of rows.
+    RowsWindow rows = 4;
+    // Spooling progress.
+    Progress progress = 5;
+    // A statement finished.
+    Summary summary = 6;
+    // A statement failed; the stream ends after this event.
+    ExecuteError error = 7;
+  }
+}
+
+// FetchRowsRequest selects a row range.
+message FetchRowsRequest {
+  // Result id from StatementStarted.
+  string result_id = 1;
+  // Index of the first row.
+  uint64 offset = 2;
+  // Maximum rows to return. The core clamps it to 5000; 0 means 500.
+  uint32 limit = 3;
+}
+
+// FetchRowsResponse holds the requested rows.
+message FetchRowsResponse {
+  // Index of rows[0].
+  uint64 offset = 1;
+  // The rows; fewer than requested at the end of the result.
+  repeated Row rows = 2;
+  // Rows spooled so far.
+  uint64 rows_spooled = 3;
+  // True once the result is fully spooled.
+  bool done = 4;
+}
+
+// CancelRequest names the session whose statement to cancel.
+message CancelRequest {
+  // Session id.
+  string session_id = 1;
+}
+
+// CancelResponse is empty.
+message CancelResponse {}
+
+// CloseResultRequest names the result to discard.
+message CloseResultRequest {
+  // Result id.
+  string result_id = 1;
+}
+
+// CloseResultResponse is empty.
+message CloseResultResponse {}
+
+// CopyFormat is the text format of CopyRange.
+enum CopyFormat {
+  // Not set. Treated as TSV.
+  COPY_FORMAT_UNSPECIFIED = 0;
+  // Tab-separated values, newline per row. NULL is an empty field; fields with
+  // tabs, newlines or quotes are double-quoted.
+  COPY_FORMAT_TSV = 1;
+  // Comma-separated values with RFC 4180 quoting. NULL is an empty field.
+  COPY_FORMAT_CSV = 2;
+  // JSON array of objects keyed by column name.
+  COPY_FORMAT_JSON = 3;
+}
+
+// RowRange is a half-open range [start, end) of row indices.
+message RowRange {
+  // First row.
+  uint64 start = 1;
+  // One past the last row; 0 or beyond the result means to the end.
+  uint64 end = 2;
+}
+
+// CopyRangeRequest selects what to copy.
+message CopyRangeRequest {
+  // Result id.
+  string result_id = 1;
+  // Rows to copy.
+  RowRange row_range = 2;
+  // Columns to copy, in output order. Empty means all columns.
+  repeated uint32 column_indices = 3;
+  // Output format.
+  CopyFormat format = 4;
+  // Write a header line (TSV/CSV). JSON always uses column names as keys.
+  bool include_header = 5;
+}
+
+// CopyRangeResponse is one chunk of formatted text.
+message CopyRangeResponse {
+  // Text to append to the output. Chunks are about 64 KiB.
+  string text = 1;
+  // Rows formatted so far, for progress display.
+  uint64 rows_written = 2;
+}

@@ -47,6 +47,8 @@ Use **`re_editor`** (with `re_highlight` for SQL grammars) for the SQL editor in
 - re_editor is mainly maintained by one company (Reqable). It is MIT, so a fork is possible if it stalls.
 - Highlighting runs in an isolate, so very large files show plain text for a moment before colours appear. That is acceptable, and it is what keeps typing at about 1 ms of UI work.
 
+- **No range decorations (found in Iteration 2).** re_editor can only highlight its own selection and find matches, so the statement that ran or failed is marked in the gutter (▸ ran, ✕ failed, via `DefaultCodeLineNumber.customLineIndex2Text`) and a failure moves the caret to the position the server reported. A real underline would need an upstream change or a fork.
+
 ## Alternatives considered
 - **flutter_code_editor:** rejected. Every keystroke re-highlights and re-lays out the whole document on the UI thread (4.2 s per keystroke on 5k lines). It also has no replace and its completion popup can't be customised.
 - **Wrapping a web editor (Monaco/CodeMirror) in a webview:** out of scope by ADR 0001 (no webview).

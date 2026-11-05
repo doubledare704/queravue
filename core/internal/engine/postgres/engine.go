@@ -77,7 +77,7 @@ func New(v Variant) *Engine {
 				{Key: ParamPassword, Label: "Password", Kind: engine.FieldPassword},
 				{Key: ParamSSLMode, Label: "SSL mode", Kind: engine.FieldSelect, Default: "prefer", Options: SSLModes},
 			},
-			Capabilities: []engine.Capability{engine.CapConnect},
+			Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute},
 		},
 	}
 }
@@ -104,11 +104,13 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	if err != nil {
 		return nil, err
 	}
+	nt := &notices{}
+	connCfg.OnNotice = nt.add
 	conn, err := pgx.ConnectConfig(ctx, connCfg)
 	if err != nil {
 		return nil, classify(e.desc.ID, "connect", err, secret)
 	}
-	return &Conn{id: e.desc.ID, variant: e.variant, conn: conn, secret: secret}, nil
+	return &Conn{id: e.desc.ID, variant: e.variant, conn: conn, secret: secret, notices: nt}, nil
 }
 
 // connConfig builds a pgx config from params only. The password is set on the
@@ -139,6 +141,9 @@ func (e *Engine) connConfig(cfg engine.Config, secret engine.Secret) (*pgx.ConnC
 	connCfg.Password = secret.Reveal()
 	// Each connection is short-lived in It. 1; skip the statement cache.
 	connCfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	// A cancelled context sends a native cancel request instead of killing
+	// the socket, so the server stops the query and the session survives.
+	connCfg.BuildContextWatcherHandler = buildWatcher
 	return connCfg, nil
 }
 
@@ -153,6 +158,7 @@ type Conn struct {
 	id      string
 	variant Variant
 	secret  engine.Secret
+	notices *notices
 
 	mu   sync.Mutex
 	conn *pgx.Conn

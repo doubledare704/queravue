@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../connections/application/connections_controller.dart';
 import '../connections/presentation/connection_actions.dart';
+import '../editor/application/editor_actions.dart';
+import '../editor/domain/query_models.dart';
 
 /// One palette entry.
 class PaletteCommand {
@@ -31,6 +33,36 @@ final paletteCommandsProvider = Provider<List<PaletteCommand>>((ref) {
       title: 'New connection',
       shortcut: '⌘N',
       run: showConnectionDialog,
+    ),
+    PaletteCommand(
+      id: 'editor.new',
+      title: 'New query tab',
+      shortcut: '⌘T',
+      run: (context, ref) async => openQueryTab(ref),
+    ),
+    PaletteCommand(
+      id: 'editor.close',
+      title: 'Close query tab',
+      shortcut: '⌘W',
+      run: (context, ref) async => closeQueryTab(ref),
+    ),
+    PaletteCommand(
+      id: 'editor.run',
+      title: 'Run statement at cursor',
+      shortcut: '⌘↵',
+      run: (context, ref) => runActiveTab(ref, ExecuteMode.statementAtCursor),
+    ),
+    PaletteCommand(
+      id: 'editor.runAll',
+      title: 'Run all statements',
+      shortcut: '⌘⇧↵',
+      run: (context, ref) => runActiveTab(ref, ExecuteMode.all),
+    ),
+    PaletteCommand(
+      id: 'editor.cancel',
+      title: 'Cancel running statement',
+      shortcut: 'Esc',
+      run: (context, ref) => cancelActiveTab(ref),
     ),
     for (final c in conns)
       PaletteCommand(
