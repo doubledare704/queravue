@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "dart": {
+      "command": "dart",
+      "args": ["mcp-server", "--enable", "run_tests", "--enable", "dart_format", "--enable", "dart_fix"]
+    },
+    "gopls": {
+      "command": "gopls",
+      "args": ["mcp"]
+    }
+  }
+}

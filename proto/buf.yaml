@@ -1,0 +1,10 @@
+# Buf workspace for the Queravue UI <-> core contract.
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+breaking:
+  use:
+    - FILE
