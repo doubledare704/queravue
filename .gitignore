@@ -36,3 +36,7 @@ app/macos/Pods/
 # Local env
 dev/.env
 .env.local
+
+# Iteration 2 spikes: build output and run logs
+spikes/**/build/
+spikes/**/*.log
