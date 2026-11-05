@@ -122,7 +122,39 @@ Future<void> tapCell(WidgetTester tester, Finder f) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
+/// Goldens render slightly differently across macOS versions (anti-aliasing),
+/// so allow a tiny pixel difference instead of requiring identical bytes.
+class _TolerantComparator extends LocalFileComparator {
+  _TolerantComparator(super.testFile, {required this.tolerance});
+
+  final double tolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    if (!result.passed && result.diffPercent <= tolerance) return true;
+    if (!result.passed) {
+      final error = await generateFailureOutput(result, golden, basedir);
+      throw FlutterError(error);
+    }
+    return true;
+  }
+}
+
 void main() {
+  setUpAll(() {
+    final current = goldenFileComparator;
+    if (current is LocalFileComparator) {
+      goldenFileComparator = _TolerantComparator(
+        Uri.parse('${current.basedir}result_grid_test.dart'),
+        tolerance: 0.005, // 0.5 % of pixels
+      );
+    }
+  });
+
   testWidgets('renders header, row numbers, values and NULL', (tester) async {
     await pumpGrid(tester);
     expect(find.text('id'), findsOneWidget);
