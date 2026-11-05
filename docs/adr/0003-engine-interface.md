@@ -32,13 +32,14 @@ type Conn interface {                    // one live connection
 ```go
 // Executor is implemented by Conns with CapExecute.
 type Executor interface {
-    Execute(ctx context.Context, stmt Statement, sink RowSink) error
+    Execute(ctx context.Context, stmt Statement, sink RowSink) (Summary, error)
 }
 type RowSink interface {
     Columns(cols []Column) error
     Batch(rows [][]Value) error   // ≤ 500 rows per call; returning an error stops the query
 }
 ```
+- `Statement` is `{SQL, Params}`; `Summary` is rows affected, duration and notices; notices are collected by the driver. See ADR 0006.
 - Add `CapExecute → reflect.TypeFor[Executor]()` to `CapabilityInterfaces`, and add `CapExecute` to the descriptors of engines that implement it.
 - The gRPC handler drives a `RowSink` that forwards each batch to the server stream. Back-pressure comes from `stream.Send` blocking, and cancellation from the stream context. Nothing collects a full result set.
 - `Conn` and `Engine` keep their current methods. The `Conn` returned by `Connect` simply gains a method. Session pooling (one long-lived `Conn` per open connection) is added in the API layer, not in this interface.

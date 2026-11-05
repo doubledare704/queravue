@@ -22,8 +22,10 @@ const (
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
 // them. Registry tests use it to check that declared capabilities match what a
-// Conn implements. Iteration 2 adds CapExecute → Executor here.
-var CapabilityInterfaces = map[Capability]reflect.Type{}
+// Conn implements.
+var CapabilityInterfaces = map[Capability]reflect.Type{
+	CapExecute: reflect.TypeFor[Executor](),
+}
 
 // FieldKind tells the UI which input widget to render.
 type FieldKind int

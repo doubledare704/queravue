@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/connections.proto";
+
+// SessionService manages live database sessions. A session holds one open
+// connection to a saved connection profile; queries on a session run one at a
+// time. Sessions that stay idle too long are closed by the core.
+service SessionService {
+  // Open connects using a saved connection profile and returns a session id.
+  // NOT_FOUND if the connection id is unknown. Connection failures (bad
+  // credentials, unreachable host...) are reported in-band in `error`.
+  // Honours cancellation.
+  rpc Open(OpenRequest) returns (OpenResponse);
+
+  // Close ends a session, cancels any running statement and deletes the
+  // session's spooled results. Closing an unknown or already closed session
+  // succeeds.
+  rpc Close(CloseRequest) returns (CloseResponse);
+}
+
+// OpenRequest selects the saved connection to open.
+message OpenRequest {
+  // Id of a saved connection (see ConnectionService).
+  string connection_id = 1;
+}
+
+// OpenResponse carries the new session or the reason it could not be opened.
+message OpenResponse {
+  // Id of the new session. Empty if `error` is set.
+  string session_id = 1;
+  // Server product and version the session is connected to.
+  ServerInfo server_info = 2;
+  // Capability names of the session's engine, e.g. "execute". The UI enables
+  // features from these names, never from engine ids. Unknown names must be
+  // ignored.
+  repeated string capabilities = 3;
+  // Set when the connection could not be opened.
+  ConnectionError error = 4;
+}
+
+// CloseRequest names the session to close.
+message CloseRequest {
+  // Session id from Open.
+  string session_id = 1;
+}
+
+// CloseResponse is empty.
+message CloseResponse {}

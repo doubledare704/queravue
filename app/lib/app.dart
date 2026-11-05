@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core_client/core_providers.dart';
 import 'features/command_palette/command_palette.dart';
 import 'features/connections/presentation/connection_actions.dart';
-import 'features/connections/presentation/connection_details.dart';
 import 'features/connections/presentation/connection_sidebar.dart';
+import 'features/editor/application/editor_actions.dart';
+import 'features/editor/domain/query_models.dart';
+import 'features/editor/presentation/workspace.dart';
+import 'shared/shortcuts.dart';
 import 'shared/widgets/status_bar.dart';
 
 /// Root widget.
@@ -63,10 +65,8 @@ class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   /// Cmd on macOS, Ctrl elsewhere.
-  static SingleActivator primary(LogicalKeyboardKey key) {
-    final mac = defaultTargetPlatform == TargetPlatform.macOS;
-    return SingleActivator(key, meta: mac, control: !mac);
-  }
+  static SingleActivator primary(LogicalKeyboardKey key) =>
+      primaryShortcut(key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,6 +76,14 @@ class HomeScreen extends ConsumerWidget {
             showConnectionDialog(context, ref),
         primary(LogicalKeyboardKey.keyK): () =>
             showCommandPalette(context, ref),
+        primaryShortcut(LogicalKeyboardKey.enter): () =>
+            runActiveTab(ref, ExecuteMode.statementAtCursor),
+        primaryShortcut(LogicalKeyboardKey.enter, shift: true): () =>
+            runActiveTab(ref, ExecuteMode.all),
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            cancelActiveTab(ref),
+        primary(LogicalKeyboardKey.keyT): () => openQueryTab(ref),
+        primary(LogicalKeyboardKey.keyW): () => closeQueryTab(ref),
       },
       child: Focus(
         autofocus: true,
@@ -88,7 +96,7 @@ class HomeScreen extends ConsumerWidget {
                 width: 1,
                 color: Theme.of(context).colorScheme.outlineVariant,
               ),
-              const Expanded(child: ConnectionDetails()),
+              const Expanded(child: Workspace()),
             ],
           ),
           bottomNavigationBar: const StatusBar(),

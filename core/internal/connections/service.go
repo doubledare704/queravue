@@ -362,6 +362,47 @@ func (s *Service) Test(ctx context.Context, req TestRequest) (TestResult, error)
 	return res, nil
 }
 
+// Open connects to a saved connection and returns the live Conn together with
+// its engine's descriptor. The caller owns the Conn and must Close it. ctx
+// bounds only the connect; failures are *engine.Error (or ErrNotFound).
+func (s *Service) Open(ctx context.Context, id string) (engine.Conn, engine.Descriptor, error) {
+	c, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, engine.Descriptor{}, err
+	}
+	eng, ok := s.registry.Get(c.EngineID)
+	if !ok {
+		return nil, engine.Descriptor{}, engine.Errorf(engine.KindInvalidConfig, c.EngineID, "open", "unknown engine %q", c.EngineID)
+	}
+	var secret engine.Secret
+	if c.SecretRef != "" {
+		pw, err := s.secrets.Get(c.SecretRef)
+		switch {
+		case errors.Is(err, secrets.ErrNotFound):
+		case err != nil:
+			s.log.Warn("read secret", "connection", c.ID, "err", err)
+			return nil, engine.Descriptor{}, engine.Errorf(engine.KindUnknown, c.EngineID, "open", "could not read the password from the keychain")
+		default:
+			secret = engine.NewSecret(pw)
+		}
+	}
+	cctx, cancel := context.WithTimeout(ctx, DefaultTestTimeout)
+	defer cancel()
+	conn, err := eng.Connect(cctx, engine.Config{EngineID: c.EngineID, Params: c.Params}, secret)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, engine.Descriptor{}, fmt.Errorf("connections: open: %w", ctx.Err())
+		}
+		e := asEngineError(c.EngineID, err, secret)
+		if errors.Is(cctx.Err(), context.DeadlineExceeded) {
+			e = &engine.Error{Kind: engine.KindTimeout, Engine: e.Engine, Op: e.Op,
+				Msg: fmt.Sprintf("timed out after %s", DefaultTestTimeout), Err: e}
+		}
+		return nil, engine.Descriptor{}, e
+	}
+	return conn, eng.Descriptor(), nil
+}
+
 func runTest(ctx context.Context, eng engine.Engine, cfg engine.Config, secret engine.Secret) (TestResult, error) {
 	var res TestResult
 	start := time.Now()

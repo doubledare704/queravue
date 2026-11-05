@@ -7,4 +7,4 @@ var Version = "0.1.0-dev"
 
 // ProtocolVersion is the revision of the queravue.v1 contract this core
 // implements. Bump it whenever RPCs are added.
-const ProtocolVersion uint32 = 2
+const ProtocolVersion uint32 = 3

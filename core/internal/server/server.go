@@ -16,6 +16,8 @@ import (
 	"github.com/doubledare704/queravue/core/internal/api"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/results"
+	"github.com/doubledare704/queravue/core/internal/session"
 )
 
 // Config configures Serve.
@@ -32,6 +34,10 @@ type Config struct {
 	OnListening func()
 	// Connections backs ConnectionService. Nil leaves the service unregistered.
 	Connections *connections.Service
+	// Sessions and Results back SessionService and QueryService. Both must be
+	// set to register them.
+	Sessions *session.Manager
+	Results  *results.Manager
 }
 
 // Serve listens on cfg.SocketPath and serves until ctx is cancelled, then
@@ -67,6 +73,10 @@ func Serve(ctx context.Context, cfg Config) error {
 	queravuev1.RegisterCoreServiceServer(srv, api.NewCoreService(draining))
 	if cfg.Connections != nil {
 		queravuev1.RegisterConnectionServiceServer(srv, api.NewConnectionService(cfg.Connections))
+	}
+	if cfg.Sessions != nil && cfg.Results != nil {
+		queravuev1.RegisterSessionServiceServer(srv, api.NewSessionService(cfg.Sessions))
+		queravuev1.RegisterQueryServiceServer(srv, api.NewQueryService(cfg.Sessions, cfg.Results, log))
 	}
 
 	serveErr := make(chan error, 1)

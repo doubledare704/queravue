@@ -4,10 +4,10 @@ VERSION    ?= 0.1.0-dev
 CORE_BIN   := core/bin/queravued
 LDFLAGS    := -s -w -X github.com/doubledare704/queravue/core/internal/version.Version=$(VERSION)
 COMPOSE    := docker compose -f dev/docker-compose.yml
-DART_FILES  = $(shell find app/lib app/test app/integration_test -name '*.dart' -not -path '*/gen/*')
+DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-integration test-e2e lint lint-proto lint-core lint-app db-up db-down
+.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-perf lint lint-proto lint-core lint-app db-up db-down
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -36,7 +36,10 @@ test-integration: db-up ## Run core integration tests against the docker DBs (QU
 	cd core && go test -count=1 -tags=integration ./...
 
 test-e2e: core ## Run the macOS integration test (real app + core, kill -9 recovery)
-	cd app && flutter test integration_test -d macos
+	cd app && flutter test integration_test/core_lifecycle_test.dart -d macos
+
+test-perf: db-up core ## Grid perf budget: 1M rows through the real core and Postgres (profile build)
+	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart
 
 lint: lint-proto lint-core lint-app ## Run all linters
 

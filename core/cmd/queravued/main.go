@@ -12,13 +12,16 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine/engines"
+	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/secrets"
 	"github.com/doubledare704/queravue/core/internal/server"
+	"github.com/doubledare704/queravue/core/internal/session"
 	"github.com/doubledare704/queravue/core/internal/version"
 )
 
@@ -39,6 +42,8 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 	logLevel := fs.String("log-level", envOr(getenv, "QUERAVUE_LOG_LEVEL", "info"), "debug|info|warn|error (env QUERAVUE_LOG_LEVEL)")
 	configDir := fs.String("config-dir", getenv("QUERAVUE_CONFIG_DIR"), "directory for connections.json (env QUERAVUE_CONFIG_DIR; default: OS config dir/Queravue)")
 	secretsBackend := fs.String("secrets", envOr(getenv, "QUERAVUE_SECRETS", "keychain"), "keychain|memory (env QUERAVUE_SECRETS); memory is for tests")
+	spoolCap := fs.Int64("spool-cap", envInt(getenv, "QUERAVUE_SPOOL_CAP", results.DefaultCap), "max bytes of spooled rows per result (env QUERAVUE_SPOOL_CAP)")
+	sessionIdle := fs.Duration("session-idle", session.DefaultIdleTimeout, "close sessions idle for this long")
 	stdinEOF := fs.Bool("exit-on-stdin-eof", false, "exit when stdin closes; set by the UI launcher")
 	showVersion := fs.Bool("version", false, "print version and exit")
 	if err := fs.Parse(args); err != nil {
@@ -69,6 +74,15 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		return err
 	}
 
+	spools, err := results.NewManager(results.DefaultBaseDir(), *spoolCap, log)
+	if err != nil {
+		return err
+	}
+	defer spools.Shutdown()
+	sessions := session.NewManager(connSvc, session.WithIdleTimeout(*sessionIdle), session.WithLogger(log),
+		session.WithOnClose(spools.CloseSession))
+	defer sessions.Shutdown()
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	if *stdinEOF {
@@ -81,6 +95,8 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		ShutdownTimeout: 5 * time.Second,
 		Logger:          log,
 		Connections:     connSvc,
+		Sessions:        sessions,
+		Results:         spools,
 	})
 	if err != nil {
 		return err
@@ -125,6 +141,13 @@ func newConnectionService(configDir, secretsBackend string, log *slog.Logger) (*
 	}
 	log.Info("config", "dir", configDir, "secrets", secretsBackend)
 	return connections.NewService(reg, connections.NewFileStore(configDir), store, connections.WithLogger(log)), nil
+}
+
+func envInt(getenv func(string) string, key string, def int64) int64 {
+	if v, err := strconv.ParseInt(getenv(key), 10, 64); err == nil && v > 0 {
+		return v
+	}
+	return def
 }
 
 func envOr(getenv func(string) string, key, def string) string {

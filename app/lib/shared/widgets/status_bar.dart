@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core_client/core_supervisor.dart';
 import '../../features/core_status/core_status_controller.dart';
+import '../../features/editor/application/query_status.dart';
 
 /// Bottom status bar showing the core sidecar's state.
 class StatusBar extends ConsumerWidget {
@@ -48,6 +49,12 @@ class StatusBar extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              const Spacer(),
+              Text(
+                ref.watch(queryStatusProvider).text,
+                key: const Key('query-status'),
+                style: Theme.of(context).textTheme.labelSmall,
               ),
             ],
           ),

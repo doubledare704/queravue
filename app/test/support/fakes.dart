@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
 import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/session.pbgrpc.dart';
 import 'package:queravue/core_client/core_launcher.dart';
 
 class FakeCoreHandle implements CoreHandle {
@@ -102,6 +104,14 @@ class FakeCoreConnection implements CoreConnection {
   @override
   ConnectionServiceClient get connectionService =>
       throw UnimplementedError('use a fake ConnectionsRepository');
+
+  @override
+  SessionServiceClient get sessionService =>
+      throw UnimplementedError('use a fake QueryRepository');
+
+  @override
+  QueryServiceClient get queryService =>
+      throw UnimplementedError('use a fake QueryRepository');
 
   @override
   Future<void> close() async {
