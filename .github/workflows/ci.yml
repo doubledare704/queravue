@@ -29,6 +29,9 @@ jobs:
           breaking: ${{ github.event_name == 'pull_request' }}
           breaking_against: ${{ github.event.repository.clone_url }}#branch=${{ github.base_ref }},subdir=proto
           push: false
+          # The workflow token is read-only; posting a PR summary comment
+          # would need pull-requests: write.
+          pr_comment: false
       - name: Generated code is up to date
         run: |
           cd proto && buf generate
