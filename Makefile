@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-e2e lint lint-proto lint-core lint-app db-up db-down
+.PHONY: help proto core app-run test test-core test-app test-integration test-e2e lint lint-proto lint-core lint-app db-up db-down
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -32,6 +32,9 @@ test-core:
 test-app:
 	cd app && flutter test
 
+test-integration: db-up ## Run core integration tests against the docker DBs (QUERAVUE_IT_KEYCHAIN=1 uses the real keychain)
+	cd core && go test -count=1 -tags=integration ./...
+
 test-e2e: core ## Run the macOS integration test (real app + core, kill -9 recovery)
 	cd app && flutter test integration_test -d macos
 
@@ -41,7 +44,7 @@ lint-proto:
 	cd proto && buf format --diff --exit-code && buf lint
 
 lint-core:
-	cd core && golangci-lint run
+	cd core && golangci-lint run --build-tags=integration
 
 lint-app:
 	cd app && flutter analyze

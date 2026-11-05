@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -24,8 +25,8 @@ func TestHello(t *testing.T) {
 	if resp.GetProtocolVersion() != version.ProtocolVersion {
 		t.Errorf("protocol_version = %d, want %d", resp.GetProtocolVersion(), version.ProtocolVersion)
 	}
-	if got := resp.GetCapabilities(); len(got) != 1 || got[0] != CapabilityHealth {
-		t.Errorf("capabilities = %v, want [%s]", got, CapabilityHealth)
+	if got := resp.GetCapabilities(); !slices.Equal(got, []string{CapabilityHealth, CapabilityConnections}) {
+		t.Errorf("capabilities = %v, want [%s %s]", got, CapabilityHealth, CapabilityConnections)
 	}
 }
 
