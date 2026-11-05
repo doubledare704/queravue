@@ -1,6 +1,6 @@
 # ADR 0005 — SQL editor: re_editor
 
-**Status:** Proposed · 2026-11-05
+**Status:** Accepted · 2026-11-05
 
 ## Context
 ROADMAP It. 2 needs a SQL editor with syntax highlighting, run statement or selection, and cancel. It. 8 adds schema-aware autocomplete (≤ 50 ms, PRD) and richer editing. The editor must stay responsive on large scripts and must let us render our own completion popup, fed by schema metadata from core. Candidates: `re_editor` and `flutter_code_editor`.
@@ -27,7 +27,7 @@ Code is in `spikes/editor/`; method is in `spikes/README.md`.
 | Replace / replace all | **yes** (replace-all of 119 in 24 ms) | **no** |
 | Multi-cursor / column selection | no (single `CodeLineSelection`) | no (single `TextSelection`) |
 | Custom completion popup | **yes**: `CodeAutocomplete.viewBuilder` returns our widget; prompts come from a `CodeAutocompletePromptsBuilder` | no: the popup is a private built-in `Popup`; only the word list can be changed |
-| Popup opens on typed input (spike check) | **not confirmed.** The API hook compiles and is used by re_editor's own example. Our automated test could not open it: programmatic edits don't trigger it by design, and typing through `TestTextInput` didn't either. Manual check: `flutter run -d macos -t lib/entry/re_editor.dart`, Load, type `cust` on an empty line | n/a |
+| Popup opens on typed input (spike check) | **yes, confirmed manually**: typing `cust` on an empty line shows our `viewBuilder` popup. The automated test could not open it: programmatic edits don't trigger it by design, and typing through `TestTextInput` didn't either | n/a |
 | Other hooks we need | `shortcutsActivatorsBuilder` / `shortcutOverrideActions` (Run, Run selection, Cancel), `findBuilder` (own find bar), `indicatorBuilder` (gutter), code folding, read-only mode | `onChanged`, gutter style |
 | License | MIT (Reqable) | Apache-2.0 / MIT (Akvelon) |
 | Last release | 2026-07 | 2025-09 |
@@ -43,7 +43,7 @@ Use **`re_editor`** (with `re_highlight` for SQL grammars) for the SQL editor in
 
 ## Consequences
 - **Multi-cursor is missing in both candidates.** If we want it (It. 8 "editor intelligence"), we contribute it upstream or maintain a fork. re_editor's single-selection model makes that a non-trivial change. Track it as an It. 8 risk.
-- Completions only open on real text input (`_onCodeUserInputChanged`), not on programmatic edits. The spike could not yet drive the popup from an automated test, so confirm it manually before It. 2 implementation starts, and work out how widget tests can trigger it. If the hook turns out not to work as documented, this decision should be revisited.
+- Completions only open on real text input (`_onCodeUserInputChanged`), not on programmatic edits. A manual check confirmed the custom popup works. The spike could not drive it from an automated test, so It. 8 must work out how widget tests can trigger it.
 - re_editor is mainly maintained by one company (Reqable). It is MIT, so a fork is possible if it stalls.
 - Highlighting runs in an isolate, so very large files show plain text for a moment before colours appear. That is acceptable, and it is what keeps typing at about 1 ms of UI work.
 
