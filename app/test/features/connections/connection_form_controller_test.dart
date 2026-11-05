@@ -79,14 +79,51 @@ void main() {
     expect(f.state().error, contains("Couldn't parse URI"));
   });
 
-  test('save validates name and required fields', () async {
+  test('save validates required fields', () async {
     final f = open(ConnectionFormArgs(engines: repo.engines));
     f.ctrl.setField('host', '');
     expect(await f.ctrl.save(), isNull);
-    expect(f.state().error, 'Name is required');
-    f.ctrl.setName('x');
-    expect(await f.ctrl.save(), isNull);
     expect(f.state().error, 'Host is required');
+  });
+
+  group('default name', () {
+    test('is "<Engine> @ host:port/db" and tracks the fields', () {
+      final f = open(ConnectionFormArgs(engines: repo.engines));
+      expect(f.ctrl.defaultName, 'PostgreSQL @ localhost:5432/postgres');
+      f.ctrl.setField('host', 'db.internal');
+      f.ctrl.setField('database', 'shop');
+      expect(f.ctrl.defaultName, 'PostgreSQL @ db.internal:5432/shop');
+    });
+
+    test('SQLite uses the file name', () {
+      final f = open(ConnectionFormArgs(engines: repo.engines));
+      f.ctrl.selectEngine('sqlite');
+      f.ctrl.setField('path', '/Users/me/data/app.db');
+      expect(f.ctrl.defaultName, 'app.db');
+    });
+
+    test(
+      'is used on save when no name is typed, never the test result',
+      () async {
+        final f = open(ConnectionFormArgs(engines: repo.engines));
+        await f.ctrl.test();
+        expect(f.state().test, isA<FormTested>());
+        final saved = await f.ctrl.save();
+        expect(saved!.name, 'PostgreSQL @ localhost:5432/postgres');
+        expect(saved.name, isNot(contains(' ms')));
+      },
+    );
+
+    test('a typed name wins', () async {
+      final f = open(ConnectionFormArgs(engines: repo.engines));
+      f.ctrl.setName('Mine');
+      expect((await f.ctrl.save())!.name, 'Mine');
+    });
+  });
+
+  test('production defaults to false for new connections', () {
+    final f = open(ConnectionFormArgs(engines: repo.engines));
+    expect(f.state().production, isFalse);
   });
 
   test('save creates a connection with the typed password', () async {
@@ -168,10 +205,11 @@ void main() {
       ),
     );
     expect(f.state().name, 'Prod PG copy');
+    expect(f.state().production, isFalse);
     expect(f.state().hasStoredPassword, isFalse);
     final saved = await f.ctrl.save();
     expect(saved!.id, isNot('c9'));
-    expect(saved.production, isTrue);
+    expect(saved.production, isFalse);
   });
 
   test('test can be cancelled', () async {

@@ -131,11 +131,6 @@ void main() {
     final repo = FakeConnectionsRepository();
     final results = await pumpDialog(tester, repo);
 
-    await tester.tap(find.byKey(const Key('save-connection')));
-    await tester.pumpAndSettle();
-    expect(find.text('Name is required'), findsOneWidget);
-    expect(repo.items, isEmpty);
-
     await tester.enterText(find.byKey(const Key('field-name')), 'Docker PG');
     await tester.enterText(find.byKey(const Key('field-password')), 'pw');
     await tester.enterText(find.byKey(const Key('field-folder')), 'Dev');

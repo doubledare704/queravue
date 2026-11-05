@@ -102,7 +102,10 @@ class _ConnectionDialogState extends ConsumerState<ConnectionDialog> {
                   key: const Key('field-name'),
                   controller: _name,
                   autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: InputDecoration(
+                    labelText: 'Name',
+                    hintText: _ctrl.defaultName,
+                  ),
                   onChanged: _ctrl.setName,
                 ),
                 const SizedBox(height: 12),

@@ -157,7 +157,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
       name: args.duplicate ? '${initial.name} copy' : initial.name,
       folder: initial.folder,
       color: initial.color,
-      production: initial.production,
+      production: args.duplicate ? false : initial.production,
       values: {...engine.defaults, ...initial.params},
       hasStoredPassword: args.isEdit && initial.hasPassword,
     );
@@ -232,7 +232,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
   /// The profile the form currently describes.
   ConnectionProfile get draft => ConnectionProfile(
     id: args.isEdit ? args.initial!.id : '',
-    name: state.name.trim(),
+    name: state.name.trim().isEmpty ? defaultName : state.name.trim(),
     engineId: state.engine.id,
     params: {
       for (final f in state.engine.paramFields)
@@ -244,9 +244,25 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
     production: state.production,
   );
 
+  /// `<Engine> @ host:port/db` (SQLite: the file name), built only from the
+  /// form's own fields, never from a test result.
+  String get defaultName {
+    final v = state.values;
+    String f(String k) => (v[k] ?? '').trim();
+    final path = f('path');
+    if (path.isNotEmpty) {
+      return path.split(RegExp(r'[\\/]')).where((p) => p.isNotEmpty).last;
+    }
+    final host = f('host');
+    if (host.isEmpty) return state.engine.displayName;
+    final port = f('port');
+    final db = f('database');
+    return '${state.engine.displayName} @ $host'
+        '${port.isEmpty ? '' : ':$port'}${db.isEmpty ? '' : '/$db'}';
+  }
+
   /// Validates required fields. Returns an error message or null.
   String? validate({bool forSave = true}) {
-    if (forSave && state.name.trim().isEmpty) return 'Name is required';
     for (final f in state.engine.paramFields) {
       if (f.required && (state.values[f.key] ?? '').trim().isEmpty) {
         return '${f.label} is required';
