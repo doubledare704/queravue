@@ -6,6 +6,7 @@ import 'package:grpc/grpc.dart';
 import 'core_launcher.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
+import 'gen/queravue/v1/document.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
 import 'gen/queravue/v1/schema.pbgrpc.dart';
@@ -54,6 +55,9 @@ abstract interface class CoreConnection {
   /// Client for query execution history.
   HistoryServiceClient get historyService;
 
+  /// Client for browsing and editing documents.
+  DocumentServiceClient get documentService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -72,6 +76,7 @@ class GrpcCoreConnection implements CoreConnection {
     schemaService = SchemaServiceClient(_channel, options: _auth);
     tableService = TableServiceClient(_channel, options: _auth);
     historyService = HistoryServiceClient(_channel, options: _auth);
+    documentService = DocumentServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -113,6 +118,9 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final HistoryServiceClient historyService;
+
+  @override
+  late final DocumentServiceClient documentService;
 
   @override
   Future<CoreInfo> hello() async {

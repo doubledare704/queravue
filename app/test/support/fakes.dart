@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
 import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/schema.pbgrpc.dart';
@@ -127,6 +128,10 @@ class FakeCoreConnection implements CoreConnection {
   @override
   HistoryServiceClient get historyService =>
       throw UnimplementedError('use a fake HistoryRepository');
+
+  @override
+  DocumentServiceClient get documentService =>
+      throw UnimplementedError('use a fake DocumentRepository');
 
   @override
   Future<void> close() async {

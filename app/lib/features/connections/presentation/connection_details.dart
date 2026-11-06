@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../editor/application/editor_tabs.dart';
+import '../application/connection_session.dart';
 import '../application/connections_controller.dart';
 import '../domain/models.dart';
 import 'connection_actions.dart';
@@ -60,14 +61,16 @@ class ConnectionDetails extends ConsumerWidget {
                     ? null
                     : () => connectTo(ref, profile),
               ),
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                key: const Key('details-new-query'),
-                icon: const Icon(Icons.edit_note, size: 18),
-                label: const Text('New query'),
-                onPressed: () =>
-                    ref.read(editorTabsProvider.notifier).open(profile.id),
-              ),
+              if (!ref.watch(connectionIsDocumentOnlyProvider(profile.id))) ...[
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  key: const Key('details-new-query'),
+                  icon: const Icon(Icons.edit_note, size: 18),
+                  label: const Text('New query'),
+                  onPressed: () =>
+                      ref.read(editorTabsProvider.notifier).open(profile.id),
+                ),
+              ],
               const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: () =>

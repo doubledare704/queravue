@@ -92,7 +92,11 @@ func Serve(ctx context.Context, cfg Config) error {
 			schemaCache = schema.NewCache()
 		}
 		queravuev1.RegisterSchemaServiceServer(srv, api.NewSchemaService(cfg.Sessions, schemaCache))
-		queravuev1.RegisterDocumentServiceServer(srv, api.NewDocumentService(cfg.Sessions, cfg.Connections, log))
+		docSvc := api.NewDocumentService(cfg.Sessions, cfg.Connections, log)
+		if cfg.History != nil {
+			docSvc.SetHistory(cfg.History)
+		}
+		queravuev1.RegisterDocumentServiceServer(srv, docSvc)
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
 	}
 	if cfg.History != nil {

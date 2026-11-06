@@ -6,8 +6,17 @@ import '../../editor/domain/query_models.dart';
 enum SchemaObjectType {
   table,
   view,
-  materializedView;
+  materializedView,
 
+  /// Document collection (MongoDB and compatible).
+  collection,
+
+  /// Time series collection.
+  timeSeries;
+
+  bool get isCollection =>
+      this == SchemaObjectType.collection ||
+      this == SchemaObjectType.timeSeries;
   bool get isTable => this == SchemaObjectType.table;
   bool get isView => this == SchemaObjectType.view;
   bool get isMaterializedView => this == SchemaObjectType.materializedView;
@@ -51,11 +60,15 @@ class SchemaObject {
     required this.name,
     required this.type,
     this.rowCountEstimate = -1,
+    this.capped = false,
   });
 
   final String name;
   final SchemaObjectType type;
   final int rowCountEstimate;
+
+  /// True for capped collections.
+  final bool capped;
 }
 
 /// Describes one column of a table.

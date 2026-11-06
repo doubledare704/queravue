@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -13,6 +14,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/session"
 )
 
@@ -31,6 +33,52 @@ type DocumentService struct {
 	sessions    *session.Manager
 	connections *connections.Service
 	log         *slog.Logger
+	history     *history.Store
+}
+
+// SetHistory records document operations in the query history.
+func (d *DocumentService) SetHistory(h *history.Store) { d.history = h }
+
+// record appends an operation to the query history. Document bodies are not
+// logged for writes, only a summary (they may hold row data).
+func (d *DocumentService) record(sess *session.Session, text string, start time.Time, n uint64, err error) {
+	if d.history == nil {
+		return
+	}
+	e := history.Entry{ConnectionID: sess.ConnectionID, QueryText: text, StartedAt: start, Duration: time.Since(start), RowsAffected: n}
+	if err != nil {
+		e.Error = "failed"
+		var ee *engine.Error
+		if errors.As(err, &ee) {
+			e.Error = ee.Msg
+		}
+	}
+	_, _ = d.history.Append(context.Background(), e)
+}
+
+func findText(r *queravuev1.FindRequest) string {
+	q := "db." + r.GetCollection() + ".find(" + orEmptyDoc(r.GetFilter())
+	if p := r.GetProjection(); p != "" {
+		q += ", " + p
+	}
+	q += ")"
+	if s := r.GetSort(); s != "" {
+		q += ".sort(" + s + ")"
+	}
+	if r.GetSkip() > 0 {
+		q += fmt.Sprintf(".skip(%d)", r.GetSkip())
+	}
+	if r.GetLimit() > 0 {
+		q += fmt.Sprintf(".limit(%d)", r.GetLimit())
+	}
+	return "// " + r.GetDatabase() + "\n" + q
+}
+
+func orEmptyDoc(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "{}"
+	}
+	return s
 }
 
 // NewDocumentService returns a DocumentService handler. connections may be
@@ -64,10 +112,11 @@ func (d *DocumentService) production(ctx context.Context, sess *session.Session)
 
 // Find implements the RPC.
 func (d *DocumentService) Find(req *queravuev1.FindRequest, stream queravuev1.DocumentService_FindServer) error {
-	_, ds, err := d.store(req.GetSessionId())
+	sess, ds, err := d.store(req.GetSessionId())
 	if err != nil {
 		return err
 	}
+	started := time.Now()
 	opt := engine.FindOptions{
 		Database: req.GetDatabase(), Collection: req.GetCollection(),
 		Filter: req.GetFilter(), Sort: req.GetSort(), Projection: req.GetProjection(),
@@ -79,7 +128,9 @@ func (d *DocumentService) Find(req *queravuev1.FindRequest, stream queravuev1.Do
 		opt.MaxTimeMS = uint32(defaultFindTimeout / time.Millisecond)
 	}
 	sink := &findSink{stream: stream}
-	if err := ds.Find(stream.Context(), opt, sink); err != nil {
+	err = ds.Find(stream.Context(), opt, sink)
+	d.record(sess, findText(req), started, sink.offset, err)
+	if err != nil {
 		if stream.Context().Err() != nil {
 			return status.FromContextError(stream.Context().Err()).Err()
 		}
@@ -135,11 +186,13 @@ func (d *DocumentService) Count(ctx context.Context, req *queravuev1.CountReques
 
 // InsertDocuments implements the RPC.
 func (d *DocumentService) InsertDocuments(ctx context.Context, req *queravuev1.InsertDocumentsRequest) (*queravuev1.InsertDocumentsResponse, error) {
-	_, ds, err := d.store(req.GetSessionId())
+	sess, ds, err := d.store(req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
+	started := time.Now()
 	ids, err := ds.Insert(ctx, req.GetDatabase(), req.GetCollection(), req.GetDocuments(), engine.WriteOptions{})
+	d.record(sess, "// "+req.GetDatabase()+"\ndb."+req.GetCollection()+".insertMany(…)", started, uint64(len(ids)), err)
 	resp := &queravuev1.InsertDocumentsResponse{InsertedIds: ids}
 	if err != nil {
 		resp.Error = toDocumentError(err)
@@ -153,11 +206,13 @@ func writeOptions(expected *string) engine.WriteOptions {
 
 // ReplaceDocument implements the RPC.
 func (d *DocumentService) ReplaceDocument(ctx context.Context, req *queravuev1.ReplaceDocumentRequest) (*queravuev1.ReplaceDocumentResponse, error) {
-	_, ds, err := d.store(req.GetSessionId())
+	sess, ds, err := d.store(req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
+	started := time.Now()
 	doc, err := ds.Replace(ctx, req.GetDatabase(), req.GetCollection(), req.GetId(), req.GetDocument(), writeOptions(req.ExpectedDocument))
+	d.record(sess, "// "+req.GetDatabase()+"\ndb."+req.GetCollection()+".replaceOne({_id: "+req.GetId()+"}, …)", started, 1, err)
 	if err != nil {
 		return &queravuev1.ReplaceDocumentResponse{Error: toDocumentError(err)}, nil
 	}
@@ -166,11 +221,13 @@ func (d *DocumentService) ReplaceDocument(ctx context.Context, req *queravuev1.R
 
 // UpdateFields implements the RPC.
 func (d *DocumentService) UpdateFields(ctx context.Context, req *queravuev1.UpdateFieldsRequest) (*queravuev1.UpdateFieldsResponse, error) {
-	_, ds, err := d.store(req.GetSessionId())
+	sess, ds, err := d.store(req.GetSessionId())
 	if err != nil {
 		return nil, err
 	}
+	started := time.Now()
 	doc, err := ds.UpdateFields(ctx, req.GetDatabase(), req.GetCollection(), req.GetId(), req.GetSet(), req.GetUnset(), writeOptions(req.ExpectedDocument))
+	d.record(sess, "// "+req.GetDatabase()+"\ndb."+req.GetCollection()+".updateOne({_id: "+req.GetId()+"}, …)", started, 1, err)
 	if err != nil {
 		return &queravuev1.UpdateFieldsResponse{Error: toDocumentError(err)}, nil
 	}
@@ -190,7 +247,9 @@ func (d *DocumentService) DeleteDocuments(ctx context.Context, req *queravuev1.D
 			Message: "This connection is flagged as production. Confirmation is required to delete documents.",
 		}}, nil
 	}
+	started := time.Now()
 	n, err := ds.Delete(ctx, req.GetDatabase(), req.GetCollection(), req.GetIds(), engine.WriteOptions{})
+	d.record(sess, fmt.Sprintf("// %s\ndb.%s.deleteMany({_id: {$in: [… %d ids]}})", req.GetDatabase(), req.GetCollection(), len(req.GetIds())), started, n, err)
 	if err != nil {
 		return &queravuev1.DeleteDocumentsResponse{Error: toDocumentError(err)}, nil
 	}

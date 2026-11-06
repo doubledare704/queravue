@@ -7,21 +7,21 @@ import '../application/schema_controller.dart';
 import '../domain/schema_models.dart';
 
 /// Formats row count estimate (e.g. ~1M rows).
-String formatRowCount(int count) {
+String formatRowCount(int count, {String unit = 'rows'}) {
   if (count < 0) return '';
   if (count >= 1000000) {
     final m = count / 1000000.0;
     final s = m >= 10 ? m.toStringAsFixed(0) : m.toStringAsFixed(1);
     final clean = s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
-    return '~${clean}M rows';
+    return '~${clean}M $unit';
   }
   if (count >= 1000) {
     final k = count / 1000.0;
     final s = k >= 10 ? k.toStringAsFixed(0) : k.toStringAsFixed(1);
     final clean = s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
-    return '~${clean}k rows';
+    return '~${clean}k $unit';
   }
-  return '~$count rows';
+  return '~$count $unit';
 }
 
 /// A tree view of databases, schemas, tables, and columns for a connection.
@@ -173,7 +173,10 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
     final controller = ref.read(
       schemaTreeProvider(widget.connectionId).notifier,
     );
-    if (key.startsWith('table:')) {
+    if (key.startsWith('coll:')) {
+      final node = _findObject(key);
+      if (node != null) _openObject(node);
+    } else if (key.startsWith('table:')) {
       final raw = key.substring(6);
       final parts = raw.split('.');
       final schema = parts.length > 1 ? parts[0] : '';
@@ -186,6 +189,26 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           );
     } else {
       controller.toggleExpand(key);
+    }
+  }
+
+  ObjectNode? _findObject(String key) {
+    final all = ref.read(schemaTreeProvider(widget.connectionId)).childrenByKey;
+    for (final list in all.values) {
+      for (final n in list) {
+        if (n is ObjectNode && n.key == key) return n;
+      }
+    }
+    return null;
+  }
+
+  /// Opens a table tab, or a document tab for document engines.
+  void _openObject(ObjectNode node) {
+    final tabs = ref.read(editorTabsProvider.notifier);
+    if (ref.read(schemaTreeProvider(widget.connectionId)).documentStore) {
+      tabs.openCollection(widget.connectionId, node.tableRef);
+    } else {
+      tabs.openTable(widget.connectionId, node.tableRef);
     }
   }
 
@@ -217,9 +240,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
       onTap: () {
         setState(() => _selectedKey = node.key);
         if (node is ObjectNode) {
-          ref
-              .read(editorTabsProvider.notifier)
-              .openTable(widget.connectionId, node.tableRef);
+          _openObject(node);
         } else {
           controller.toggleExpand(node.key);
         }
@@ -269,7 +290,10 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
               Padding(
                 padding: const EdgeInsets.only(left: 4),
                 child: Text(
-                  formatRowCount(node.rowCountEstimate),
+                  formatRowCount(
+                    node.rowCountEstimate,
+                    unit: state.documentStore ? 'docs' : 'rows',
+                  ),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
                     fontSize: 10,
@@ -309,6 +333,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
   }
 
   bool _canExpand(SchemaTreeNode node) {
+    if (node is ObjectNode && node.key.startsWith('coll:')) return false;
     return node is DatabaseNode ||
         node is SchemaNamespaceNode ||
         node is ObjectNode;
@@ -342,6 +367,16 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           size: 14,
           color: scheme.tertiary,
         ),
+        SchemaObjectType.collection => Icon(
+          Icons.data_object,
+          size: 14,
+          color: scheme.primary,
+        ),
+        SchemaObjectType.timeSeries => Icon(
+          Icons.show_chart,
+          size: 14,
+          color: scheme.primary,
+        ),
       },
       ColumnNode(:final column) =>
         column.isPrimaryKey
@@ -372,10 +407,17 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
   ) async {
     final items = <PopupMenuEntry<String>>[];
 
+    final docs = ref
+        .read(schemaTreeProvider(widget.connectionId))
+        .documentStore;
     if (node is ObjectNode) {
       items.addAll([
-        const PopupMenuItem(value: 'open', child: Text('Open table')),
-        const PopupMenuItem(value: 'query', child: Text('New query here')),
+        PopupMenuItem(
+          value: 'open',
+          child: Text(docs ? 'Open collection' : 'Open table'),
+        ),
+        if (!docs)
+          const PopupMenuItem(value: 'query', child: Text('New query here')),
         const PopupMenuDivider(),
         const PopupMenuItem(value: 'copy', child: Text('Copy name')),
         const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
@@ -402,11 +444,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
 
     switch (selected) {
       case 'open':
-        if (node is ObjectNode) {
-          ref
-              .read(editorTabsProvider.notifier)
-              .openTable(widget.connectionId, node.tableRef);
-        }
+        if (node is ObjectNode) _openObject(node);
       case 'query':
         if (node is ObjectNode) {
           final sql = node.tableRef.schema.isNotEmpty
