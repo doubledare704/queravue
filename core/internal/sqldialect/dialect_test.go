@@ -80,3 +80,38 @@ func TestMySQL(t *testing.T) {
 		t.Errorf("Paginate = %q %v", got, stable)
 	}
 }
+
+func TestMSSQL(t *testing.T) {
+	d := sqldialect.MSSQL
+	checks := []struct{ name, got, want string }{
+		{"quote", d.QuoteIdent("a]b"), "[a]]b]"},
+		{"qualify", d.QualifyTable("dbo", "t"), "[dbo].[t]"},
+		{"qualify in", d.QualifyTableIn("shop", "sales", "t"), "[shop].[sales].[t]"},
+		{"qualify in default schema", d.QualifyTableIn("shop", "", "t"), "[shop].[dbo].[t]"},
+		{"qualify in no db", d.QualifyTableIn("", "sales", "t"), "[sales].[t]"},
+		{"placeholder", d.Placeholder(3), "@p3"},
+		{"begin", d.Begin(), "BEGIN TRANSACTION;"},
+		{"nulls last", d.OrderTerm("[c]", true, sqldialect.NullsLast), "CASE WHEN [c] IS NULL THEN 1 ELSE 0 END, [c] DESC"},
+		{"nulls first", d.OrderTerm("[c]", false, sqldialect.NullsFirst), "CASE WHEN [c] IS NULL THEN 0 ELSE 1 END, [c] ASC"},
+		{"string", d.FormatLiteral(engine.Text("it's")), "N'it''s'"},
+		{"bool", d.FormatLiteral(engine.Bool(true)), "1"},
+		{"bytes", d.FormatLiteral(engine.Bytes([]byte{0, 0xff})), "0x00FF"},
+		{"timestamp", d.FormatLiteral(engine.Timestamptz(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))), "'2026-01-02 03:04:05 +00:00'"},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+	got, stable := d.Paginate("SELECT * FROM t", 5, false)
+	if got != "SELECT * FROM t ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY" || stable {
+		t.Errorf("unordered Paginate = %q stable=%v", got, stable)
+	}
+	got, stable = d.Paginate("SELECT * FROM t ORDER BY a", 5, true)
+	if got != "SELECT * FROM t ORDER BY a OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY" || !stable {
+		t.Errorf("ordered Paginate = %q stable=%v", got, stable)
+	}
+	if got, stable := d.Paginate("SELECT 1", 0, false); got != "SELECT 1" || !stable {
+		t.Errorf("no limit = %q %v", got, stable)
+	}
+}

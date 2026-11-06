@@ -27,10 +27,14 @@ func (bracketDialect) Paginate(sql string, _ uint64, has bool) (string, bool) {
 	return sql + " OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY", has
 }
 func (bracketDialect) ILike(c, p string) string { return c + " LIKE " + p }
-func (bracketDialect) Lexer() sqlsplit.Dialect  { return sqlsplit.Postgres }
+func (bracketDialect) Begin() string            { return "BEGIN TRANSACTION;" }
+func (d bracketDialect) QualifyTableIn(db, s, t string) string {
+	return "[" + db + "]." + d.QualifyTable(s, t)
+}
+func (bracketDialect) Lexer() sqlsplit.Dialect { return sqlsplit.Postgres }
 
 func TestBuildSelectUsesDialect(t *testing.T) {
-	ref := &queravuev1.TableRef{Schema: "dbo", Table: "t"}
+	ref := &queravuev1.TableRef{Database: "shop", Schema: "dbo", Table: "t"}
 	filter := &queravuev1.TableFilter{Root: &queravuev1.FilterGroup{Conditions: []*queravuev1.FilterCondition{{
 		Column: "a", Op: queravuev1.FilterOp_FILTER_OP_EQUALS,
 		Values: []*queravuev1.Value{{Kind: &queravuev1.Value_IntValue{IntValue: 1}}},
@@ -39,7 +43,7 @@ func TestBuildSelectUsesDialect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "SELECT * FROM [dbo].[t] WHERE [a] = @p1 ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;"
+	want := "SELECT * FROM [shop].[dbo].[t] WHERE [a] = @p1 ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;"
 	if sql != want {
 		t.Errorf("sql = %q\nwant  %q", sql, want)
 	}

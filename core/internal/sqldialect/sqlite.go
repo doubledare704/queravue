@@ -15,7 +15,11 @@ func (sqliteDialect) QuoteIdent(n string) string          { return quoteWith(n, 
 func (sqliteDialect) Placeholder(int) string              { return "?" }
 func (sqliteDialect) FormatLiteral(v engine.Value) string { return literal(v) }
 func (sqliteDialect) ILike(col, ph string) string         { return ilikeLower(col, ph) }
-func (sqliteDialect) Lexer() sqlsplit.Dialect             { return sqlsplit.SQLite }
+func (d sqliteDialect) QualifyTableIn(_, schema, table string) string {
+	return d.QualifyTable(schema, table)
+}
+func (sqliteDialect) Begin() string           { return "BEGIN;" }
+func (sqliteDialect) Lexer() sqlsplit.Dialect { return sqlsplit.SQLite }
 
 // QualifyTable omits the default "main" schema.
 func (d sqliteDialect) QualifyTable(schema, table string) string {

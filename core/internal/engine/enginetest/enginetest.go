@@ -347,7 +347,7 @@ func editRollback(t *testing.T, tg Target) {
 		t.Fatalf("plan: %v", err)
 	}
 	// Pending changes applied then rolled back leave no trace.
-	exec(t, c, "BEGIN")
+	exec(t, c, d.Begin())
 	for _, p := range plans {
 		if _, sum := exec(t, c, p.Statement.SQL, p.Statement.Params...); sum.RowsAffected != 1 {
 			t.Errorf("insert affected %d rows", sum.RowsAffected)
@@ -362,7 +362,7 @@ func editRollback(t *testing.T, tg Target) {
 	}
 
 	// Commit path: insert, update, delete, in one transaction.
-	exec(t, c, "BEGIN")
+	exec(t, c, d.Begin())
 	for _, p := range plans {
 		exec(t, c, p.Statement.SQL, p.Statement.Params...)
 	}

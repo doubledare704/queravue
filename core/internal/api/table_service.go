@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -62,7 +63,7 @@ func (t *TableService) OpenTable(req *queravuev1.OpenTableRequest, stream querav
 		return status.Error(codes.FailedPrecondition, "connection has no SQL dialect")
 	}
 
-	sqlText, params, err := sqlbuilder.BuildSelect(dialect, req.GetTableRef(), req.GetFilter(), req.GetSort(), req.GetPageSize())
+	sqlText, params, stable, err := sqlbuilder.BuildSelectOrdered(dialect, req.GetTableRef(), req.GetFilter(), req.GetSort(), req.GetPageSize())
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, "build select query: %v", err)
 	}
@@ -75,6 +76,22 @@ func (t *TableService) OpenTable(req *queravuev1.OpenTableRequest, stream querav
 		return status.Error(codes.NotFound, "session not found")
 	}
 	defer finish()
+
+	// Dialects that must invent an ORDER BY to paginate (SQL Server) get the
+	// primary key instead; with no key the page order is not stable.
+	var notices []string
+	if !stable {
+		if pk := primaryKeySorts(ctx, sess, req.GetTableRef()); len(pk) > 0 {
+			sorts := append(append([]*queravuev1.SortClause(nil), req.GetSort()...), pk...)
+			sqlText, params, stable, err = sqlbuilder.BuildSelectOrdered(dialect, req.GetTableRef(), req.GetFilter(), sorts, req.GetPageSize())
+			if err != nil {
+				return status.Errorf(codes.InvalidArgument, "build select query: %v", err)
+			}
+		}
+		if !stable {
+			notices = append(notices, "Row order is not stable: the table has no primary key and no sort is set, so pages may repeat or skip rows. Sort by a column to fix the order.")
+		}
+	}
 
 	id, spool, err := t.results.Create(sess.ID)
 	if err != nil {
@@ -154,7 +171,7 @@ func (t *TableService) OpenTable(req *queravuev1.OpenTableRequest, stream querav
 			RowsAffected:   0,
 			RowsSpooled:    rows,
 			Duration:       durationpb.New(sum.Duration),
-			Notices:        sum.Notices,
+			Notices:        append(sum.Notices, notices...),
 			Truncated:      truncated,
 			HasRows:        sum.HasRows,
 		},
@@ -280,7 +297,7 @@ func (t *TableService) ApplyChanges(ctx context.Context, req *queravuev1.ApplyCh
 	}
 
 	// Begin transaction
-	if _, err := ex.Execute(sctx, engine.Statement{SQL: "BEGIN;"}, nilSink{}); err != nil {
+	if _, err := ex.Execute(sctx, engine.Statement{SQL: dialect.Begin()}, nilSink{}); err != nil {
 		return rollback(fmt.Errorf("begin transaction: %w", err))
 	}
 
@@ -375,4 +392,29 @@ func (s *tableStreamSink) Batch(batch [][]engine.Value) error {
 		return engine.ErrStop
 	}
 	return nil
+}
+
+// primaryKeySorts returns ascending sorts on the table's primary key columns,
+// or nil if the table has no key or cannot be described.
+func primaryKeySorts(ctx context.Context, sess *session.Session, ref *queravuev1.TableRef) []*queravuev1.SortClause {
+	inspector, ok := engine.As[engine.SchemaInspector](sess.Conn)
+	if !ok {
+		return nil
+	}
+	details, err := inspector.DescribeTable(ctx, ref.GetDatabase(), ref.GetSchema(), ref.GetTable())
+	if err != nil {
+		return nil
+	}
+	var pk []engine.ColumnDef
+	for _, c := range details.Columns {
+		if c.IsPrimaryKey {
+			pk = append(pk, c)
+		}
+	}
+	sort.SliceStable(pk, func(i, j int) bool { return pk[i].PrimaryKeyOrder < pk[j].PrimaryKeyOrder })
+	out := make([]*queravuev1.SortClause, 0, len(pk))
+	for _, c := range pk {
+		out = append(out, &queravuev1.SortClause{Column: c.Name, Direction: queravuev1.SortDirection_SORT_DIRECTION_ASC})
+	}
+	return out
 }
