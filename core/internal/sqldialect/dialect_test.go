@@ -57,3 +57,26 @@ func TestOfWithoutProvider(t *testing.T) {
 		t.Fatal("nil conn must not provide a dialect")
 	}
 }
+
+func TestMySQL(t *testing.T) {
+	d := sqldialect.MySQL
+	checks := []struct{ name, got, want string }{
+		{"quote", d.QuoteIdent("a`b"), "`a``b`"},
+		{"qualify", d.QualifyTable("db", "t"), "`db`.`t`"},
+		{"qualify no schema", d.QualifyTable("", "t"), "`t`"},
+		{"placeholder", d.Placeholder(3), "?"},
+		{"nulls last", d.OrderTerm("`c`", true, sqldialect.NullsLast), "`c` IS NULL ASC, `c` DESC"},
+		{"nulls first", d.OrderTerm("`c`", false, sqldialect.NullsFirst), "`c` IS NULL DESC, `c` ASC"},
+		{"default order", d.OrderTerm("`c`", false, sqldialect.NullsDefault), "`c` ASC"},
+		{"string", d.FormatLiteral(engine.Text(`a\b'c`)), `'a\\b''c'`},
+		{"timestamp", d.FormatLiteral(engine.Timestamptz(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))), "'2026-01-02 03:04:05'"},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s = %s, want %s", c.name, c.got, c.want)
+		}
+	}
+	if got, stable := d.Paginate("SELECT 1", 7, false); got != "SELECT 1 LIMIT 7" || !stable {
+		t.Errorf("Paginate = %q %v", got, stable)
+	}
+}

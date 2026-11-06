@@ -39,6 +39,9 @@ type Dialect interface {
 	// says whether sql already has an ORDER BY. The result's stable is false
 	// when the dialect had to invent an order, so page contents may vary.
 	Paginate(sql string, limit uint64, hasOrderBy bool) (out string, stable bool)
+	// ILike renders a case-insensitive LIKE of an already quoted column
+	// against a placeholder.
+	ILike(quotedCol, placeholder string) string
 	// FormatLiteral renders v as SQL text for previews. Never executed.
 	FormatLiteral(v engine.Value) string
 	// Lexer is the sqlsplit lexer for this family.
@@ -88,6 +91,9 @@ func limitSuffix(sql string, limit uint64) string {
 	}
 	return fmt.Sprintf("%s LIMIT %d", sql, limit)
 }
+
+// ilikeLower is the portable case-insensitive LIKE.
+func ilikeLower(col, ph string) string { return "LOWER(" + col + ") LIKE LOWER(" + ph + ")" }
 
 // literal formats v the way Postgres and SQLite previews always have.
 func literal(v engine.Value) string {

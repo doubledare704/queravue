@@ -26,7 +26,8 @@ func (bracketDialect) Paginate(sql string, _ uint64, has bool) (string, bool) {
 	}
 	return sql + " OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY", has
 }
-func (bracketDialect) Lexer() sqlsplit.Dialect { return sqlsplit.Postgres }
+func (bracketDialect) ILike(c, p string) string { return c + " LIKE " + p }
+func (bracketDialect) Lexer() sqlsplit.Dialect  { return sqlsplit.Postgres }
 
 func TestBuildSelectUsesDialect(t *testing.T) {
 	ref := &queravuev1.TableRef{Schema: "dbo", Table: "t"}

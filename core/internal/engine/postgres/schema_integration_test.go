@@ -173,4 +173,3 @@ func TestIntegration_SchemaInspector_Postgres(t *testing.T) {
 		t.Errorf("materialized views must be read-only")
 	}
 }
-

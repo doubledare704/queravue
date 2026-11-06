@@ -14,6 +14,7 @@ func (sqliteDialect) ID() string                          { return "sqlite" }
 func (sqliteDialect) QuoteIdent(n string) string          { return quoteWith(n, `"`, `"`) }
 func (sqliteDialect) Placeholder(int) string              { return "?" }
 func (sqliteDialect) FormatLiteral(v engine.Value) string { return literal(v) }
+func (sqliteDialect) ILike(col, ph string) string         { return ilikeLower(col, ph) }
 func (sqliteDialect) Lexer() sqlsplit.Dialect             { return sqlsplit.SQLite }
 
 // QualifyTable omits the default "main" schema.
