@@ -68,6 +68,7 @@ jobs:
           - {name: SQL Server, service: mssql, pkg: mssql, test: 'TestIntegration.*'}
           - {name: CockroachDB, service: cockroachdb, pkg: postgres, test: TestIntegrationSuiteCockroach}
           - {name: MongoDB, service: mongo, pkg: mongo, test: 'TestIntegration.*'}
+          - {name: DocumentDB, service: documentdb, pkg: mongo, test: TestSmokeDocumentDB}
     env:
       # MongoDB 8.x aborts at startup on the runners' Linux kernel 6.19+
       # (SERVER-121912); 7.0 starts. Local dev stays on the compose default.
@@ -122,6 +123,9 @@ jobs:
           exit 1
       - name: Integration tests
         working-directory: core
+        env:
+          # Read only by TestSmokeDocumentDB; dev-only credentials from compose.
+          QV_DOCDB_URI: mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllowInvalidCertificates=true&directConnection=true
         run: go test -tags=integration -run '^${{ matrix.test }}$' ./internal/engine/${{ matrix.pkg }}/...
 
   app:

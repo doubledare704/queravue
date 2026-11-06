@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-perf lint lint-proto lint-core lint-app db-up db-down
+.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -61,3 +61,21 @@ db-up: ## Start test databases and wait until healthy
 
 db-down: ## Stop test databases (data volumes are kept)
 	$(COMPOSE) down
+
+# Free memory while working on one engine: stop every compose service, then
+# start only the named one (dependencies come along). Volumes are kept.
+#   make db-only DB=documentdb
+db-only: ## Stop all test databases, then start only DB=<service>
+	@test -n "$(DB)" || { echo "usage: make db-only DB=<service>"; exit 2; }
+	$(COMPOSE) down
+	$(COMPOSE) up -d --wait --wait-timeout 600 $(DB)
+
+DOCDB_URI ?= mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllowInvalidCertificates=true&directConnection=true
+
+test-docdb: ## DocumentDB smoke tests against the documentdb compose service (starts only that service)
+	$(COMPOSE) up -d --wait --wait-timeout 300 documentdb
+	cd core && QV_DOCDB_URI='$(DOCDB_URI)' go test -count=1 -tags=integration -run TestSmokeDocumentDB -v ./internal/engine/mongo/
+
+test-cosmos: ## Cosmos DB (Mongo API) smoke tests; needs QV_COSMOS_URI of a real account
+	@test -n "$$QV_COSMOS_URI" || { echo "set QV_COSMOS_URI (see docs/engines/cosmosdb.md)"; exit 2; }
+	cd core && go test -count=1 -tags=integration -run TestSmokeCosmosDB -v ./internal/engine/mongo/

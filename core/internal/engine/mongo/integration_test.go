@@ -110,7 +110,7 @@ func TestIntegrationConnectFieldsAndURI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connect via parsed URI: %v", err)
 	}
-	defer c2.Close()
+	defer func() { _ = c2.Close() }()
 	if err := c2.Ping(ctx); err != nil {
 		t.Fatal(err)
 	}
