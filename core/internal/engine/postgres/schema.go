@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -101,7 +102,7 @@ WHERE n.nspname = $1
   AND c.relkind IN ('r', 'p', 'v', 'm')
 ORDER BY c.relname;`
 
-	rows, err := conn.Query(ctx, query, schema)
+	rows, err := conn.Query(ctx, c.forVariant(query), schema)
 	if err != nil {
 		return nil, c.execError(ctx, err)
 	}
@@ -171,7 +172,7 @@ FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1 AND c.relname = $2;`
 
-	err := conn.QueryRow(ctx, relQuery, schema, table).Scan(&relOID, &relkind, &estRows)
+	err := conn.QueryRow(ctx, c.forVariant(relQuery), schema, table).Scan(&relOID, &relkind, &estRows)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return details, &engine.Error{Kind: engine.KindNotFound, Engine: c.id, Op: "describe table", Msg: fmt.Sprintf("table %q not found in schema %q", table, schema)}
@@ -202,8 +203,21 @@ FROM pg_attribute a
 JOIN pg_type t ON t.oid = a.atttypid
 LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
 LEFT JOIN pg_index i ON i.indrelid = a.attrelid AND i.indisprimary
-WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
+WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped%s
 ORDER BY a.attnum;`
+	// CockroachDB gives tables without a primary key a hidden rowid column
+	// that SELECT * does not return; it must not count as a key.
+	hidden := ""
+	if c.variant == VariantCockroach {
+		hidden = " AND NOT a.attishidden"
+	}
+	colQuery = fmt.Sprintf(colQuery, hidden)
+	if c.variant == VariantPostgres {
+		// indkey is an int2vector, indexed from 0 in PostgreSQL (from 1 in
+		// CockroachDB), so array_position is one short of the 1-based order.
+		colQuery = strings.Replace(colQuery, "COALESCE(array_position(i.indkey, a.attnum), 0)",
+			"COALESCE(array_position(i.indkey, a.attnum) + 1, 0)", 1)
+	}
 
 	colRows, err := conn.Query(ctx, colQuery, relOID)
 	if err != nil {
@@ -268,6 +282,9 @@ ORDER BY c2.relname;`
 			var isUnique, isPrimary bool
 			var columns []string
 			if err := idxRows.Scan(&name, &isUnique, &isPrimary, &columns); err == nil {
+				if c.variant == VariantCockroach && isPrimary && !allVisible(columns, details.Columns) {
+					continue // implicit rowid primary key
+				}
 				details.Indexes = append(details.Indexes, engine.IndexDef{
 					Name:      name,
 					Columns:   columns,
@@ -351,4 +368,32 @@ ORDER BY con.conname;`
 	}
 
 	return details, nil
+}
+
+// forVariant adapts catalog queries to the server variant. CockroachDB does
+// not maintain pg_class.reltuples; its row estimates come from table
+// statistics (0 until statistics exist).
+func (c *Conn) forVariant(query string) string {
+	if c.variant != VariantCockroach {
+		return query
+	}
+	return strings.ReplaceAll(query, "c.reltuples::bigint",
+		"COALESCE((SELECT s.estimated_row_count FROM crdb_internal.table_row_statistics s WHERE s.table_id = c.oid::int), 0)")
+}
+
+// allVisible reports whether every index column is a listed (visible) column.
+func allVisible(indexCols []string, cols []engine.ColumnDef) bool {
+	for _, ic := range indexCols {
+		found := false
+		for _, cd := range cols {
+			if cd.Name == ic {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
