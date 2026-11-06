@@ -34,6 +34,11 @@ enum SchemaObjectType {
   SCHEMA_OBJECT_TYPE_VIEW = 2;
   // Materialized view with cached data.
   SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW = 3;
+  // Document collection (MongoDB and compatible). Views use
+  // SCHEMA_OBJECT_TYPE_VIEW.
+  SCHEMA_OBJECT_TYPE_COLLECTION = 4;
+  // Time series collection.
+  SCHEMA_OBJECT_TYPE_TIME_SERIES = 5;
 }
 
 // TableRef uniquely identifies a table or view within a connection.
@@ -54,6 +59,10 @@ message SchemaObject {
   SchemaObjectType type = 2;
   // Estimated row count from table statistics, or -1 if unknown or not applicable.
   int64 row_count_estimate = 3;
+  // True for capped collections.
+  bool capped = 4;
+  // Storage size in bytes, or 0 if unknown.
+  uint64 size_bytes = 5;
 }
 
 // ColumnDetails describes a single column in a table or view.
@@ -140,6 +149,8 @@ message ListObjectsRequest {
   string schema = 3;
   // True to bypass and invalidate cached objects.
   bool refresh = 4;
+  // Include system objects such as MongoDB's system.* collections.
+  bool include_system = 5;
 }
 
 // ListObjectsResponse returns tables and views in the schema.

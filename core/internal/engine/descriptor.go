@@ -20,6 +20,8 @@ const (
 	CapExecute Capability = "execute"
 	// CapSchemaInspector: SchemaInspector (Iteration 3).
 	CapSchemaInspector Capability = "schema_inspector"
+	// CapDocumentStore: DocumentStore (Iteration 5).
+	CapDocumentStore Capability = "document_store"
 )
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
@@ -28,6 +30,7 @@ const (
 var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapExecute:         reflect.TypeFor[Executor](),
 	CapSchemaInspector: reflect.TypeFor[SchemaInspector](),
+	CapDocumentStore:   reflect.TypeFor[DocumentStore](),
 }
 
 // FieldKind tells the UI which input widget to render.

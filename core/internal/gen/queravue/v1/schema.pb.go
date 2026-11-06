@@ -33,6 +33,11 @@ const (
 	SchemaObjectType_SCHEMA_OBJECT_TYPE_VIEW SchemaObjectType = 2
 	// Materialized view with cached data.
 	SchemaObjectType_SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW SchemaObjectType = 3
+	// Document collection (MongoDB and compatible). Views use
+	// SCHEMA_OBJECT_TYPE_VIEW.
+	SchemaObjectType_SCHEMA_OBJECT_TYPE_COLLECTION SchemaObjectType = 4
+	// Time series collection.
+	SchemaObjectType_SCHEMA_OBJECT_TYPE_TIME_SERIES SchemaObjectType = 5
 )
 
 // Enum value maps for SchemaObjectType.
@@ -42,12 +47,16 @@ var (
 		1: "SCHEMA_OBJECT_TYPE_TABLE",
 		2: "SCHEMA_OBJECT_TYPE_VIEW",
 		3: "SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW",
+		4: "SCHEMA_OBJECT_TYPE_COLLECTION",
+		5: "SCHEMA_OBJECT_TYPE_TIME_SERIES",
 	}
 	SchemaObjectType_value = map[string]int32{
 		"SCHEMA_OBJECT_TYPE_UNSPECIFIED":       0,
 		"SCHEMA_OBJECT_TYPE_TABLE":             1,
 		"SCHEMA_OBJECT_TYPE_VIEW":              2,
 		"SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW": 3,
+		"SCHEMA_OBJECT_TYPE_COLLECTION":        4,
+		"SCHEMA_OBJECT_TYPE_TIME_SERIES":       5,
 	}
 )
 
@@ -151,8 +160,12 @@ type SchemaObject struct {
 	Type SchemaObjectType `protobuf:"varint,2,opt,name=type,proto3,enum=queravue.v1.SchemaObjectType" json:"type,omitempty"`
 	// Estimated row count from table statistics, or -1 if unknown or not applicable.
 	RowCountEstimate int64 `protobuf:"varint,3,opt,name=row_count_estimate,json=rowCountEstimate,proto3" json:"row_count_estimate,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// True for capped collections.
+	Capped bool `protobuf:"varint,4,opt,name=capped,proto3" json:"capped,omitempty"`
+	// Storage size in bytes, or 0 if unknown.
+	SizeBytes     uint64 `protobuf:"varint,5,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SchemaObject) Reset() {
@@ -202,6 +215,20 @@ func (x *SchemaObject) GetType() SchemaObjectType {
 func (x *SchemaObject) GetRowCountEstimate() int64 {
 	if x != nil {
 		return x.RowCountEstimate
+	}
+	return 0
+}
+
+func (x *SchemaObject) GetCapped() bool {
+	if x != nil {
+		return x.Capped
+	}
+	return false
+}
+
+func (x *SchemaObject) GetSizeBytes() uint64 {
+	if x != nil {
+		return x.SizeBytes
 	}
 	return 0
 }
@@ -682,7 +709,9 @@ type ListObjectsRequest struct {
 	// Schema name.
 	Schema string `protobuf:"bytes,3,opt,name=schema,proto3" json:"schema,omitempty"`
 	// True to bypass and invalidate cached objects.
-	Refresh       bool `protobuf:"varint,4,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	Refresh bool `protobuf:"varint,4,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	// Include system objects such as MongoDB's system.* collections.
+	IncludeSystem bool `protobuf:"varint,5,opt,name=include_system,json=includeSystem,proto3" json:"include_system,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -741,6 +770,13 @@ func (x *ListObjectsRequest) GetSchema() string {
 func (x *ListObjectsRequest) GetRefresh() bool {
 	if x != nil {
 		return x.Refresh
+	}
+	return false
+}
+
+func (x *ListObjectsRequest) GetIncludeSystem() bool {
+	if x != nil {
+		return x.IncludeSystem
 	}
 	return false
 }
@@ -1064,11 +1100,14 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\bTableRef\x12\x1a\n" +
 	"\bdatabase\x18\x01 \x01(\tR\bdatabase\x12\x16\n" +
 	"\x06schema\x18\x02 \x01(\tR\x06schema\x12\x14\n" +
-	"\x05table\x18\x03 \x01(\tR\x05table\"\x83\x01\n" +
+	"\x05table\x18\x03 \x01(\tR\x05table\"\xba\x01\n" +
 	"\fSchemaObject\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x121\n" +
 	"\x04type\x18\x02 \x01(\x0e2\x1d.queravue.v1.SchemaObjectTypeR\x04type\x12,\n" +
-	"\x12row_count_estimate\x18\x03 \x01(\x03R\x10rowCountEstimate\"\x96\x02\n" +
+	"\x12row_count_estimate\x18\x03 \x01(\x03R\x10rowCountEstimate\x12\x16\n" +
+	"\x06capped\x18\x04 \x01(\bR\x06capped\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x05 \x01(\x04R\tsizeBytes\"\x96\x02\n" +
 	"\rColumnDetails\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\ttype_name\x18\x02 \x01(\tR\btypeName\x12*\n" +
@@ -1102,13 +1141,14 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\bdatabase\x18\x02 \x01(\tR\bdatabase\x12\x18\n" +
 	"\arefresh\x18\x03 \x01(\bR\arefresh\"/\n" +
 	"\x13ListSchemasResponse\x12\x18\n" +
-	"\aschemas\x18\x01 \x03(\tR\aschemas\"\x81\x01\n" +
+	"\aschemas\x18\x01 \x03(\tR\aschemas\"\xa8\x01\n" +
 	"\x12ListObjectsRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1a\n" +
 	"\bdatabase\x18\x02 \x01(\tR\bdatabase\x12\x16\n" +
 	"\x06schema\x18\x03 \x01(\tR\x06schema\x12\x18\n" +
-	"\arefresh\x18\x04 \x01(\bR\arefresh\"J\n" +
+	"\arefresh\x18\x04 \x01(\bR\arefresh\x12%\n" +
+	"\x0einclude_system\x18\x05 \x01(\bR\rincludeSystem\"J\n" +
 	"\x13ListObjectsResponse\x123\n" +
 	"\aobjects\x18\x01 \x03(\v2\x19.queravue.v1.SchemaObjectR\aobjects\"\x85\x01\n" +
 	"\x16GetTableDetailsRequest\x12\x1d\n" +
@@ -1129,12 +1169,14 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x122\n" +
 	"\ttable_ref\x18\x02 \x01(\v2\x15.queravue.v1.TableRefR\btableRef\"\x17\n" +
-	"\x15RefreshSchemaResponse*\x9b\x01\n" +
+	"\x15RefreshSchemaResponse*\xe2\x01\n" +
 	"\x10SchemaObjectType\x12\"\n" +
 	"\x1eSCHEMA_OBJECT_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18SCHEMA_OBJECT_TYPE_TABLE\x10\x01\x12\x1b\n" +
 	"\x17SCHEMA_OBJECT_TYPE_VIEW\x10\x02\x12(\n" +
-	"$SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW\x10\x032\xc1\x03\n" +
+	"$SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW\x10\x03\x12!\n" +
+	"\x1dSCHEMA_OBJECT_TYPE_COLLECTION\x10\x04\x12\"\n" +
+	"\x1eSCHEMA_OBJECT_TYPE_TIME_SERIES\x10\x052\xc1\x03\n" +
 	"\rSchemaService\x12V\n" +
 	"\rListDatabases\x12!.queravue.v1.ListDatabasesRequest\x1a\".queravue.v1.ListDatabasesResponse\x12P\n" +
 	"\vListSchemas\x12\x1f.queravue.v1.ListSchemasRequest\x1a .queravue.v1.ListSchemasResponse\x12P\n" +

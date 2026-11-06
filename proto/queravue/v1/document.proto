@@ -1,0 +1,322 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+// DocumentService browses and edits documents of engines with the
+// "document_store" capability (MongoDB and wire-compatible servers).
+//
+// Every document, _id, filter, sort and projection travels as text in
+// MongoDB Extended JSON v2. Documents and _id values are CANONICAL EJSON, so
+// every BSON type survives a round trip (ADR 0009). Filter, sort and
+// projection also accept relaxed EJSON. Databases and collections are listed
+// through SchemaService.
+//
+// Operational failures that the UI shows next to the input (parse errors,
+// write conflicts, confirmation required) are reported in-band as
+// DocumentError. Unknown sessions are NOT_FOUND and sessions whose engine has
+// no document_store capability are FAILED_PRECONDITION.
+service DocumentService {
+  // Find streams the documents matching `filter`, `batch_size` documents (or
+  // about 2 MiB) at a time. The last batch has done=true. Cancelling the call
+  // kills the server-side cursor. A failure ends the stream with an error
+  // event.
+  rpc Find(FindRequest) returns (stream FindResponse);
+
+  // Count returns the number of matching documents: an estimate when the
+  // filter is empty, exact otherwise.
+  rpc Count(CountRequest) returns (CountResponse);
+
+  // InsertDocuments inserts documents. Documents without _id get an ObjectId.
+  rpc InsertDocuments(InsertDocumentsRequest) returns (InsertDocumentsResponse);
+
+  // ReplaceDocument replaces the document with the given _id. With
+  // expected_document set, the write only happens if the stored document still
+  // equals it; otherwise a CONFLICT error carries the current document.
+  rpc ReplaceDocument(ReplaceDocumentRequest) returns (ReplaceDocumentResponse);
+
+  // UpdateFields sets and unsets top-level or dotted fields of one document,
+  // leaving other fields untouched. Optimistic concurrency works as in
+  // ReplaceDocument.
+  rpc UpdateFields(UpdateFieldsRequest) returns (UpdateFieldsResponse);
+
+  // DeleteDocuments deletes documents by _id.
+  rpc DeleteDocuments(DeleteDocumentsRequest) returns (DeleteDocumentsResponse);
+
+  // SampleFields samples a collection and reports its top-level fields, the
+  // types seen and how often they occur. The UI uses it to build table-view
+  // columns.
+  rpc SampleFields(SampleFieldsRequest) returns (SampleFieldsResponse);
+}
+
+// DocumentErrorKind classifies a document operation failure.
+enum DocumentErrorKind {
+  // Unclassified failure.
+  DOCUMENT_ERROR_KIND_UNSPECIFIED = 0;
+  // The filter, sort, projection or a document is not valid EJSON. See
+  // DocumentError.field and position.
+  DOCUMENT_ERROR_KIND_PARSE = 1;
+  // The stored document no longer equals expected_document.
+  // DocumentError.current_document holds the stored document, or is unset if
+  // it was deleted.
+  DOCUMENT_ERROR_KIND_CONFLICT = 2;
+  // The target document or collection does not exist.
+  DOCUMENT_ERROR_KIND_NOT_FOUND = 3;
+  // The connection is flagged production and the request did not set
+  // confirmed. Nothing was changed.
+  DOCUMENT_ERROR_KIND_CONFIRMATION_REQUIRED = 4;
+  // Bad credentials or not permitted.
+  DOCUMENT_ERROR_KIND_AUTH = 5;
+  // Server unreachable or connection lost.
+  DOCUMENT_ERROR_KIND_NETWORK = 6;
+  // The operation exceeded max_time_ms or the server selection timeout.
+  DOCUMENT_ERROR_KIND_TIMEOUT = 7;
+  // The operation was cancelled.
+  DOCUMENT_ERROR_KIND_CANCELED = 8;
+  // The server does not support the operation (e.g. $sample on a variant).
+  DOCUMENT_ERROR_KIND_UNSUPPORTED = 9;
+  // The server rejected the operation (duplicate key, validation, ...).
+  DOCUMENT_ERROR_KIND_SERVER = 10;
+}
+
+// DocumentInput names the request field a parse error refers to.
+enum DocumentInput {
+  // Not tied to an input.
+  DOCUMENT_INPUT_UNSPECIFIED = 0;
+  // The filter text.
+  DOCUMENT_INPUT_FILTER = 1;
+  // The sort text.
+  DOCUMENT_INPUT_SORT = 2;
+  // The projection text.
+  DOCUMENT_INPUT_PROJECTION = 3;
+  // A document, _id or update text.
+  DOCUMENT_INPUT_DOCUMENT = 4;
+}
+
+// DocumentError is a typed failure. The message never contains secrets.
+message DocumentError {
+  // Failure class.
+  DocumentErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+  // For PARSE: the input that failed.
+  DocumentInput input = 3;
+  // For PARSE: offset of the error inside that input, in UTF-16 code units.
+  optional uint32 position = 4;
+  // For PARSE in a multi-document request: index of the failing document.
+  optional uint32 document_index = 5;
+  // For CONFLICT: the stored canonical EJSON document. Unset if deleted.
+  optional string current_document = 6;
+}
+
+// FindRequest is the input of Find.
+message FindRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection or view name.
+  string collection = 3;
+  // Filter as EJSON text. Empty means {}.
+  string filter = 4;
+  // Sort as EJSON text, e.g. {"name": 1}. Empty means natural order.
+  string sort = 5;
+  // Projection as EJSON text. Empty means all fields.
+  string projection = 6;
+  // Documents to skip.
+  uint64 skip = 7;
+  // Maximum documents to return. 0 means no limit.
+  uint64 limit = 8;
+  // Documents per batch. 0 means 500; the core clamps it to [1, 5000].
+  uint32 batch_size = 9;
+  // Server-side time limit (maxTimeMS). 0 means the core default (30000).
+  uint32 max_time_ms = 10;
+}
+
+// DocumentBatch is a group of documents.
+message DocumentBatch {
+  // Index of documents[0] among the documents of this Find, starting at 0.
+  uint64 offset = 1;
+  // Canonical EJSON documents, one per entry. At most batch_size entries and
+  // about 2 MiB, except that a single large document travels alone.
+  repeated string documents = 2;
+  // True on the last batch.
+  bool done = 3;
+}
+
+// FindResponse is one event of a Find stream.
+message FindResponse {
+  // The event.
+  oneof event {
+    // Next group of documents.
+    DocumentBatch batch = 1;
+    // The find failed; the stream ends after this event.
+    DocumentError error = 2;
+  }
+}
+
+// CountRequest is the input of Count.
+message CountRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection or view name.
+  string collection = 3;
+  // Filter as EJSON text. Empty means {} (estimated count).
+  string filter = 4;
+  // Server-side time limit. 0 means the core default (10000).
+  uint32 max_time_ms = 5;
+}
+
+// CountResponse holds the count or the failure.
+message CountResponse {
+  // Number of documents.
+  uint64 count = 1;
+  // True if the count is exact, false if estimated from metadata.
+  bool exact = 2;
+  // Set when counting failed; count is then 0.
+  DocumentError error = 3;
+}
+
+// InsertDocumentsRequest is the input of InsertDocuments.
+message InsertDocumentsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection name.
+  string collection = 3;
+  // Canonical EJSON documents.
+  repeated string documents = 4;
+  // Set after the user confirmed on a production connection.
+  bool confirmed = 5;
+}
+
+// InsertDocumentsResponse holds the inserted ids or the failure.
+message InsertDocumentsResponse {
+  // Canonical EJSON _id of every inserted document, in request order.
+  repeated string inserted_ids = 1;
+  // Set when the insert failed; inserted_ids then lists what was written
+  // before the failure.
+  DocumentError error = 2;
+}
+
+// ReplaceDocumentRequest is the input of ReplaceDocument.
+message ReplaceDocumentRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection name.
+  string collection = 3;
+  // Canonical EJSON value of the _id to replace.
+  string id = 4;
+  // Canonical EJSON replacement document. Its _id, if present, must equal id.
+  string document = 5;
+  // Document as the editor loaded it. If set, the write is rejected with
+  // CONFLICT when the stored document differs. Unset overwrites.
+  optional string expected_document = 6;
+  // Set after the user confirmed on a production connection.
+  bool confirmed = 7;
+}
+
+// ReplaceDocumentResponse holds the stored document or the failure.
+message ReplaceDocumentResponse {
+  // Canonical EJSON of the document as stored.
+  string document = 1;
+  // Set when the replace failed.
+  DocumentError error = 2;
+}
+
+// UpdateFieldsRequest is the input of UpdateFields.
+message UpdateFieldsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection name.
+  string collection = 3;
+  // Canonical EJSON value of the _id to update.
+  string id = 4;
+  // Canonical EJSON object of fields to $set; keys may be dotted paths.
+  string set = 5;
+  // Field paths to $unset.
+  repeated string unset = 6;
+  // Document as the editor loaded it; see ReplaceDocumentRequest.
+  optional string expected_document = 7;
+  // Set after the user confirmed on a production connection.
+  bool confirmed = 8;
+}
+
+// UpdateFieldsResponse holds the stored document or the failure.
+message UpdateFieldsResponse {
+  // Canonical EJSON of the document after the update.
+  string document = 1;
+  // Set when the update failed.
+  DocumentError error = 2;
+}
+
+// DeleteDocumentsRequest is the input of DeleteDocuments.
+message DeleteDocumentsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection name.
+  string collection = 3;
+  // Canonical EJSON _id values.
+  repeated string ids = 4;
+  // Must be true on production connections, else CONFIRMATION_REQUIRED.
+  bool confirmed = 5;
+}
+
+// DeleteDocumentsResponse holds the delete count or the failure.
+message DeleteDocumentsResponse {
+  // Documents deleted.
+  uint64 deleted_count = 1;
+  // Set when the delete failed or needs confirmation.
+  DocumentError error = 2;
+}
+
+// SampleFieldsRequest is the input of SampleFields.
+message SampleFieldsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection or view name.
+  string collection = 3;
+  // Documents to sample. 0 means 100; the core clamps it to [1, 1000].
+  uint32 sample_size = 4;
+}
+
+// TypeCount says how many sampled documents held a BSON type in a field.
+message TypeCount {
+  // BSON type alias as used by $type, e.g. "int", "long", "string", "date".
+  string type = 1;
+  // Number of sampled documents with this type for the field.
+  uint32 count = 2;
+}
+
+// FieldStat describes one top-level field in the sample.
+message FieldStat {
+  // Field name.
+  string name = 1;
+  // Types seen, most frequent first.
+  repeated TypeCount types = 2;
+  // Share of sampled documents that have the field, in [0, 1].
+  double frequency = 3;
+}
+
+// SampleFieldsResponse holds the sampled fields or the failure.
+message SampleFieldsResponse {
+  // Fields ordered by frequency, then name. _id comes first.
+  repeated FieldStat fields = 1;
+  // Number of documents actually sampled.
+  uint32 sampled = 2;
+  // True if $sample was unavailable and the first documents were read
+  // instead.
+  bool used_fallback = 3;
+  // Set when sampling failed.
+  DocumentError error = 4;
+}

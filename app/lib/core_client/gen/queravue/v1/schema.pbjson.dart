@@ -23,6 +23,8 @@ const SchemaObjectType$json = {
     {'1': 'SCHEMA_OBJECT_TYPE_TABLE', '2': 1},
     {'1': 'SCHEMA_OBJECT_TYPE_VIEW', '2': 2},
     {'1': 'SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW', '2': 3},
+    {'1': 'SCHEMA_OBJECT_TYPE_COLLECTION', '2': 4},
+    {'1': 'SCHEMA_OBJECT_TYPE_TIME_SERIES', '2': 5},
   ],
 };
 
@@ -30,7 +32,9 @@ const SchemaObjectType$json = {
 final $typed_data.Uint8List schemaObjectTypeDescriptor = $convert.base64Decode(
     'ChBTY2hlbWFPYmplY3RUeXBlEiIKHlNDSEVNQV9PQkpFQ1RfVFlQRV9VTlNQRUNJRklFRBAAEh'
     'wKGFNDSEVNQV9PQkpFQ1RfVFlQRV9UQUJMRRABEhsKF1NDSEVNQV9PQkpFQ1RfVFlQRV9WSUVX'
-    'EAISKAokU0NIRU1BX09CSkVDVF9UWVBFX01BVEVSSUFMSVpFRF9WSUVXEAM=');
+    'EAISKAokU0NIRU1BX09CSkVDVF9UWVBFX01BVEVSSUFMSVpFRF9WSUVXEAMSIQodU0NIRU1BX0'
+    '9CSkVDVF9UWVBFX0NPTExFQ1RJT04QBBIiCh5TQ0hFTUFfT0JKRUNUX1RZUEVfVElNRV9TRVJJ'
+    'RVMQBQ==');
 
 @$core.Deprecated('Use tableRefDescriptor instead')
 const TableRef$json = {
@@ -67,6 +71,8 @@ const SchemaObject$json = {
       '5': 3,
       '10': 'rowCountEstimate'
     },
+    {'1': 'capped', '3': 4, '4': 1, '5': 8, '10': 'capped'},
+    {'1': 'size_bytes', '3': 5, '4': 1, '5': 4, '10': 'sizeBytes'},
   ],
 };
 
@@ -74,7 +80,8 @@ const SchemaObject$json = {
 final $typed_data.Uint8List schemaObjectDescriptor = $convert.base64Decode(
     'CgxTY2hlbWFPYmplY3QSEgoEbmFtZRgBIAEoCVIEbmFtZRIxCgR0eXBlGAIgASgOMh0ucXVlcm'
     'F2dWUudjEuU2NoZW1hT2JqZWN0VHlwZVIEdHlwZRIsChJyb3dfY291bnRfZXN0aW1hdGUYAyAB'
-    'KANSEHJvd0NvdW50RXN0aW1hdGU=');
+    'KANSEHJvd0NvdW50RXN0aW1hdGUSFgoGY2FwcGVkGAQgASgIUgZjYXBwZWQSHQoKc2l6ZV9ieX'
+    'RlcxgFIAEoBFIJc2l6ZUJ5dGVz');
 
 @$core.Deprecated('Use columnDetailsDescriptor instead')
 const ColumnDetails$json = {
@@ -233,6 +240,7 @@ const ListObjectsRequest$json = {
     {'1': 'database', '3': 2, '4': 1, '5': 9, '10': 'database'},
     {'1': 'schema', '3': 3, '4': 1, '5': 9, '10': 'schema'},
     {'1': 'refresh', '3': 4, '4': 1, '5': 8, '10': 'refresh'},
+    {'1': 'include_system', '3': 5, '4': 1, '5': 8, '10': 'includeSystem'},
   ],
 };
 
@@ -240,7 +248,8 @@ const ListObjectsRequest$json = {
 final $typed_data.Uint8List listObjectsRequestDescriptor = $convert.base64Decode(
     'ChJMaXN0T2JqZWN0c1JlcXVlc3QSHQoKc2Vzc2lvbl9pZBgBIAEoCVIJc2Vzc2lvbklkEhoKCG'
     'RhdGFiYXNlGAIgASgJUghkYXRhYmFzZRIWCgZzY2hlbWEYAyABKAlSBnNjaGVtYRIYCgdyZWZy'
-    'ZXNoGAQgASgIUgdyZWZyZXNo');
+    'ZXNoGAQgASgIUgdyZWZyZXNoEiUKDmluY2x1ZGVfc3lzdGVtGAUgASgIUg1pbmNsdWRlU3lzdG'
+    'Vt');
 
 @$core.Deprecated('Use listObjectsResponseDescriptor instead')
 const ListObjectsResponse$json = {

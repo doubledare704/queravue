@@ -109,11 +109,15 @@ class SchemaObject extends $pb.GeneratedMessage {
     $core.String? name,
     SchemaObjectType? type,
     $fixnum.Int64? rowCountEstimate,
+    $core.bool? capped,
+    $fixnum.Int64? sizeBytes,
   }) {
     final result = create();
     if (name != null) result.name = name;
     if (type != null) result.type = type;
     if (rowCountEstimate != null) result.rowCountEstimate = rowCountEstimate;
+    if (capped != null) result.capped = capped;
+    if (sizeBytes != null) result.sizeBytes = sizeBytes;
     return result;
   }
 
@@ -134,6 +138,10 @@ class SchemaObject extends $pb.GeneratedMessage {
     ..aE<SchemaObjectType>(2, _omitFieldNames ? '' : 'type',
         enumValues: SchemaObjectType.values)
     ..aInt64(3, _omitFieldNames ? '' : 'rowCountEstimate')
+    ..aOB(4, _omitFieldNames ? '' : 'capped')
+    ..a<$fixnum.Int64>(
+        5, _omitFieldNames ? '' : 'sizeBytes', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -184,6 +192,26 @@ class SchemaObject extends $pb.GeneratedMessage {
   $core.bool hasRowCountEstimate() => $_has(2);
   @$pb.TagNumber(3)
   void clearRowCountEstimate() => $_clearField(3);
+
+  /// True for capped collections.
+  @$pb.TagNumber(4)
+  $core.bool get capped => $_getBF(3);
+  @$pb.TagNumber(4)
+  set capped($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCapped() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCapped() => $_clearField(4);
+
+  /// Storage size in bytes, or 0 if unknown.
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get sizeBytes => $_getI64(4);
+  @$pb.TagNumber(5)
+  set sizeBytes($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSizeBytes() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSizeBytes() => $_clearField(5);
 }
 
 /// ColumnDetails describes a single column in a table or view.
@@ -767,12 +795,14 @@ class ListObjectsRequest extends $pb.GeneratedMessage {
     $core.String? database,
     $core.String? schema,
     $core.bool? refresh,
+    $core.bool? includeSystem,
   }) {
     final result = create();
     if (sessionId != null) result.sessionId = sessionId;
     if (database != null) result.database = database;
     if (schema != null) result.schema = schema;
     if (refresh != null) result.refresh = refresh;
+    if (includeSystem != null) result.includeSystem = includeSystem;
     return result;
   }
 
@@ -793,6 +823,7 @@ class ListObjectsRequest extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'database')
     ..aOS(3, _omitFieldNames ? '' : 'schema')
     ..aOB(4, _omitFieldNames ? '' : 'refresh')
+    ..aOB(5, _omitFieldNames ? '' : 'includeSystem')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -853,6 +884,16 @@ class ListObjectsRequest extends $pb.GeneratedMessage {
   $core.bool hasRefresh() => $_has(3);
   @$pb.TagNumber(4)
   void clearRefresh() => $_clearField(4);
+
+  /// Include system objects such as MongoDB's system.* collections.
+  @$pb.TagNumber(5)
+  $core.bool get includeSystem => $_getBF(4);
+  @$pb.TagNumber(5)
+  set includeSystem($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIncludeSystem() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIncludeSystem() => $_clearField(5);
 }
 
 /// ListObjectsResponse returns tables and views in the schema.
