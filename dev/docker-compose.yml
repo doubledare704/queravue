@@ -112,6 +112,17 @@ services:
       retries: 30
       start_period: 10s
 
+  mongo-seed:
+    # One-shot: loads dev/seed/mongo (users, orders, 1M-document events).
+    #   docker compose -f dev/docker-compose.yml --profile seed up mongo-seed
+    profiles: ["seed"]
+    image: mongo:8.0.34
+    depends_on:
+      mongo: {condition: service_healthy}
+    volumes: ["./seed/mongo:/seed:ro"]
+    entrypoint: ["mongosh", "--quiet", "mongodb://mongo:27017/?directConnection=true", "/seed/01_seed.js"]
+    restart: "no"
+
   redis:
     image: redis:7.4.12
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-queravue}"]

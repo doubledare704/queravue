@@ -45,11 +45,9 @@ type Count struct {
 	Exact bool
 }
 
-// WriteOptions carries the safety flags of a write.
+// WriteOptions carries the concurrency guard of a write. Production
+// confirmation is enforced by the API layer, which knows the connection flag.
 type WriteOptions struct {
-	// Confirmed is set after the user confirmed a destructive write on a
-	// production connection.
-	Confirmed bool
 	// Expected, if non-nil, makes a replace or update fail with
 	// KindConflict when the stored document differs.
 	Expected *Document

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -94,7 +95,7 @@ func (s *SchemaService) ListObjects(ctx context.Context, req *queravuev1.ListObj
 
 	if !req.GetRefresh() {
 		if cached, ok := s.cache.GetObjects(sess.ID, req.GetDatabase(), req.GetSchema()); ok {
-			return &queravuev1.ListObjectsResponse{Objects: toProtoObjects(cached)}, nil
+			return &queravuev1.ListObjectsResponse{Objects: toProtoObjects(filterSystem(cached, req.GetIncludeSystem()))}, nil
 		}
 	}
 
@@ -104,7 +105,23 @@ func (s *SchemaService) ListObjects(ctx context.Context, req *queravuev1.ListObj
 	}
 
 	s.cache.SetObjects(sess.ID, req.GetDatabase(), req.GetSchema(), objs)
-	return &queravuev1.ListObjectsResponse{Objects: toProtoObjects(objs)}, nil
+	return &queravuev1.ListObjectsResponse{Objects: toProtoObjects(filterSystem(objs, req.GetIncludeSystem()))}, nil
+}
+
+// filterSystem hides MongoDB system.* collections unless asked. The cache
+// holds the full list so the flag never affects the cache key.
+func filterSystem(objs []engine.SchemaObject, include bool) []engine.SchemaObject {
+	if include {
+		return objs
+	}
+	out := make([]engine.SchemaObject, 0, len(objs))
+	for _, o := range objs {
+		if (o.Type == engine.ObjectTypeCollection || o.Type == engine.ObjectTypeTimeSeries) && strings.HasPrefix(o.Name, "system.") {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out
 }
 
 // GetTableDetails implements the RPC.
@@ -149,11 +166,17 @@ func toProtoObjects(objs []engine.SchemaObject) []*queravuev1.SchemaObject {
 			t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_VIEW
 		case engine.ObjectTypeMaterializedView:
 			t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW
+		case engine.ObjectTypeCollection:
+			t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_COLLECTION
+		case engine.ObjectTypeTimeSeries:
+			t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_TIME_SERIES
 		}
 		out[i] = &queravuev1.SchemaObject{
 			Name:             o.Name,
 			Type:             t,
 			RowCountEstimate: o.EstimatedRows,
+			Capped:           o.Capped,
+			SizeBytes:        o.SizeBytes,
 		}
 	}
 	return out
@@ -166,6 +189,10 @@ func toProtoTableDetails(td engine.TableDetails, ref *queravuev1.TableRef) *quer
 		t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_VIEW
 	case engine.ObjectTypeMaterializedView:
 		t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW
+	case engine.ObjectTypeCollection:
+		t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_COLLECTION
+	case engine.ObjectTypeTimeSeries:
+		t = queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_TIME_SERIES
 	}
 
 	cols := make([]*queravuev1.ColumnDetails, len(td.Columns))

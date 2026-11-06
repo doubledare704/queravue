@@ -70,6 +70,8 @@ func Serve(ctx context.Context, cfg Config) error {
 
 	token := []byte(cfg.Token)
 	srv := grpc.NewServer(
+		// Documents can be up to 16 MiB of BSON, more as Extended JSON (ADR 0009).
+		grpc.MaxRecvMsgSize(48<<20), grpc.MaxSendMsgSize(48<<20),
 		grpc.ChainUnaryInterceptor(logUnary(log), recoverUnary(log), authUnary(token)),
 		grpc.ChainStreamInterceptor(logStream(log), recoverStream(log), authStream(token)),
 	)
@@ -90,6 +92,7 @@ func Serve(ctx context.Context, cfg Config) error {
 			schemaCache = schema.NewCache()
 		}
 		queravuev1.RegisterSchemaServiceServer(srv, api.NewSchemaService(cfg.Sessions, schemaCache))
+		queravuev1.RegisterDocumentServiceServer(srv, api.NewDocumentService(cfg.Sessions, cfg.Connections, log))
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
 	}
 	if cfg.History != nil {
