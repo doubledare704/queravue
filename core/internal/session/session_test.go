@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
 	"github.com/doubledare704/queravue/core/internal/sqlsplit"
 )
 
@@ -53,7 +54,7 @@ func TestOpenGetClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Dialect != sqlsplit.Postgres {
+	if s.Dialect == nil || s.Dialect.Lexer() != sqlsplit.Postgres {
 		t.Errorf("dialect = %v", s.Dialect)
 	}
 	if got, err := m.Get(s.ID); err != nil || got != s {
@@ -149,3 +150,6 @@ func TestCloseCancelsRunningStatement(t *testing.T) {
 		t.Fatal("running statement was not cancelled")
 	}
 }
+
+// Dialect makes fakeConn a sqldialect.Provider.
+func (*fakeConn) Dialect() sqldialect.Dialect { return sqldialect.Postgres }

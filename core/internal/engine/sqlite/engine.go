@@ -17,6 +17,7 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
 // ID is the engine id.
@@ -209,3 +210,6 @@ func (c *Conn) Close() error {
 	}
 	return nil
 }
+
+// Dialect implements sqldialect.Provider.
+func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.SQLite }

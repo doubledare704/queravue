@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
 // Variant selects PostgreSQL or a wire-compatible server.
@@ -218,3 +219,6 @@ func parseBanner(banner, serverVersion string) engine.ServerInfo {
 	}
 	return info
 }
+
+// Dialect implements sqldialect.Provider.
+func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.Postgres }

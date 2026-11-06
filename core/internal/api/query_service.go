@@ -75,7 +75,11 @@ func (h *QueryService) Execute(req *queravuev1.ExecuteRequest, stream queravuev1
 
 	text := req.GetText()
 	om := sqlsplit.NewOffsetMap(text)
-	stmts := selectStatements(sess.Dialect, text, om, req)
+	var lexer sqlsplit.Dialect
+	if sess.Dialect != nil {
+		lexer = sess.Dialect.Lexer()
+	}
+	stmts := selectStatements(lexer, text, om, req)
 	plan := &queravuev1.StatementPlan{}
 	for i, r := range stmts {
 		plan.Statements = append(plan.Statements, &queravuev1.StatementRange{
