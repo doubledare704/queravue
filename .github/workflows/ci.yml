@@ -56,7 +56,7 @@ jobs:
 
   integration:
     name: Integration (${{ matrix.name }})
-    runs-on: ${{ matrix.runner || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -67,9 +67,11 @@ jobs:
           - {name: PostgreSQL, service: postgres, pkg: postgres, test: TestIntegrationSuitePostgres}
           - {name: SQL Server, service: mssql, pkg: mssql, test: 'TestIntegration.*'}
           - {name: CockroachDB, service: cockroachdb, pkg: postgres, test: TestIntegrationSuiteCockroach}
-          # MongoDB 8.0 crashes on Linux kernel 6.19+ (SERVER-121912), which
-          # ubuntu-latest (26.04) runs. Drop runner once a fixed image exists.
-          - {name: MongoDB, service: mongo, pkg: mongo, test: 'TestIntegration.*', runner: ubuntu-24.04}
+          - {name: MongoDB, service: mongo, pkg: mongo, test: 'TestIntegration.*'}
+    env:
+      # MongoDB 8.x aborts at startup on the runners' Linux kernel 6.19+
+      # (SERVER-121912); 7.0 starts. Local dev stays on the compose default.
+      MONGO_IMAGE: mongo:7.0.45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6

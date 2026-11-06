@@ -96,7 +96,7 @@ func TestIntegrationConnectFieldsAndURI(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := c.ServerInfo(ctx)
-	if err != nil || info.Product != "MongoDB" || !strings.HasPrefix(info.Version, "8.") {
+	if err != nil || info.Product != "MongoDB" || !strings.HasPrefix(info.Version, "8.") && !strings.HasPrefix(info.Version, "7.") {
 		t.Fatalf("info = %+v, %v", info, err)
 	}
 
