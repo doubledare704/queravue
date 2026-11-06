@@ -86,7 +86,17 @@ jobs:
           }
       - name: Seed TiDB (no init directory)
         if: matrix.service == 'tidb'
-        run: mysql -h127.0.0.1 -P4000 -uroot < dev/seed/tidb/01_schema.sql
+        run: |
+          mysql -h127.0.0.1 -P4000 -uroot < dev/seed/tidb/01_schema.sql
+          # TiDB publishes table_rows from its statistics asynchronously
+          # after ANALYZE; wait so the suite's estimate check does not race it.
+          for i in $(seq 1 60); do
+            n=$(mysql -h127.0.0.1 -P4000 -uroot -N -e "SELECT table_rows FROM information_schema.tables WHERE table_schema = 'queravue' AND table_name = 'million_items'")
+            [ "${n:-0}" -ge 100000 ] 2>/dev/null && exit 0
+            sleep 2
+          done
+          echo "TiDB row estimate did not reach 100000 within 2 minutes" >&2
+          exit 1
       - name: Seed PostgreSQL (not loaded by the image)
         if: matrix.service == 'postgres'
         run: docker exec -i queravue-dev-postgres-1 psql -q -U queravue -d queravue < dev/seed/postgres/01_schema.sql
