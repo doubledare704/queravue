@@ -57,9 +57,9 @@ func (t *TableService) OpenTable(req *queravuev1.OpenTableRequest, stream querav
 		return status.Error(codes.FailedPrecondition, "connection cannot execute statements")
 	}
 
-	dialect := sqlbuilder.DialectPostgres
-	if sess.Desc.Family == "sqlite" {
-		dialect = sqlbuilder.DialectSQLite
+	dialect := sess.Dialect
+	if dialect == nil {
+		return status.Error(codes.FailedPrecondition, "connection has no SQL dialect")
 	}
 
 	sqlText, params, err := sqlbuilder.BuildSelect(dialect, req.GetTableRef(), req.GetFilter(), req.GetSort(), req.GetPageSize())
@@ -213,9 +213,12 @@ func (t *TableService) ApplyChanges(ctx context.Context, req *queravuev1.ApplyCh
 	}
 
 	// 3. Build SQL statements
-	dialect := sqlbuilder.DialectPostgres
-	if sess.Desc.Family == "sqlite" {
-		dialect = sqlbuilder.DialectSQLite
+	dialect := sess.Dialect
+	if dialect == nil {
+		return &queravuev1.ApplyChangesResponse{
+			Success:      false,
+			ErrorMessage: "connection has no SQL dialect",
+		}, nil
 	}
 
 	plans, previewSQL, err := sqlbuilder.BuildApplyChanges(dialect, ref, req.GetChanges())

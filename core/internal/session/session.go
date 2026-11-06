@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
-	"github.com/doubledare704/queravue/core/internal/sqlsplit"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
 // DefaultIdleTimeout closes sessions that run nothing for this long.
@@ -42,8 +42,8 @@ type Session struct {
 	Conn engine.Conn
 	// Desc is the engine descriptor.
 	Desc engine.Descriptor
-	// Dialect selects the statement splitter; zero if the engine has none.
-	Dialect sqlsplit.Dialect
+	// Dialect is the SQL dialect of the engine; nil if it is not a SQL engine.
+	Dialect sqldialect.Dialect
 
 	now func() time.Time
 
@@ -166,12 +166,7 @@ func (m *Manager) Open(ctx context.Context, connectionID string) (*Session, erro
 		return nil, err
 	}
 	s := &Session{ID: uuid.NewString(), ConnectionID: connectionID, Conn: conn, Desc: desc, now: m.now, lastUsed: m.now()}
-	switch desc.Family {
-	case "postgres":
-		s.Dialect = sqlsplit.Postgres
-	case "sqlite":
-		s.Dialect = sqlsplit.SQLite
-	}
+	s.Dialect, _ = sqldialect.Of(conn)
 	m.mu.Lock()
 	if m.stopped {
 		m.mu.Unlock()

@@ -8,30 +8,28 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/results"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
-// Dialect identifies SQL dialect syntax rules.
-type Dialect int
+// Dialect is the SQL syntax of the target engine; see package sqldialect.
+type Dialect = sqldialect.Dialect
 
-const (
-	// DialectPostgres formats identifiers and placeholders ($1) for PostgreSQL and CockroachDB.
-	DialectPostgres Dialect = iota
-	// DialectSQLite formats identifiers and placeholders (?) for SQLite.
-	DialectSQLite
+// Built-in dialects, kept for callers that name them directly.
+var (
+	// DialectPostgres is the PostgreSQL and CockroachDB dialect.
+	DialectPostgres = sqldialect.Postgres
+	// DialectSQLite is the SQLite dialect.
+	DialectSQLite = sqldialect.SQLite
 )
 
-// QuoteIdent quotes a SQL identifier safely per dialect rules.
-func QuoteIdent(s string) string {
-	return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
-}
+// QuoteIdent quotes an identifier with ANSI double quotes.
+//
+// Deprecated: use Dialect.QuoteIdent so the engine's quoting applies.
+func QuoteIdent(s string) string { return sqldialect.Postgres.QuoteIdent(s) }
 
 // QualifyTable returns a safely quoted qualified table name.
 func QualifyTable(d Dialect, schema, table string) string {
-	qTable := QuoteIdent(table)
-	if schema == "" || (d == DialectSQLite && schema == "main") {
-		return qTable
-	}
-	return QuoteIdent(schema) + "." + qTable
+	return d.QualifyTable(schema, table)
 }
 
 // Builder generates parameterized SQL queries and human-readable previews.
@@ -48,10 +46,7 @@ func New(d Dialect) *Builder {
 
 func (b *Builder) nextPlaceholder() string {
 	b.idx++
-	if b.dialect == DialectPostgres {
-		return fmt.Sprintf("$%d", b.idx)
-	}
-	return "?"
+	return b.dialect.Placeholder(b.idx)
 }
 
 func (b *Builder) addParam(v engine.Value) string {
@@ -61,19 +56,27 @@ func (b *Builder) addParam(v engine.Value) string {
 
 // BuildSelect creates a parameterized SELECT query and returns the SQL text, parameters, and preview SQL.
 func BuildSelect(d Dialect, ref *queravuev1.TableRef, filter *queravuev1.TableFilter, sorts []*queravuev1.SortClause, pageSize uint64) (sql string, params []engine.Value, err error) {
+	sql, params, _, err = BuildSelectOrdered(d, ref, filter, sorts, pageSize)
+	return sql, params, err
+}
+
+// BuildSelectOrdered is BuildSelect that also reports whether the row order
+// is stable. It is false when the dialect had to invent an ORDER BY to
+// paginate, so repeated pages may differ.
+func BuildSelectOrdered(d Dialect, ref *queravuev1.TableRef, filter *queravuev1.TableFilter, sorts []*queravuev1.SortClause, pageSize uint64) (sql string, params []engine.Value, orderStable bool, err error) {
 	if ref == nil || ref.GetTable() == "" {
-		return "", nil, fmt.Errorf("table reference is required")
+		return "", nil, false, fmt.Errorf("table reference is required")
 	}
 
 	b := New(d)
-	target := QualifyTable(d, ref.GetSchema(), ref.GetTable())
+	target := d.QualifyTable(ref.GetSchema(), ref.GetTable())
 
 	var whereClauses []string
 	if filter != nil {
 		if filter.GetRoot() != nil {
 			condSQL, err := b.buildGroup(filter.GetRoot())
 			if err != nil {
-				return "", nil, err
+				return "", nil, false, err
 			}
 			if condSQL != "" {
 				whereClauses = append(whereClauses, condSQL)
@@ -90,19 +93,15 @@ func BuildSelect(d Dialect, ref *queravuev1.TableRef, filter *queravuev1.TableFi
 		if s == nil || s.GetColumn() == "" {
 			continue
 		}
-		col := QuoteIdent(s.GetColumn())
-		dir := "ASC"
-		if s.GetDirection() == queravuev1.SortDirection_SORT_DIRECTION_DESC {
-			dir = "DESC"
-		}
-		nulls := ""
+		nulls := sqldialect.NullsDefault
 		switch s.GetNulls() {
 		case queravuev1.NullsOrder_NULLS_ORDER_FIRST:
-			nulls = " NULLS FIRST"
+			nulls = sqldialect.NullsFirst
 		case queravuev1.NullsOrder_NULLS_ORDER_LAST:
-			nulls = " NULLS LAST"
+			nulls = sqldialect.NullsLast
 		}
-		sortClauses = append(sortClauses, fmt.Sprintf("%s %s%s", col, dir, nulls))
+		desc := s.GetDirection() == queravuev1.SortDirection_SORT_DIRECTION_DESC
+		sortClauses = append(sortClauses, d.OrderTerm(d.QuoteIdent(s.GetColumn()), desc, nulls))
 	}
 
 	var sb strings.Builder
@@ -115,12 +114,9 @@ func BuildSelect(d Dialect, ref *queravuev1.TableRef, filter *queravuev1.TableFi
 		sb.WriteString(" ORDER BY ")
 		sb.WriteString(strings.Join(sortClauses, ", "))
 	}
-	if pageSize > 0 {
-		fmt.Fprintf(&sb, " LIMIT %d", pageSize)
-	}
-	sb.WriteString(";")
+	out, stable := d.Paginate(sb.String(), pageSize, len(sortClauses) > 0)
 
-	return sb.String(), b.params, nil
+	return out + ";", b.params, stable, nil
 }
 
 func (b *Builder) buildGroup(g *queravuev1.FilterGroup) (string, error) {
@@ -167,7 +163,7 @@ func (b *Builder) buildCondition(c *queravuev1.FilterCondition) (string, error) 
 	if c == nil || c.GetColumn() == "" {
 		return "", nil
 	}
-	col := QuoteIdent(c.GetColumn())
+	col := b.dialect.QuoteIdent(c.GetColumn())
 
 	switch c.GetOp() {
 	case queravuev1.FilterOp_FILTER_OP_IS_NULL:
@@ -269,7 +265,7 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 	if ref == nil || ref.GetTable() == "" {
 		return nil, "", fmt.Errorf("table reference is required")
 	}
-	target := QualifyTable(d, ref.GetSchema(), ref.GetTable())
+	target := d.QualifyTable(ref.GetSchema(), ref.GetTable())
 
 	var plans []StatementPlan
 	var previewLines []string
@@ -287,10 +283,10 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 			}
 			var cols, phs, previewVals []string
 			for _, cv := range ch.GetValues() {
-				cols = append(cols, QuoteIdent(cv.GetColumn()))
+				cols = append(cols, d.QuoteIdent(cv.GetColumn()))
 				v := results.ValueFromProto(cv.GetValue())
 				phs = append(phs, b.addParam(v))
-				previewVals = append(previewVals, formatPreviewValue(v))
+				previewVals = append(previewVals, d.FormatLiteral(v))
 			}
 			sql := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);", target, strings.Join(cols, ", "), strings.Join(phs, ", "))
 			preview := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s);", target, strings.Join(cols, ", "), strings.Join(previewVals, ", "))
@@ -309,17 +305,17 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 			}
 			var setClauses, previewSets []string
 			for _, cv := range ch.GetValues() {
-				col := QuoteIdent(cv.GetColumn())
+				col := d.QuoteIdent(cv.GetColumn())
 				v := results.ValueFromProto(cv.GetValue())
 				setClauses = append(setClauses, fmt.Sprintf("%s = %s", col, b.addParam(v)))
-				previewSets = append(previewSets, fmt.Sprintf("%s = %s", col, formatPreviewValue(v)))
+				previewSets = append(previewSets, fmt.Sprintf("%s = %s", col, d.FormatLiteral(v)))
 			}
 			var whereClauses, previewWheres []string
 			for _, cv := range ch.GetKeys() {
-				col := QuoteIdent(cv.GetColumn())
+				col := d.QuoteIdent(cv.GetColumn())
 				v := results.ValueFromProto(cv.GetValue())
 				whereClauses = append(whereClauses, fmt.Sprintf("%s = %s", col, b.addParam(v)))
-				previewWheres = append(previewWheres, fmt.Sprintf("%s = %s", col, formatPreviewValue(v)))
+				previewWheres = append(previewWheres, fmt.Sprintf("%s = %s", col, d.FormatLiteral(v)))
 			}
 			sql := fmt.Sprintf("UPDATE %s SET %s WHERE %s;", target, strings.Join(setClauses, ", "), strings.Join(whereClauses, " AND "))
 			preview := fmt.Sprintf("UPDATE %s SET %s WHERE %s;", target, strings.Join(previewSets, ", "), strings.Join(previewWheres, " AND "))
@@ -335,10 +331,10 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 			}
 			var whereClauses, previewWheres []string
 			for _, cv := range ch.GetKeys() {
-				col := QuoteIdent(cv.GetColumn())
+				col := d.QuoteIdent(cv.GetColumn())
 				v := results.ValueFromProto(cv.GetValue())
 				whereClauses = append(whereClauses, fmt.Sprintf("%s = %s", col, b.addParam(v)))
-				previewWheres = append(previewWheres, fmt.Sprintf("%s = %s", col, formatPreviewValue(v)))
+				previewWheres = append(previewWheres, fmt.Sprintf("%s = %s", col, d.FormatLiteral(v)))
 			}
 			sql := fmt.Sprintf("DELETE FROM %s WHERE %s;", target, strings.Join(whereClauses, " AND "))
 			preview := fmt.Sprintf("DELETE FROM %s WHERE %s;", target, strings.Join(previewWheres, " AND "))
@@ -353,30 +349,4 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 	previewLines = append(previewLines, "COMMIT;")
 	fullPreview := strings.Join(previewLines, "\n")
 	return plans, fullPreview, nil
-}
-
-func formatPreviewValue(v engine.Value) string {
-	switch v.Kind {
-	case engine.VNull:
-		return "NULL"
-	case engine.VBool:
-		if v.Bool {
-			return "TRUE"
-		}
-		return "FALSE"
-	case engine.VInt:
-		return fmt.Sprintf("%d", v.Int)
-	case engine.VFloat:
-		return fmt.Sprintf("%f", v.Float)
-	case engine.VDecimal:
-		return v.Str
-	case engine.VText, engine.VUUID, engine.VJSON:
-		return "'" + strings.ReplaceAll(v.Str, "'", "''") + "'"
-	case engine.VTimestamptz:
-		return "'" + v.Time.UTC().Format("2006-01-02 15:04:05.999999Z07:00") + "'"
-	case engine.VBytes:
-		return fmt.Sprintf("X'%X'", v.Bytes)
-	default:
-		return "'" + strings.ReplaceAll(v.Str, "'", "''") + "'"
-	}
 }
