@@ -14,6 +14,10 @@ const (
 	ObjectTypeView ObjectType = "view"
 	// ObjectTypeMaterializedView represents a materialized view.
 	ObjectTypeMaterializedView ObjectType = "materialized_view"
+	// ObjectTypeCollection represents a document collection.
+	ObjectTypeCollection ObjectType = "collection"
+	// ObjectTypeTimeSeries represents a time series collection.
+	ObjectTypeTimeSeries ObjectType = "time_series"
 )
 
 // SchemaObject represents a table or view in a schema list.
@@ -21,6 +25,8 @@ type SchemaObject struct {
 	Name          string
 	Type          ObjectType
 	EstimatedRows int64 // -1 if unknown or unsupported
+	Capped        bool  // capped collection
+	SizeBytes     uint64
 }
 
 // ColumnDef describes a single table column.

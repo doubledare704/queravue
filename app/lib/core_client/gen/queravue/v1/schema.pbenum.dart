@@ -34,15 +34,28 @@ class SchemaObjectType extends $pb.ProtobufEnum {
       SchemaObjectType._(
           3, _omitEnumNames ? '' : 'SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW');
 
+  /// Document collection (MongoDB and compatible). Views use
+  /// SCHEMA_OBJECT_TYPE_VIEW.
+  static const SchemaObjectType SCHEMA_OBJECT_TYPE_COLLECTION =
+      SchemaObjectType._(
+          4, _omitEnumNames ? '' : 'SCHEMA_OBJECT_TYPE_COLLECTION');
+
+  /// Time series collection.
+  static const SchemaObjectType SCHEMA_OBJECT_TYPE_TIME_SERIES =
+      SchemaObjectType._(
+          5, _omitEnumNames ? '' : 'SCHEMA_OBJECT_TYPE_TIME_SERIES');
+
   static const $core.List<SchemaObjectType> values = <SchemaObjectType>[
     SCHEMA_OBJECT_TYPE_UNSPECIFIED,
     SCHEMA_OBJECT_TYPE_TABLE,
     SCHEMA_OBJECT_TYPE_VIEW,
     SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW,
+    SCHEMA_OBJECT_TYPE_COLLECTION,
+    SCHEMA_OBJECT_TYPE_TIME_SERIES,
   ];
 
   static final $core.List<SchemaObjectType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static SchemaObjectType? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

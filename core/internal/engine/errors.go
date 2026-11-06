@@ -30,6 +30,15 @@ const (
 	KindCanceled
 	// KindConnectionLost: the connection broke while a statement ran.
 	KindConnectionLost
+	// KindParse: filter, sort, projection or a document is not valid EJSON.
+	KindParse
+	// KindConflict: the stored document differs from the expected one.
+	KindConflict
+	// KindConfirmationRequired: a destructive write on a production
+	// connection lacks the confirmation flag.
+	KindConfirmationRequired
+	// KindUnsupported: the server does not support the operation.
+	KindUnsupported
 )
 
 // String implements fmt.Stringer.
@@ -53,6 +62,14 @@ func (k Kind) String() string {
 		return "canceled"
 	case KindConnectionLost:
 		return "connection_lost"
+	case KindParse:
+		return "parse"
+	case KindConflict:
+		return "conflict"
+	case KindConfirmationRequired:
+		return "confirmation_required"
+	case KindUnsupported:
+		return "unsupported"
 	default:
 		return "unknown"
 	}
@@ -73,6 +90,9 @@ type Error struct {
 	// a 1-based character (rune) offset, or 0 if unknown. Only set for
 	// KindSQL errors.
 	Position int
+	// Current is the stored canonical EJSON document for KindConflict; nil if
+	// it was deleted.
+	Current *string
 }
 
 // Error implements error.
