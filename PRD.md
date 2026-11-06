@@ -33,7 +33,7 @@ A fast, lightweight, native desktop database workspace for SQL and NoSQL engines
 | SQLite | `modernc.org/sqlite` (pure Go) | |
 | ClickHouse | `ClickHouse/clickhouse-go` | |
 | DuckDB | `marcboeker/go-duckdb` | cgo |
-| MongoDB | `go.mongodb.org/mongo-driver` | also Azure Cosmos DB (Mongo API), Amazon DocumentDB |
+| MongoDB | `go.mongodb.org/mongo-driver/v2` | implemented in It. 5 ([docs/engines/mongodb.md](docs/engines/mongodb.md)); variants: Azure Cosmos DB for MongoDB ([cosmosdb.md](docs/engines/cosmosdb.md), smoke test not yet run against a real account) and DocumentDB / Amazon DocumentDB ([documentdb.md](docs/engines/documentdb.md), verified against DocumentDB Local 7.0.0) |
 | Redis | `redis/go-redis` | |
 
 ## 6. Feature scope

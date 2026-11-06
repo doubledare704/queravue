@@ -4,6 +4,10 @@
 # theirs on first start (drop the volume to reload).
 #
 #   docker compose -f dev/docker-compose.yml up -d --wait
+#
+# Services with a profile (documentdb) do not start with a plain `up`; name
+# them to start them. To free memory while working on one engine, run
+# `make db-only DB=<service>`: it stops every other service first.
 name: queravue-dev
 
 services:
@@ -123,6 +127,20 @@ services:
     entrypoint: ["mongosh", "--quiet", "mongodb://mongo:27017/?directConnection=true", "/seed/01_seed.js"]
     restart: "no"
 
+  documentdb:
+    # Open-source DocumentDB (documentdb.io): PostgreSQL plus a MongoDB wire
+    # gateway. Stands in for Amazon DocumentDB and Cosmos DB for MongoDB vCore.
+    # Self-signed TLS on 10260. Not started by a plain `up`: name it, or use
+    # `make db-only DB=documentdb`. The image defines its own HEALTHCHECK.
+    profiles: ["documentdb"]
+    image: ghcr.io/documentdb/documentdb/documentdb-local:pg17-1.0.0
+    environment:
+      USERNAME: ${DOCDB_USER:-queravue}
+      PASSWORD: ${DOCDB_PASSWORD:-Queravue_dev1}
+      DOCUMENTDB_USAGE_TELEMETRY: "false"
+    ports: ["127.0.0.1:${DOCDB_PORT:-10260}:10260"]
+    volumes: [documentdb:/data]
+
   redis:
     image: redis:7.4.12
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-queravue}"]
@@ -194,6 +212,7 @@ volumes:
   mysql:
   mariadb:
   mongo:
+  documentdb:
   redis:
   mssql:
   clickhouse:
