@@ -1,6 +1,7 @@
 # Local test databases for Queravue development and integration tests.
 # Dev-only credentials; ports bind to 127.0.0.1. Override values via dev/.env
-# (see .env.example). No seed data yet.
+# (see .env.example). Seeds live in dev/seed/<engine>/; mysql and mariadb load
+# theirs on first start (drop the volume to reload).
 #
 #   docker compose -f dev/docker-compose.yml up -d --wait
 name: queravue-dev
@@ -28,13 +29,49 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-queravue}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-queravue}
     ports: ["127.0.0.1:${MYSQL_PORT:-3306}:3306"]
-    volumes: [mysql:/var/lib/mysql]
+    volumes:
+      - mysql:/var/lib/mysql
+      - ./seed/mysql:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 20s
+
+  mariadb:
+    image: mariadb:11.4.5
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-queravue}
+      MARIADB_USER: ${MARIADB_USER:-queravue}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-queravue}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-queravue}
+    ports: ["127.0.0.1:${MARIADB_PORT:-3307}:3306"]
+    volumes:
+      - mariadb:/var/lib/mysql
+      - ./seed/mariadb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # healthcheck.sh ships with the official image; --innodb_initialized
+      # waits for the init scripts (seed) to finish.
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  tidb:
+    # Single-process playground (unistore, no PD/TiKV): enough for protocol and
+    # SQL-compat tests. Not for performance numbers.
+    image: pingcap/tidb:v8.5.1
+    command: ["--store=unistore", "--path=", "--host=0.0.0.0", "-P", "4000"]
+    ports: ["127.0.0.1:${TIDB_PORT:-4000}:4000"]
+    healthcheck:
+      # No curl in the image: ask the status port with bash /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/10080 && printf 'GET /status HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
 
   mongo:
     image: mongo:8.0.34
@@ -115,6 +152,7 @@ services:
 volumes:
   postgres:
   mysql:
+  mariadb:
   mongo:
   redis:
   mssql:

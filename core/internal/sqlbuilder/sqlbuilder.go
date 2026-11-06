@@ -217,10 +217,7 @@ func (b *Builder) buildCondition(c *queravuev1.FilterCondition) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		if b.dialect == DialectPostgres {
-			return fmt.Sprintf("%s ILIKE %s", col, b.addParam(v)), nil
-		}
-		return fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", col, b.addParam(v)), nil
+		return b.dialect.ILike(col, b.addParam(v)), nil
 	case queravuev1.FilterOp_FILTER_OP_BETWEEN:
 		vals := c.GetValues()
 		if len(vals) < 2 {

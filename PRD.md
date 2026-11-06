@@ -27,7 +27,7 @@ A fast, lightweight, native desktop database workspace for SQL and NoSQL engines
 | Engine | Go driver | Notes |
 |---|---|---|
 | PostgreSQL | `jackc/pgx` | also CockroachDB (wire-compatible) |
-| MySQL / MariaDB | `go-sql-driver/mysql` | also TiDB |
+| MySQL / MariaDB | `go-sql-driver/mysql` | also TiDB; implemented in It. 4 ([docs/engines/mysql.md](docs/engines/mysql.md)) |
 | SQL Server | `microsoft/go-mssqldb` | |
 | Oracle | `sijms/go-ora` | pure Go, no Instant Client |
 | SQLite | `modernc.org/sqlite` (pure Go) | |

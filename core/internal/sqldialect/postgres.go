@@ -17,6 +17,7 @@ func (postgres) ID() string                          { return "postgres" }
 func (postgres) QuoteIdent(n string) string          { return quoteWith(n, `"`, `"`) }
 func (postgres) Placeholder(n int) string            { return fmt.Sprintf("$%d", n) }
 func (postgres) FormatLiteral(v engine.Value) string { return literal(v) }
+func (postgres) ILike(col, ph string) string         { return col + " ILIKE " + ph }
 func (postgres) Lexer() sqlsplit.Dialect             { return sqlsplit.Postgres }
 
 func (d postgres) QualifyTable(schema, table string) string {

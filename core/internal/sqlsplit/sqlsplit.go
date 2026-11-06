@@ -21,6 +21,10 @@ const (
 	Postgres Dialect = iota + 1
 	// SQLite: CREATE TRIGGER ... BEGIN ... END bodies, [x] and `x` identifiers.
 	SQLite
+	// MySQL (also MariaDB and TiDB): backslash escapes in '...' and "..."
+	// strings, backtick identifiers, # and "-- " line comments, and the
+	// DELIMITER client command.
+	MySQL
 )
 
 // Range locates one statement as byte offsets into the scanned text.
@@ -42,7 +46,7 @@ func (r Range) Text(s string) string { return s[r.Start:r.End] }
 // whitespace and comments are skipped. It never panics on malformed input:
 // unterminated strings and comments run to the end of the text.
 func Split(d Dialect, text string) []Range {
-	s := scanner{d: d, text: text}
+	s := scanner{d: d, text: text, delim: ";"}
 	return s.run()
 }
 
@@ -81,9 +85,45 @@ func Overlapping(ranges []Range, start, end int) []int {
 }
 
 type scanner struct {
-	d    Dialect
-	text string
-	pos  int
+	d     Dialect
+	text  string
+	pos   int
+	delim string // statement terminator; ";" unless a DELIMITER command changed it
+}
+
+// atDelim reports whether the terminator starts at s.pos.
+func (s *scanner) atDelim() bool {
+	return strings.HasPrefix(s.text[s.pos:], s.delim)
+}
+
+// mysqlDelimiterCmd handles a DELIMITER client command at s.pos (only valid
+// before the first token of a statement). It returns true if one was consumed.
+func (s *scanner) mysqlDelimiterCmd() bool {
+	const kw = "delimiter"
+	t := s.text[s.pos:]
+	if len(t) <= len(kw) || !strings.EqualFold(t[:len(kw)], kw) || (t[len(kw)] != ' ' && t[len(kw)] != '\t') {
+		return false
+	}
+	end := strings.IndexByte(t, '\n')
+	if end < 0 {
+		end = len(t)
+	}
+	arg := strings.TrimSpace(t[len(kw):end])
+	if arg == "" {
+		return false
+	}
+	if f := strings.Fields(arg); len(f) > 0 {
+		arg = f[0]
+	}
+	s.delim = arg
+	s.pos += end
+	return true
+}
+
+// mysqlDashComment reports whether "--" at pos starts a comment: MySQL
+// requires whitespace (or end of input) after the dashes.
+func mysqlDashComment(text string, pos int) bool {
+	return pos+2 >= len(text) || isSpace(text[pos+2])
 }
 
 func isIdentStart(c byte) bool {
@@ -196,36 +236,42 @@ func (s *scanner) run() []Range {
 
 	for s.pos < n {
 		c := text[s.pos]
+		if s.d == MySQL && start < 0 && !inWord && s.mysqlDelimiterCmd() {
+			continue
+		}
 		switch {
 		case isSpace(c):
 			flushWord(s.pos)
 			s.pos++
-		case c == '-' && s.pos+1 < n && text[s.pos+1] == '-':
+		case s.atDelim():
+			flushWord(s.pos)
+			s.pos += len(s.delim)
+			if st.inBlock > 0 {
+				markTok(s.pos-len(s.delim), s.pos)
+				continue
+			}
+			endStmt(s.pos)
+		case c == '-' && s.pos+1 < n && text[s.pos+1] == '-' && (s.d != MySQL || mysqlDashComment(text, s.pos)):
+			flushWord(s.pos)
+			s.skipLine()
+		case c == '#' && s.d == MySQL:
 			flushWord(s.pos)
 			s.skipLine()
 		case c == '/' && s.pos+1 < n && text[s.pos+1] == '*':
 			flushWord(s.pos)
 			s.skipBlockComment()
-		case c == ';':
-			flushWord(s.pos)
-			s.pos++
-			if st.inBlock > 0 {
-				markTok(s.pos-1, s.pos)
-				continue
-			}
-			endStmt(s.pos)
 		case c == '\'':
 			flushWord(s.pos)
 			from := s.pos
-			escapes := s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
-				(from < 2 || !isIdentPart(text[from-2]))
+			escapes := s.d == MySQL || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
+				(from < 2 || !isIdentPart(text[from-2])))
 			s.skipQuoted('\'', escapes)
 			markTok(from, s.pos)
 			st.prevWord = ""
-		case c == '"' || (s.d == SQLite && c == '`'):
+		case c == '"' || ((s.d == SQLite || s.d == MySQL) && c == '`'):
 			flushWord(s.pos)
 			from := s.pos
-			s.skipQuoted(c, false)
+			s.skipQuoted(c, s.d == MySQL && c == '"')
 			markTok(from, s.pos)
 			st.prevWord = ""
 		case s.d == SQLite && c == '[':
