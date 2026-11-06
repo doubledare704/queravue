@@ -1,0 +1,333 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// WorkspaceService reads, writes, searches and watches saved queries and
+// scripts stored as plain files in workspace folders (ADR 0011).
+//
+// Paths are a root id plus a slash-separated path relative to the root.
+// Failures are reported in-band as WorkspaceError.
+service WorkspaceService {
+  // GetRoots lists the configured workspace roots.
+  rpc GetRoots(GetRootsRequest) returns (GetRootsResponse);
+
+  // SetRoots replaces the list of roots. Missing folders are created.
+  rpc SetRoots(SetRootsRequest) returns (SetRootsResponse);
+
+  // ListTree lists the entries of one directory.
+  rpc ListTree(ListTreeRequest) returns (ListTreeResponse);
+
+  // Read returns a file with its mtime and content hash.
+  rpc Read(ReadRequest) returns (ReadResponse);
+
+  // Write replaces a file atomically. With expected_mtime or expected_hash
+  // set, it only writes if the file on disk still matches; otherwise it
+  // returns a CONFLICT error with the current file.
+  rpc Write(WriteRequest) returns (WriteResponse);
+
+  // Create makes a new file or folder. ALREADY_EXISTS if the path exists.
+  rpc Create(CreateRequest) returns (CreateResponse);
+
+  // Rename renames or moves a file or folder inside one root.
+  rpc Rename(RenameRequest) returns (RenameResponse);
+
+  // Delete removes a file or a folder with its contents.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // Search streams the files matching the text and tags as they are found.
+  // Cancelling the call stops the search.
+  rpc Search(SearchRequest) returns (stream SearchResponse);
+
+  // Watch streams changes made on disk, by the app or anything else, until
+  // the client cancels.
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+}
+
+// WorkspaceErrorKind classifies a workspace failure.
+enum WorkspaceErrorKind {
+  // Unclassified failure.
+  WORKSPACE_ERROR_KIND_UNSPECIFIED = 0;
+  // The path resolves outside its root (.. or a symlink).
+  WORKSPACE_ERROR_KIND_PATH_ESCAPES_ROOT = 1;
+  // The root or path does not exist.
+  WORKSPACE_ERROR_KIND_NOT_FOUND = 2;
+  // The target path already exists.
+  WORKSPACE_ERROR_KIND_ALREADY_EXISTS = 3;
+  // The file changed on disk since it was read. WorkspaceError.current holds
+  // the file as it is now.
+  WORKSPACE_ERROR_KIND_CONFLICT = 4;
+  // The file is larger than the size cap.
+  WORKSPACE_ERROR_KIND_TOO_LARGE = 5;
+  // Any other file system failure.
+  WORKSPACE_ERROR_KIND_IO = 6;
+}
+
+// WorkspaceError is a typed failure.
+message WorkspaceError {
+  // Failure class.
+  WorkspaceErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+  // For CONFLICT: the file as it is on disk now. Unset if it was deleted.
+  optional FileContent current = 3;
+}
+
+// WorkspaceRoot is a workspace folder.
+message WorkspaceRoot {
+  // Stable id used in paths.
+  string id = 1;
+  // Display name.
+  string name = 2;
+  // Absolute folder path on the machine running core.
+  string path = 3;
+}
+
+// GetRootsRequest is empty.
+message GetRootsRequest {}
+
+// GetRootsResponse lists the roots.
+message GetRootsResponse {
+  // Configured roots. On first use it holds the default root.
+  repeated WorkspaceRoot roots = 1;
+}
+
+// SetRootsRequest is the new list of roots.
+message SetRootsRequest {
+  // Roots to keep. Entries with an empty id get a new one.
+  repeated WorkspaceRoot roots = 1;
+}
+
+// SetRootsResponse returns the stored roots.
+message SetRootsResponse {
+  // The roots as stored, with ids filled in.
+  repeated WorkspaceRoot roots = 1;
+  // Set when the roots could not be applied.
+  WorkspaceError error = 2;
+}
+
+// FileKind says what a file is for.
+enum FileKind {
+  // Not a script.
+  FILE_KIND_UNSPECIFIED = 0;
+  // A .sql query.
+  FILE_KIND_SQL = 1;
+  // A .mongo.js script.
+  FILE_KIND_MONGO = 2;
+}
+
+// FileMeta is the header metadata of a script (ADR 0011).
+message FileMeta {
+  // Display title.
+  string title = 1;
+  // Free-text description.
+  string description = 2;
+  // Default connection id or name. Never credentials.
+  string connection = 3;
+  // Tags.
+  repeated string tags = 4;
+}
+
+// TreeEntry is one file or folder.
+message TreeEntry {
+  // Entry name, without path.
+  string name = 1;
+  // True for a folder.
+  bool is_dir = 2;
+  // What a file is for. Unspecified for folders and other files.
+  FileKind kind = 3;
+  // File size in bytes.
+  uint64 size = 4;
+  // Last modification time.
+  google.protobuf.Timestamp mtime = 5;
+  // Header metadata of a script file.
+  FileMeta meta = 6;
+}
+
+// ListTreeRequest names the directory to list.
+message ListTreeRequest {
+  // Root id.
+  string root_id = 1;
+  // Directory relative to the root. Empty is the root.
+  string path = 2;
+}
+
+// ListTreeResponse holds the entries, folders first, then by name.
+message ListTreeResponse {
+  // Entries of the directory. `.git` is not listed.
+  repeated TreeEntry entries = 1;
+  // Set when listing failed.
+  WorkspaceError error = 2;
+}
+
+// FileContent is a file read from disk.
+message FileContent {
+  // File text, UTF-8.
+  string content = 1;
+  // Last modification time.
+  google.protobuf.Timestamp mtime = 2;
+  // SHA-256 of the content, hex.
+  string hash = 3;
+  // Parsed header metadata.
+  FileMeta meta = 4;
+  // What the file is for.
+  FileKind kind = 5;
+}
+
+// ReadRequest names the file to read.
+message ReadRequest {
+  // Root id.
+  string root_id = 1;
+  // File path relative to the root.
+  string path = 2;
+}
+
+// ReadResponse holds the file or the failure.
+message ReadResponse {
+  // The file.
+  FileContent file = 1;
+  // Set when reading failed.
+  WorkspaceError error = 2;
+}
+
+// WriteRequest is the input of Write.
+message WriteRequest {
+  // Root id.
+  string root_id = 1;
+  // File path relative to the root.
+  string path = 2;
+  // New file text.
+  string content = 3;
+  // mtime the client last read. Unset skips the check.
+  google.protobuf.Timestamp expected_mtime = 4;
+  // Hash the client last read. Empty skips the check.
+  string expected_hash = 5;
+  // Overwrite without checking, after the user chose "keep mine".
+  bool force = 6;
+}
+
+// WriteResponse holds the written file's state or the failure.
+message WriteResponse {
+  // New mtime.
+  google.protobuf.Timestamp mtime = 1;
+  // New content hash.
+  string hash = 2;
+  // Set when the write failed or conflicted.
+  WorkspaceError error = 3;
+}
+
+// CreateRequest is the input of Create.
+message CreateRequest {
+  // Root id.
+  string root_id = 1;
+  // Path relative to the root.
+  string path = 2;
+  // True to create a folder.
+  bool is_dir = 3;
+  // Initial text of a new file.
+  string content = 4;
+}
+
+// CreateResponse holds the created file's state or the failure.
+message CreateResponse {
+  // New mtime of a created file.
+  google.protobuf.Timestamp mtime = 1;
+  // Content hash of a created file.
+  string hash = 2;
+  // Set when creating failed.
+  WorkspaceError error = 3;
+}
+
+// RenameRequest is the input of Rename.
+message RenameRequest {
+  // Root id.
+  string root_id = 1;
+  // Existing path relative to the root.
+  string from_path = 2;
+  // New path relative to the root.
+  string to_path = 3;
+}
+
+// RenameResponse is empty on success.
+message RenameResponse {
+  // Set when renaming failed.
+  WorkspaceError error = 1;
+}
+
+// DeleteRequest names the entry to delete.
+message DeleteRequest {
+  // Root id.
+  string root_id = 1;
+  // Path relative to the root.
+  string path = 2;
+}
+
+// DeleteResponse is empty on success.
+message DeleteResponse {
+  // Set when deleting failed.
+  WorkspaceError error = 1;
+}
+
+// SearchRequest is the input of Search.
+message SearchRequest {
+  // Case-insensitive text matched against file names, titles, tags and
+  // content. Empty matches every file.
+  string text = 1;
+  // Only files that have all these tags.
+  repeated string tags = 2;
+  // Limit the search to one root. Empty searches all roots.
+  string root_id = 3;
+  // Maximum hits. 0 means 200.
+  uint32 limit = 4;
+}
+
+// SearchResponse is one matching file.
+message SearchResponse {
+  // Root id.
+  string root_id = 1;
+  // File path relative to the root.
+  string path = 2;
+  // What the file is for.
+  FileKind kind = 3;
+  // Header metadata.
+  FileMeta meta = 4;
+  // First matching line text, if the content matched.
+  string snippet = 5;
+  // Line of the snippet, starting at 1. 0 if the match was not in content.
+  uint32 line = 6;
+}
+
+// WatchRequest selects what to watch.
+message WatchRequest {
+  // Roots to watch. Empty watches all roots.
+  repeated string root_ids = 1;
+}
+
+// ChangeKind is what happened to a path.
+enum ChangeKind {
+  // Not set.
+  CHANGE_KIND_UNSPECIFIED = 0;
+  // A file or folder appeared.
+  CHANGE_KIND_CREATED = 1;
+  // A file's content changed.
+  CHANGE_KIND_MODIFIED = 2;
+  // A file or folder disappeared.
+  CHANGE_KIND_DELETED = 3;
+  // A file or folder was renamed. `path` is the new name.
+  CHANGE_KIND_RENAMED = 4;
+}
+
+// WatchResponse reports a change on disk.
+message WatchResponse {
+  // Root id.
+  string root_id = 1;
+  // Path relative to the root.
+  string path = 2;
+  // What happened.
+  ChangeKind kind = 3;
+  // For RENAMED: the old path.
+  string old_path = 4;
+  // Modification time after the change, unset for deletions.
+  google.protobuf.Timestamp mtime = 5;
+}
