@@ -65,6 +65,7 @@ jobs:
           - {name: MariaDB, service: mariadb, pkg: mysql, test: TestIntegrationMariaDB}
           - {name: TiDB, service: tidb, pkg: mysql, test: TestIntegrationTiDB}
           - {name: PostgreSQL, service: postgres, pkg: postgres, test: TestIntegrationSuitePostgres}
+          - {name: SQL Server, service: mssql, pkg: mssql, test: 'TestIntegration.*'}
           - {name: CockroachDB, service: cockroachdb, pkg: postgres, test: TestIntegrationSuiteCockroach}
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +81,9 @@ jobs:
       - name: Seed PostgreSQL (not loaded by the image)
         if: matrix.service == 'postgres'
         run: docker exec -i queravue-dev-postgres-1 psql -q -U queravue -d queravue < dev/seed/postgres/01_schema.sql
+      - name: Seed SQL Server (no init directory)
+        if: matrix.service == 'mssql'
+        run: docker compose -f dev/docker-compose.yml --profile seed up mssql-seed
       - name: Seed CockroachDB (no init directory)
         if: matrix.service == 'cockroachdb'
         run: |

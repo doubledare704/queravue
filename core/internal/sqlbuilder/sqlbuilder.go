@@ -69,7 +69,7 @@ func BuildSelectOrdered(d Dialect, ref *queravuev1.TableRef, filter *queravuev1.
 	}
 
 	b := New(d)
-	target := d.QualifyTable(ref.GetSchema(), ref.GetTable())
+	target := d.QualifyTableIn(ref.GetDatabase(), ref.GetSchema(), ref.GetTable())
 
 	var whereClauses []string
 	if filter != nil {
@@ -262,11 +262,11 @@ func BuildApplyChanges(d Dialect, ref *queravuev1.TableRef, changes []*queravuev
 	if ref == nil || ref.GetTable() == "" {
 		return nil, "", fmt.Errorf("table reference is required")
 	}
-	target := d.QualifyTable(ref.GetSchema(), ref.GetTable())
+	target := d.QualifyTableIn(ref.GetDatabase(), ref.GetSchema(), ref.GetTable())
 
 	var plans []StatementPlan
 	var previewLines []string
-	previewLines = append(previewLines, "BEGIN;")
+	previewLines = append(previewLines, d.Begin())
 
 	for i, ch := range changes {
 		if ch == nil {

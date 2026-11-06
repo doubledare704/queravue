@@ -17,7 +17,11 @@ func (mysqlDialect) ID() string                  { return "mysql" }
 func (mysqlDialect) QuoteIdent(n string) string  { return quoteWith(n, "`", "`") }
 func (mysqlDialect) Placeholder(int) string      { return "?" }
 func (mysqlDialect) ILike(col, ph string) string { return ilikeLower(col, ph) }
-func (mysqlDialect) Lexer() sqlsplit.Dialect     { return sqlsplit.MySQL }
+func (d mysqlDialect) QualifyTableIn(_, schema, table string) string {
+	return d.QualifyTable(schema, table)
+}
+func (mysqlDialect) Begin() string           { return "BEGIN;" }
+func (mysqlDialect) Lexer() sqlsplit.Dialect { return sqlsplit.MySQL }
 
 // QualifyTable qualifies with the database: in MySQL a schema is a database.
 func (d mysqlDialect) QualifyTable(schema, table string) string {

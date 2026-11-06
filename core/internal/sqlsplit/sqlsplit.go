@@ -25,6 +25,11 @@ const (
 	// strings, backtick identifiers, # and "-- " line comments, and the
 	// DELIMITER client command.
 	MySQL
+	// MSSQL (SQL Server): [ident] with ]] escapes, N'...' strings, nested
+	// block comments, the GO batch separator (a line of its own, optional
+	// count), and CREATE/ALTER PROCEDURE, FUNCTION, TRIGGER and VIEW bodies,
+	// which run to the end of the batch.
+	MSSQL
 )
 
 // Range locates one statement as byte offsets into the scanned text.
@@ -143,6 +148,7 @@ type stmtState struct {
 	inBlock    int  // BEGIN ... END nesting that hides semicolons
 	caseDepth  int  // CASE ... END inside a block
 	blockStart bool // statement kind allows a body block
+	batchBody  bool // MSSQL: statement body runs to the next GO, ';' does not end it
 }
 
 func (st *stmtState) word(d Dialect, w string) {
@@ -150,6 +156,12 @@ func (st *stmtState) word(d Dialect, w string) {
 	if len(st.words) < 8 {
 		st.words = append(st.words, up)
 		st.blockStart = bodyStatement(d, st.words)
+		if d == MSSQL && st.blockStart {
+			st.batchBody = true
+		}
+	}
+	if d == MSSQL {
+		return
 	}
 	switch {
 	case st.blockStart && up == "BEGIN" && st.inBlock == 0 && d == SQLite:
@@ -171,6 +183,9 @@ func (st *stmtState) word(d Dialect, w string) {
 // bodyStatement reports whether the leading words start a statement that can
 // contain a semicolon-bearing body.
 func bodyStatement(d Dialect, w []string) bool {
+	if d == MSSQL {
+		return mssqlBodyStatement(w)
+	}
 	i := 0
 	if len(w) == 0 || w[0] != "CREATE" {
 		return false
@@ -197,6 +212,26 @@ func bodyStatement(d Dialect, w []string) bool {
 	case Postgres:
 		skip("OR", "REPLACE")
 		return i < len(w) && (w[i] == "FUNCTION" || w[i] == "PROCEDURE")
+	}
+	return false
+}
+
+// mssqlBodyStatement reports whether the leading words start a CREATE or
+// ALTER of an object whose body may hold semicolons.
+func mssqlBodyStatement(w []string) bool {
+	if len(w) < 2 || (w[0] != "CREATE" && w[0] != "ALTER") {
+		return false
+	}
+	i := 1
+	if i+1 < len(w) && w[i] == "OR" && w[i+1] == "ALTER" {
+		i += 2
+	}
+	if i >= len(w) {
+		return false
+	}
+	switch w[i] {
+	case "PROC", "PROCEDURE", "FUNCTION", "TRIGGER", "VIEW":
+		return true
 	}
 	return false
 }
@@ -239,6 +274,11 @@ func (s *scanner) run() []Range {
 		if s.d == MySQL && start < 0 && !inWord && s.mysqlDelimiterCmd() {
 			continue
 		}
+		if s.d == MSSQL && (c == 'g' || c == 'G') && s.mssqlGoLine() {
+			flushWord(s.pos)
+			endStmt(s.pos)
+			continue
+		}
 		switch {
 		case isSpace(c):
 			flushWord(s.pos)
@@ -246,7 +286,7 @@ func (s *scanner) run() []Range {
 		case s.atDelim():
 			flushWord(s.pos)
 			s.pos += len(s.delim)
-			if st.inBlock > 0 {
+			if st.inBlock > 0 || st.batchBody {
 				markTok(s.pos-len(s.delim), s.pos)
 				continue
 			}
@@ -274,14 +314,10 @@ func (s *scanner) run() []Range {
 			s.skipQuoted(c, s.d == MySQL && c == '"')
 			markTok(from, s.pos)
 			st.prevWord = ""
-		case s.d == SQLite && c == '[':
+		case (s.d == SQLite || s.d == MSSQL) && c == '[':
 			flushWord(s.pos)
 			from := s.pos
-			if i := strings.IndexByte(text[s.pos:], ']'); i >= 0 {
-				s.pos += i + 1
-			} else {
-				s.pos = n
-			}
+			s.skipBracket()
 			markTok(from, s.pos)
 			st.prevWord = ""
 		case s.d == Postgres && c == '$' && (s.pos == 0 || !isIdentPart(text[s.pos-1])):
@@ -329,7 +365,7 @@ func (s *scanner) skipBlockComment() {
 	s.pos += 2
 	for s.pos < len(s.text) {
 		switch {
-		case s.d == Postgres && strings.HasPrefix(s.text[s.pos:], "/*"):
+		case (s.d == Postgres || s.d == MSSQL) && strings.HasPrefix(s.text[s.pos:], "/*"):
 			depth++
 			s.pos += 2
 		case strings.HasPrefix(s.text[s.pos:], "*/"):
@@ -397,4 +433,61 @@ func (s *scanner) skipDollar(tag string) {
 		return
 	}
 	s.pos = len(s.text)
+}
+
+// skipBracket skips a [bracketed identifier] starting at s.pos. In MSSQL a
+// doubled ]] is an escaped bracket.
+func (s *scanner) skipBracket() {
+	s.pos++
+	for s.pos < len(s.text) {
+		if s.text[s.pos] == ']' {
+			if s.d == MSSQL && s.pos+1 < len(s.text) && s.text[s.pos+1] == ']' {
+				s.pos += 2
+				continue
+			}
+			s.pos++
+			return
+		}
+		s.pos++
+	}
+}
+
+// mssqlGoLine reports whether the text at s.pos is a GO batch separator: the
+// word GO alone on its line, with an optional repeat count and trailing
+// comment. If so it advances s.pos to the end of the line.
+func (s *scanner) mssqlGoLine() bool {
+	t := s.text
+	// Only whitespace may precede GO on its line.
+	for i := s.pos - 1; i >= 0 && t[i] != '\n'; i-- {
+		if t[i] != ' ' && t[i] != '\t' && t[i] != '\r' {
+			return false
+		}
+	}
+	if s.pos+2 > len(t) || !strings.EqualFold(t[s.pos:s.pos+2], "go") {
+		return false
+	}
+	i := s.pos + 2
+	skipBlanks := func() {
+		for i < len(t) && (t[i] == ' ' || t[i] == '\t') {
+			i++
+		}
+	}
+	if i < len(t) && !isSpace(t[i]) && t[i] != '-' {
+		return false // e.g. "gone"
+	}
+	skipBlanks()
+	for i < len(t) && t[i] >= '0' && t[i] <= '9' {
+		i++
+	}
+	skipBlanks()
+	if i < len(t) && t[i] == '-' && i+1 < len(t) && t[i+1] == '-' {
+		for i < len(t) && t[i] != '\n' {
+			i++
+		}
+	}
+	if i < len(t) && t[i] != '\n' && t[i] != '\r' {
+		return false
+	}
+	s.pos = i
+	return true
 }

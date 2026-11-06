@@ -5,6 +5,7 @@ package engines
 
 import (
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/engine/mssql"
 	"github.com/doubledare704/queravue/core/internal/engine/mysql"
 	"github.com/doubledare704/queravue/core/internal/engine/postgres"
 	"github.com/doubledare704/queravue/core/internal/engine/sqlite"
@@ -18,6 +19,7 @@ func All() []engine.Engine {
 		mysql.New(mysql.VariantMySQL),
 		mysql.New(mysql.VariantMariaDB),
 		mysql.New(mysql.VariantTiDB),
+		mssql.New(),
 		sqlite.New(),
 	}
 }

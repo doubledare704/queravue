@@ -143,6 +143,20 @@ services:
       retries: 30
       start_period: 30s
 
+  mssql-seed:
+    # One-shot: loads dev/seed/mssql into the running mssql service.
+    #   docker compose -f dev/docker-compose.yml --profile seed up mssql-seed
+    profiles: ["seed"]
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    platform: linux/amd64
+    depends_on:
+      mssql: {condition: service_healthy}
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Queravue_dev1}
+    volumes: ["./seed/mssql:/seed:ro"]
+    entrypoint: ["/bin/bash", "-c", "/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -b -i /seed/01_schema.sql"]
+    restart: "no"
+
   clickhouse:
     # 26.3 is the current LTS line.
     image: clickhouse/clickhouse-server:26.3.25.2

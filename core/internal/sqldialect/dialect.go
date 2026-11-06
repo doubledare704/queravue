@@ -31,6 +31,12 @@ type Dialect interface {
 	QuoteIdent(name string) string
 	// QualifyTable returns the quoted, optionally schema-qualified name.
 	QualifyTable(schema, table string) string
+	// QualifyTableIn is QualifyTable with a database, for dialects whose
+	// names can be cross-database (SQL Server: [db].[schema].[table]). Others
+	// ignore the database: the connection is already in it.
+	QualifyTableIn(database, schema, table string) string
+	// Begin is the statement that starts a transaction.
+	Begin() string
 	// Placeholder returns the n-th (1-based) bind placeholder.
 	Placeholder(n int) string
 	// OrderTerm renders one ORDER BY term for an already quoted column.
