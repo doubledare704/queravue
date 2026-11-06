@@ -73,6 +73,21 @@ services:
       retries: 20
       start_period: 5s
 
+  cockroachdb:
+    image: cockroachdb/cockroach:v25.4.2
+    # In-memory store: a disk-backed 1M-row seed takes ~12 min on a laptop
+    # VM. Data is gone on restart; reload dev/seed/cockroachdb.
+    command: ["start-single-node", "--insecure", "--store=type=mem,size=2GiB"]
+    ports:
+      - "127.0.0.1:${COCKROACH_PORT:-26257}:26257"
+      - "127.0.0.1:${COCKROACH_HTTP_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "./cockroach", "sql", "--insecure", "-e", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
   mongo:
     image: mongo:8.0.34
     # Single-node replica set so transactions and change streams work.
