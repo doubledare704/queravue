@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../editor/data/query_repository.dart';
 import '../../editor/domain/query_models.dart';
+import 'connections_controller.dart';
 
 /// State of an active DB session for a connection.
 class ConnectionSessionState {
@@ -84,3 +85,31 @@ final connectionSessionProvider =
       ConnectionSessionState,
       String
     >(ConnectionSessionController.new);
+
+/// True for connections to document engines that cannot run SQL: they have
+/// the `document_store` capability and not `execute`. Decided from the live
+/// session when connected, else from the engine descriptor; unknown means
+/// false, so SQL entry points stay available.
+final connectionIsDocumentOnlyProvider = Provider.family<bool, String>((
+  ref,
+  connectionId,
+) {
+  final session = ref.watch(connectionSessionProvider(connectionId)).session;
+  Set<String>? caps = session?.capabilities;
+  if (caps == null) {
+    final profile = ref
+        .watch(connectionsControllerProvider)
+        .value
+        ?.where((c) => c.id == connectionId)
+        .firstOrNull;
+    final engine = ref
+        .watch(enginesProvider)
+        .value
+        ?.where((e) => e.id == profile?.engineId)
+        .firstOrNull;
+    caps = engine?.capabilities;
+  }
+  return caps != null &&
+      caps.contains('document_store') &&
+      !caps.contains('execute');
+});

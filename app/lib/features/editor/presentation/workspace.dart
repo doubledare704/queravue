@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/shortcuts.dart';
+import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
+import '../../documents/presentation/document_tab_view.dart';
 import '../../connections/presentation/connection_details.dart';
 import '../../table_view/presentation/table_tab_view.dart';
 import '../application/editor_tabs.dart';
@@ -48,12 +50,13 @@ class Workspace extends ConsumerWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  key: const Key('new-tab'),
-                  tooltip: 'New query tab (${primaryLabel}T)',
-                  icon: const Icon(Icons.add, size: 18),
-                  onPressed: () => notifier.open(id),
-                ),
+                if (!ref.watch(connectionIsDocumentOnlyProvider(id)))
+                  IconButton(
+                    key: const Key('new-tab'),
+                    tooltip: 'New query tab (${primaryLabel}T)',
+                    icon: const Icon(Icons.add, size: 18),
+                    onPressed: () => notifier.open(id),
+                  ),
               ],
             ),
           ),
@@ -64,7 +67,9 @@ class Workspace extends ConsumerWidget {
             index: tabs.indexWhere((t) => t.id == active.id),
             children: [
               for (final t in tabs)
-                t.isTable
+                t.isCollection
+                    ? DocumentTabView(key: ValueKey(t.id), tab: t)
+                    : t.isTable
                     ? TableTabView(key: ValueKey(t.id), tab: t)
                     : QueryTabView(key: ValueKey(t.id), tab: t),
             ],
@@ -108,7 +113,11 @@ class _TabButton extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              tab.isTable ? Icons.table_chart_outlined : Icons.code,
+              tab.isCollection
+                  ? Icons.data_object
+                  : tab.isTable
+                  ? Icons.table_chart_outlined
+                  : Icons.code,
               size: 14,
               color: selected ? cs.primary : cs.onSurfaceVariant,
             ),

@@ -105,12 +105,17 @@ class GrpcSchemaRepository implements SchemaRepository {
         pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_VIEW => SchemaObjectType.view,
         pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW =>
           SchemaObjectType.materializedView,
+        pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_COLLECTION =>
+          SchemaObjectType.collection,
+        pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_TIME_SERIES =>
+          SchemaObjectType.timeSeries,
         _ => SchemaObjectType.table,
       };
       return SchemaObject(
         name: o.name,
         type: type,
         rowCountEstimate: o.rowCountEstimate.toInt(),
+        capped: o.capped,
       );
     }).toList();
   }
@@ -138,6 +143,10 @@ class GrpcSchemaRepository implements SchemaRepository {
       pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_VIEW => SchemaObjectType.view,
       pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW =>
         SchemaObjectType.materializedView,
+      pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_COLLECTION =>
+        SchemaObjectType.collection,
+      pb.SchemaObjectType.SCHEMA_OBJECT_TYPE_TIME_SERIES =>
+        SchemaObjectType.timeSeries,
       _ => SchemaObjectType.table,
     };
 

@@ -41,6 +41,13 @@ Per-request failures are in-band `DocumentError{kind, message, input, position, 
 ### 10. Connection parameters
 No change to the `Connection` message. The engine descriptor declares fields stored in `params`: `hosts`, `srv`, `replica_set`, `database`, `username`, `auth_source`, `auth_mechanism` (`default`, `SCRAM-SHA-256`, `SCRAM-SHA-1`, `MONGODB-X509`), `tls`, `tls_ca_file`, `tls_cert_key_file`, `tls_insecure`, `direct_connection`, `read_preference`. Passwords and credentials embedded in URIs are split off by `ParseConnectionString` and live only in the keychain. Logs never contain the URI. Variants (`mongodb`, `cosmosdb-mongo`, `documentdb`) set defaults in their descriptors (ADR 0003 pattern).
 
+### 11. UI (PR 3)
+- **Capability gating, no engine ids in Dart.** The tree treats a session with `document_store` as "databases hold collections directly" (`ListObjects(db, "")`) and opens collections in document tabs. SQL entry points (new query tab, ⌘T, the `+` button) are hidden when the engine has `document_store` and not `execute`. The connection form is built from the descriptor, including select, boolean and file fields; "paste URI" goes through `ParseConnectionString`.
+- **One page, three views.** A collection tab holds one page of documents (20/50/100/500; one extra document is requested to know whether a next page exists) and shows it as Table (the virtualized `FixedGridView` of ADR 0004), Tree (flattened to the expanded rows and built lazily) or JSON (one lazily built entry per document). Table columns come from `SampleFields`, `_id` first; nested values show as compact shell-style text and open in a value dialog.
+- **Display vs. wire.** Views show shell-style text (`NumberLong("5")`, `ISODate(…)`, `UUID(…)`) derived from the canonical tree, with a type badge in the tree. Edits always start from the canonical text received from the core.
+- **Editing.** The editor shows pretty-printed canonical EJSON, a "Changes" tab with a line diff of canonical text (so Int32 → Int64 is visible), and saves with `expected_document` set to the text as loaded. A conflict offers reload or overwrite (overwrite is not offered if the document was deleted). Deletes always confirm; production connections say so in the dialog and button.
+- **Cancel.** Find and Count run as cancellable gRPC calls; a Cancel button replaces Run after 300 ms. The core records document operations in the query history as shell-style text.
+
 ## Consequences
 - Dart needs no BSON library; the editor and diff work on text, and exact types survive because the canonical form is the single stored representation.
 - EJSON is bulkier on the wire than BSON; mitigated by batch caps, and revisitable by adding a `bytes` field alongside later (additive).

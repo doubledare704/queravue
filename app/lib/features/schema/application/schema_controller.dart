@@ -36,11 +36,13 @@ class ObjectNode extends SchemaTreeNode {
     required this.tableRef,
     required this.type,
     this.rowCountEstimate = -1,
+    this.capped = false,
   });
 
   final TableRef tableRef;
   final SchemaObjectType type;
   final int rowCountEstimate;
+  final bool capped;
 }
 
 class ColumnNode extends SchemaTreeNode {
@@ -78,6 +80,7 @@ class ForeignKeyNode extends SchemaTreeNode {
 class SchemaTreeState {
   const SchemaTreeState({
     this.sessionId,
+    this.documentStore = false,
     this.isLoading = false,
     this.error,
     this.expandedKeys = const {},
@@ -88,6 +91,10 @@ class SchemaTreeState {
   });
 
   final String? sessionId;
+
+  /// The engine has the `document_store` capability: databases hold
+  /// collections directly (no schema level) and open in document tabs.
+  final bool documentStore;
   final bool isLoading;
   final Object? error;
   final Set<String> expandedKeys;
@@ -98,6 +105,7 @@ class SchemaTreeState {
 
   SchemaTreeState copyWith({
     String? sessionId,
+    bool? documentStore,
     bool? isLoading,
     Object? error,
     bool clearError = false,
@@ -108,6 +116,7 @@ class SchemaTreeState {
     Map<String, TableDetails>? tableDetailsByRef,
   }) => SchemaTreeState(
     sessionId: sessionId ?? this.sessionId,
+    documentStore: documentStore ?? this.documentStore,
     isLoading: isLoading ?? this.isLoading,
     error: clearError ? null : (error ?? this.error),
     expandedKeys: expandedKeys ?? this.expandedKeys,
@@ -135,7 +144,12 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
 
     if (sessionId != null) {
       Future.microtask(() => _loadRoot(sessionId));
-      return SchemaTreeState(sessionId: sessionId, isLoading: true);
+      return SchemaTreeState(
+        sessionId: sessionId,
+        documentStore:
+            connState.session?.capabilities.contains('document_store') ?? false,
+        isLoading: true,
+      );
     }
     return const SchemaTreeState();
   }
@@ -145,7 +159,16 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
   Future<void> _loadRoot(String sessionId) async {
     try {
       final dbs = await _repo.listDatabases(sessionId);
-      if (dbs.isEmpty || (dbs.length == 1 && dbs.first == 'main')) {
+      if (state.documentStore) {
+        state = state.copyWith(
+          isLoading: false,
+          childrenByKey: {
+            'root': [
+              for (final db in dbs) DatabaseNode(key: 'db:$db', label: db),
+            ],
+          },
+        );
+      } else if (dbs.isEmpty || (dbs.length == 1 && dbs.first == 'main')) {
         // Single database (like SQLite): load schemas directly
         final schemas = await _repo.listSchemas(sessionId);
         final nodes = <SchemaTreeNode>[
@@ -226,7 +249,31 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
     state = state.copyWith(loadingKeys: {...state.loadingKeys, key});
 
     try {
-      if (key.startsWith('db:')) {
+      if (key.startsWith('db:') && state.documentStore) {
+        final db = key.substring(3);
+        final objs = await _repo.listObjects(
+          sessionId,
+          database: db,
+          schema: '',
+          refresh: refresh,
+        );
+        state = state.copyWith(
+          childrenByKey: {
+            ...state.childrenByKey,
+            key: [
+              for (final o in objs)
+                ObjectNode(
+                  key: 'coll:$db/${o.name}',
+                  label: o.name,
+                  tableRef: TableRef(database: db, table: o.name),
+                  type: o.type,
+                  rowCountEstimate: o.rowCountEstimate,
+                  capped: o.capped,
+                ),
+            ],
+          },
+        );
+      } else if (key.startsWith('db:')) {
         final db = key.substring(3);
         final schemas = await _repo.listSchemas(
           sessionId,

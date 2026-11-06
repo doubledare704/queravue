@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../connections/application/connections_controller.dart';
 import '../connections/presentation/connection_actions.dart';
+import '../documents/application/document_actions.dart';
 import '../editor/application/editor_actions.dart';
 import '../editor/domain/query_models.dart';
 import '../history/presentation/history_dialog.dart';
@@ -64,6 +65,25 @@ final paletteCommandsProvider = Provider<List<PaletteCommand>>((ref) {
       title: 'Cancel running statement',
       shortcut: 'Esc',
       run: (context, ref) => cancelActiveTab(ref),
+    ),
+    PaletteCommand(
+      id: 'documents.run',
+      title: 'Run document query',
+      subtitle: 'Collection tab: filter, sort, projection',
+      shortcut: '⌘↵',
+      run: (context, ref) => runDocumentQuery(ref),
+    ),
+    PaletteCommand(
+      id: 'documents.insert',
+      title: 'Insert document',
+      subtitle: 'Collection tab',
+      run: (context, ref) async => insertDocument(context, ref),
+    ),
+    PaletteCommand(
+      id: 'documents.refresh',
+      title: 'Refresh documents',
+      subtitle: 'Collection tab',
+      run: (context, ref) => refreshDocuments(ref),
     ),
     PaletteCommand(
       id: 'history.open',

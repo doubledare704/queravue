@@ -10,7 +10,7 @@ import '../../schema/domain/schema_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table }
+enum TabKind { query, table, collection }
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -32,6 +32,7 @@ class EditorTab {
 
   bool get isQuery => kind == TabKind.query;
   bool get isTable => kind == TabKind.table;
+  bool get isCollection => kind == TabKind.collection;
 }
 
 @immutable
@@ -115,6 +116,36 @@ class EditorTabs extends Notifier<EditorTabsState> {
       title: tableRef.table,
       kind: TabKind.table,
       tableRef: tableRef,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  /// Opens a document tab for collection [ref] (`ref.database` and
+  /// `ref.table`). If already open, focuses it.
+  EditorTab openCollection(String connectionId, TableRef ref) {
+    final existing = state.tabs
+        .where(
+          (t) =>
+              t.isCollection &&
+              t.connectionId == connectionId &&
+              t.tableRef == ref,
+        )
+        .firstOrNull;
+    if (existing != null) {
+      select(existing.id);
+      return existing;
+    }
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: ref.table,
+      kind: TabKind.collection,
+      tableRef: ref,
     );
     _live.add(tab);
     state = EditorTabsState(
