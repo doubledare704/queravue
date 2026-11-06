@@ -67,6 +67,11 @@ jobs:
           - {name: PostgreSQL, service: postgres, pkg: postgres, test: TestIntegrationSuitePostgres}
           - {name: SQL Server, service: mssql, pkg: mssql, test: 'TestIntegration.*'}
           - {name: CockroachDB, service: cockroachdb, pkg: postgres, test: TestIntegrationSuiteCockroach}
+          - {name: MongoDB, service: mongo, pkg: mongo, test: 'TestIntegration.*'}
+    env:
+      # MongoDB 8.x aborts at startup on the runners' Linux kernel 6.19+
+      # (SERVER-121912); 7.0 starts. Local dev stays on the compose default.
+      MONGO_IMAGE: mongo:7.0.45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -74,16 +79,33 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
       - name: Start database
-        run: docker compose -f dev/docker-compose.yml up -d --wait ${{ matrix.service }}
+        run: |
+          docker compose -f dev/docker-compose.yml up -d --wait ${{ matrix.service }} || {
+            docker compose -f dev/docker-compose.yml logs --tail 100 ${{ matrix.service }}
+            exit 1
+          }
       - name: Seed TiDB (no init directory)
         if: matrix.service == 'tidb'
-        run: mysql -h127.0.0.1 -P4000 -uroot < dev/seed/tidb/01_schema.sql
+        run: |
+          mysql -h127.0.0.1 -P4000 -uroot < dev/seed/tidb/01_schema.sql
+          # TiDB publishes table_rows from its statistics asynchronously
+          # after ANALYZE; wait so the suite's estimate check does not race it.
+          for i in $(seq 1 60); do
+            n=$(mysql -h127.0.0.1 -P4000 -uroot -N -e "SELECT table_rows FROM information_schema.tables WHERE table_schema = 'queravue' AND table_name = 'million_items'")
+            [ "${n:-0}" -ge 100000 ] 2>/dev/null && exit 0
+            sleep 2
+          done
+          echo "TiDB row estimate did not reach 100000 within 2 minutes" >&2
+          exit 1
       - name: Seed PostgreSQL (not loaded by the image)
         if: matrix.service == 'postgres'
         run: docker exec -i queravue-dev-postgres-1 psql -q -U queravue -d queravue < dev/seed/postgres/01_schema.sql
       - name: Seed SQL Server (no init directory)
         if: matrix.service == 'mssql'
         run: docker compose -f dev/docker-compose.yml --profile seed up mssql-seed
+      - name: Seed MongoDB (users, orders, 1M events)
+        if: matrix.service == 'mongo'
+        run: docker compose -f dev/docker-compose.yml --profile seed up mongo-seed
       - name: Seed CockroachDB (no init directory)
         if: matrix.service == 'cockroachdb'
         run: |

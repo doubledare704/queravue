@@ -39,6 +39,9 @@ const (
 	KindConfirmationRequired
 	// KindUnsupported: the server does not support the operation.
 	KindUnsupported
+	// KindServer: the server rejected an operation that is not a statement
+	// (document engines: duplicate key, validation failure, ...).
+	KindServer
 )
 
 // String implements fmt.Stringer.
@@ -70,6 +73,8 @@ func (k Kind) String() string {
 		return "confirmation_required"
 	case KindUnsupported:
 		return "unsupported"
+	case KindServer:
+		return "server"
 	default:
 		return "unknown"
 	}
@@ -93,7 +98,27 @@ type Error struct {
 	// Current is the stored canonical EJSON document for KindConflict; nil if
 	// it was deleted.
 	Current *string
+	// Input names the request input a KindParse error refers to.
+	Input Input
+	// DocumentIndex is the index of the failing document in a multi-document
+	// request, or -1 if not applicable (zero value 0 means index 0 only for
+	// KindParse with HasIndex).
+	DocumentIndex int
+	// HasIndex reports whether DocumentIndex is set.
+	HasIndex bool
 }
+
+// Input names which request input a parse error refers to.
+type Input int
+
+// Inputs of a document request.
+const (
+	InputNone Input = iota
+	InputFilter
+	InputSort
+	InputProjection
+	InputDocument
+)
 
 // Error implements error.
 func (e *Error) Error() string {
