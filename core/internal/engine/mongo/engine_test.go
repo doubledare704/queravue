@@ -87,7 +87,12 @@ func TestBuildURI(t *testing.T) {
 		ParamHosts: "a:1,b:2", ParamReplicaSet: "rs0", ParamUsername: "us er", ParamTLS: "true",
 		ParamTLSCAFile: "/ca.pem", ParamAuthSource: "admin", ParamDatabase: "app",
 	}})
-	u, err := url.Parse(e.buildURI(cfg, engine.NewSecret("p@ss:w/rd")))
+	builtURI := e.buildURI(cfg, engine.NewSecret("p@ss:w/rd"))
+	if !strings.Contains(builtURI, "@a:1,b:2/app?") {
+		t.Errorf("host list not kept in %q", builtURI)
+	}
+	// net/url rejects a comma-separated host list, so parse a single-host copy.
+	u, err := url.Parse(strings.Replace(builtURI, "a:1,b:2", "a:1", 1))
 	if err != nil {
 		t.Fatal(err)
 	}

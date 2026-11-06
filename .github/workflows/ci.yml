@@ -75,7 +75,11 @@ jobs:
           go-version-file: core/go.mod
           cache-dependency-path: core/go.sum
       - name: Start database
-        run: docker compose -f dev/docker-compose.yml up -d --wait ${{ matrix.service }}
+        run: |
+          docker compose -f dev/docker-compose.yml up -d --wait ${{ matrix.service }} || {
+            docker compose -f dev/docker-compose.yml logs --tail 100 ${{ matrix.service }}
+            exit 1
+          }
       - name: Seed TiDB (no init directory)
         if: matrix.service == 'tidb'
         run: mysql -h127.0.0.1 -P4000 -uroot < dev/seed/tidb/01_schema.sql

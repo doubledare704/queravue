@@ -56,6 +56,15 @@ cd app && flutter run -d macos
 5. **Everything is cancellable.** Pass `context.Context` through every core call; the UI exposes cancel for any operation > 300 ms.
 6. **Core must not crash.** Recover panics at the gRPC boundary and in each driver goroutine; return typed errors.
 
+## Code style: names over comments
+Code explains itself through naming. Files stay small; comments do not pad them.
+- Name classes, methods, variables, fields and tests so that a reader needs no comment to know what they are and do. If you feel the urge to comment a block, first try a rename or extracting a well-named function.
+- Do not comment what the code already says: no doc comment that restates the name (`// Close closes the connection`), no per-field or per-line narration, no section banners, no commented-out code, no change-log or "added in PR x" notes.
+- A comment is allowed only for what names cannot carry: a non-obvious *why* (a server quirk, a workaround, a trade-off, a hidden invariant, a concurrency or security constraint). Write it as one short line directly above the code it explains, never trailing.
+- Exported Go identifiers need a doc comment only when the linter requires one or when it adds information beyond the name. Keep it to one sentence. Dart: same rule, no `///` that repeats the member name.
+- Anything longer than two lines is documentation, not a comment: put it in `docs/` (engine notes in `docs/engines/`, decisions in `docs/adr/`) and, if needed, point to it with a one-line comment.
+- When you touch a file, remove comments in the lines you change that break these rules. Do not mass-strip comments in code you are not changing.
+
 ## Go conventions
 - Go ≥ 1.23. `gofmt`/`goimports`; `golangci-lint` clean.
 - Wrap errors with context: `fmt.Errorf("postgres: list tables: %w", err)`. No `panic` for control flow.
