@@ -6,8 +6,11 @@ import 'package:grpc/grpc.dart';
 import 'core_launcher.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
+import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
+import 'gen/queravue/v1/schema.pbgrpc.dart';
 import 'gen/queravue/v1/session.pbgrpc.dart';
+import 'gen/queravue/v1/table.pbgrpc.dart';
 
 export 'gen/queravue/v1/core.pb.dart' show HealthResponse;
 export 'gen/queravue/v1/core.pbenum.dart' show HealthStatus;
@@ -42,6 +45,15 @@ abstract interface class CoreConnection {
   /// Client for running statements and reading results.
   QueryServiceClient get queryService;
 
+  /// Client for database schema introspection.
+  SchemaServiceClient get schemaService;
+
+  /// Client for table browsing and inline editing.
+  TableServiceClient get tableService;
+
+  /// Client for query execution history.
+  HistoryServiceClient get historyService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -57,6 +69,9 @@ class GrpcCoreConnection implements CoreConnection {
     connectionService = ConnectionServiceClient(_channel, options: _auth);
     sessionService = SessionServiceClient(_channel, options: _auth);
     queryService = QueryServiceClient(_channel, options: _auth);
+    schemaService = SchemaServiceClient(_channel, options: _auth);
+    tableService = TableServiceClient(_channel, options: _auth);
+    historyService = HistoryServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -89,6 +104,15 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final QueryServiceClient queryService;
+
+  @override
+  late final SchemaServiceClient schemaService;
+
+  @override
+  late final TableServiceClient tableService;
+
+  @override
+  late final HistoryServiceClient historyService;
 
   @override
   Future<CoreInfo> hello() async {

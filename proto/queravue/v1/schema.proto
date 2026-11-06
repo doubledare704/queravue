@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/query.proto";
+
+// SchemaService provides lazy database schema inspection for connections.
+// Calls are cached per session and can be invalidated explicitly via refresh.
+service SchemaService {
+  // ListDatabases returns the names of all accessible databases for the session.
+  rpc ListDatabases(ListDatabasesRequest) returns (ListDatabasesResponse);
+
+  // ListSchemas returns the names of schemas within the specified database.
+  rpc ListSchemas(ListSchemasRequest) returns (ListSchemasResponse);
+
+  // ListObjects returns tables, views, and materialized views inside a schema.
+  rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+
+  // GetTableDetails returns detailed column definitions, indexes, foreign keys,
+  // and editability status for a single table or view.
+  rpc GetTableDetails(GetTableDetailsRequest) returns (GetTableDetailsResponse);
+
+  // RefreshSchema invalidates cached schema metadata for a session or specific table.
+  rpc RefreshSchema(RefreshSchemaRequest) returns (RefreshSchemaResponse);
+}
+
+// SchemaObjectType classifies an object in the database schema.
+enum SchemaObjectType {
+  // Unknown or unspecified object type.
+  SCHEMA_OBJECT_TYPE_UNSPECIFIED = 0;
+  // Standard relational table.
+  SCHEMA_OBJECT_TYPE_TABLE = 1;
+  // Standard SQL view.
+  SCHEMA_OBJECT_TYPE_VIEW = 2;
+  // Materialized view with cached data.
+  SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW = 3;
+}
+
+// TableRef uniquely identifies a table or view within a connection.
+message TableRef {
+  // Database name. Empty for single-database engines like SQLite.
+  string database = 1;
+  // Schema name, e.g. "public" in PostgreSQL or "main" in SQLite.
+  string schema = 2;
+  // Table or view name.
+  string table = 3;
+}
+
+// SchemaObject represents a table, view, or materialized view in a schema list.
+message SchemaObject {
+  // Object name.
+  string name = 1;
+  // Type of object (table, view, materialized view).
+  SchemaObjectType type = 2;
+  // Estimated row count from table statistics, or -1 if unknown or not applicable.
+  int64 row_count_estimate = 3;
+}
+
+// ColumnDetails describes a single column in a table or view.
+message ColumnDetails {
+  // Column name.
+  string name = 1;
+  // Native engine type name, e.g. "varchar(255)", "int4", "TEXT".
+  string type_name = 2;
+  // General value kind for cell formatting and editing.
+  ValueKind kind = 3;
+  // True if the column allows NULL values.
+  bool nullable = 4;
+  // Default value expression as defined in the database, if any.
+  optional string default_value = 5;
+  // True if this column is part of the primary key.
+  bool is_primary_key = 6;
+  // 1-based order within a composite primary key; 0 if not a primary key.
+  uint32 primary_key_order = 7;
+}
+
+// IndexDetails describes an index on a table.
+message IndexDetails {
+  // Name of the index.
+  string name = 1;
+  // Column names included in the index, in order.
+  repeated string columns = 2;
+  // True if the index enforces uniqueness.
+  bool is_unique = 3;
+  // True if this is the backing index for the primary key.
+  bool is_primary = 4;
+}
+
+// ForeignKeyDetails describes a foreign key constraint.
+message ForeignKeyDetails {
+  // Constraint name.
+  string name = 1;
+  // Constrained column names in the source table.
+  repeated string columns = 2;
+  // Referenced schema name.
+  string referenced_schema = 3;
+  // Referenced table name.
+  string referenced_table = 4;
+  // Referenced column names in the target table.
+  repeated string referenced_columns = 5;
+}
+
+// ListDatabasesRequest selects the session to inspect.
+message ListDatabasesRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // True to bypass and invalidate cached databases.
+  bool refresh = 2;
+}
+
+// ListDatabasesResponse returns database names.
+message ListDatabasesResponse {
+  // Database names in alphabetical order.
+  repeated string databases = 1;
+}
+
+// ListSchemasRequest selects the session and database to inspect.
+message ListSchemasRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name. Optional if the engine has only one database.
+  string database = 2;
+  // True to bypass and invalidate cached schemas.
+  bool refresh = 3;
+}
+
+// ListSchemasResponse returns schema names.
+message ListSchemasResponse {
+  // Schema names in alphabetical order.
+  repeated string schemas = 1;
+}
+
+// ListObjectsRequest selects the session, database, and schema to inspect.
+message ListObjectsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Schema name.
+  string schema = 3;
+  // True to bypass and invalidate cached objects.
+  bool refresh = 4;
+}
+
+// ListObjectsResponse returns tables and views in the schema.
+message ListObjectsResponse {
+  // Schema objects ordered by name.
+  repeated SchemaObject objects = 1;
+}
+
+// GetTableDetailsRequest selects the table to inspect.
+message GetTableDetailsRequest {
+  // Session id.
+  string session_id = 1;
+  // Table reference.
+  TableRef table_ref = 2;
+  // True to bypass and invalidate cached table details.
+  bool refresh = 3;
+}
+
+// GetTableDetailsResponse returns columns, indexes, and constraints of a table.
+message GetTableDetailsResponse {
+  // Table reference.
+  TableRef table_ref = 1;
+  // Object type (table, view, materialized view).
+  SchemaObjectType type = 2;
+  // Columns in physical order.
+  repeated ColumnDetails columns = 3;
+  // Indexes defined on the table.
+  repeated IndexDetails indexes = 4;
+  // Foreign keys originating from this table.
+  repeated ForeignKeyDetails foreign_keys = 5;
+  // Estimated row count from stats, or -1 if unsupported.
+  int64 row_count_estimate = 6;
+  // True if the table has a primary key or unique NOT NULL column, allowing editing.
+  bool can_edit = 7;
+  // Explanation when can_edit is false.
+  string edit_disabled_reason = 8;
+}
+
+// RefreshSchemaRequest selects what to invalidate.
+message RefreshSchemaRequest {
+  // Session id.
+  string session_id = 1;
+  // Optional specific table to refresh. If unset, refreshes the whole session cache.
+  TableRef table_ref = 2;
+}
+
+// RefreshSchemaResponse is empty on success.
+message RefreshSchemaResponse {}

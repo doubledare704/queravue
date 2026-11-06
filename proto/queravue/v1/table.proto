@@ -1,0 +1,196 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/query.proto";
+import "queravue/v1/schema.proto";
+
+// TableService provides browsing, filtering, sorting, and inline editing of table data.
+service TableService {
+  // OpenTable generates dialect-specific SQL for browsing a table with filters,
+  // sorts, and page size, executes it through the core spool, and streams results.
+  // The first response event returns the generated SQL.
+  rpc OpenTable(OpenTableRequest) returns (stream OpenTableResponse);
+
+  // ApplyChanges executes inserts, updates, and deletes against a table within a single
+  // transaction. When dry_run is true, it returns the generated SQL preview without executing.
+  rpc ApplyChanges(ApplyChangesRequest) returns (ApplyChangesResponse);
+}
+
+// FilterOp defines comparison and matching operators for table filters.
+enum FilterOp {
+  // Unspecified operator.
+  FILTER_OP_UNSPECIFIED = 0;
+  // Exact equality: column = value.
+  FILTER_OP_EQUALS = 1;
+  // Inequality: column != value.
+  FILTER_OP_NOT_EQUALS = 2;
+  // Less than: column < value.
+  FILTER_OP_LESS_THAN = 3;
+  // Less than or equal: column <= value.
+  FILTER_OP_LESS_THAN_OR_EQUAL = 4;
+  // Greater than: column > value.
+  FILTER_OP_GREATER_THAN = 5;
+  // Greater than or equal: column >= value.
+  FILTER_OP_GREATER_THAN_OR_EQUAL = 6;
+  // Pattern match (case-sensitive where supported): column LIKE value.
+  FILTER_OP_LIKE = 7;
+  // Case-insensitive pattern match: column ILIKE value.
+  FILTER_OP_ILIKE = 8;
+  // Set membership: column IN (value1, value2, ...).
+  FILTER_OP_IN = 9;
+  // Null test: column IS NULL.
+  FILTER_OP_IS_NULL = 10;
+  // Not null test: column IS NOT NULL.
+  FILTER_OP_IS_NOT_NULL = 11;
+  // Range test: column BETWEEN min_value AND max_value.
+  FILTER_OP_BETWEEN = 12;
+}
+
+// LogicalOp connects conditions within a group.
+enum LogicalOp {
+  // Unspecified logical operator. Treated as AND.
+  LOGICAL_OP_UNSPECIFIED = 0;
+  // Logical conjunction (all conditions must be true).
+  LOGICAL_OP_AND = 1;
+  // Logical disjunction (at least one condition must be true).
+  LOGICAL_OP_OR = 2;
+}
+
+// FilterCondition represents a single leaf predicate on a column.
+message FilterCondition {
+  // Name of the column.
+  string column = 1;
+  // Comparison operator.
+  FilterOp op = 2;
+  // Operand values (none for IS NULL/IS NOT NULL; 1 for comparisons/LIKE; 2 for BETWEEN; 1+ for IN).
+  repeated Value values = 3;
+}
+
+// FilterGroup is a composite node containing conditions and nested groups joined by a logical operator.
+message FilterGroup {
+  // Logical operator joining children (AND or OR).
+  LogicalOp op = 1;
+  // Leaf conditions in this group.
+  repeated FilterCondition conditions = 2;
+  // Nested filter groups.
+  repeated FilterGroup groups = 3;
+}
+
+// TableFilter contains structured filter conditions and an optional raw WHERE escape hatch.
+message TableFilter {
+  // Root filter group of conditions.
+  FilterGroup root = 1;
+  // Optional raw SQL WHERE clause snippet, shown with a safety warning in the UI.
+  string raw_where = 2;
+}
+
+// SortDirection defines ascending or descending sort order.
+enum SortDirection {
+  // Unspecified sort direction. Treated as ASC.
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  // Ascending order.
+  SORT_DIRECTION_ASC = 1;
+  // Descending order.
+  SORT_DIRECTION_DESC = 2;
+}
+
+// NullsOrder controls placement of NULL values in sorted results.
+enum NullsOrder {
+  // Default server placement.
+  NULLS_ORDER_UNSPECIFIED = 0;
+  // NULL values appear first.
+  NULLS_ORDER_FIRST = 1;
+  // NULL values appear last.
+  NULLS_ORDER_LAST = 2;
+}
+
+// SortClause specifies ordering on a single column.
+message SortClause {
+  // Name of the column to sort on.
+  string column = 1;
+  // Sort direction (ASC or DESC).
+  SortDirection direction = 2;
+  // Placement of NULL values.
+  NullsOrder nulls = 3;
+}
+
+// OpenTableRequest configures table browsing.
+message OpenTableRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Table reference to browse.
+  TableRef table_ref = 2;
+  // Structured filter and optional raw WHERE clause.
+  TableFilter filter = 3;
+  // Multi-column sort clauses in priority order.
+  repeated SortClause sort = 4;
+  // Page size limit (e.g. 500); 0 means unlimited rows.
+  uint64 page_size = 5;
+}
+
+// OpenTableResponse carries events from opening and spooling a table query.
+message OpenTableResponse {
+  // Dialect-specific generated SQL query, provided on the initial response event.
+  string sql = 1;
+  // Spooling and execution events reusing the QueryService event channel.
+  ExecuteResponse event = 2;
+}
+
+// RowChangeType classifies a pending row mutation.
+enum RowChangeType {
+  // Unspecified change type.
+  ROW_CHANGE_TYPE_UNSPECIFIED = 0;
+  // Insert a new row.
+  ROW_CHANGE_TYPE_INSERT = 1;
+  // Update an existing row identified by its primary key.
+  ROW_CHANGE_TYPE_UPDATE = 2;
+  // Delete an existing row identified by its primary key.
+  ROW_CHANGE_TYPE_DELETE = 3;
+}
+
+// ColumnValue pairs a column name with its cell value.
+message ColumnValue {
+  // Column name.
+  string column = 1;
+  // Cell value.
+  Value value = 2;
+}
+
+// RowChange represents an insert, update, or delete on a table.
+message RowChange {
+  // Type of row mutation.
+  RowChangeType type = 1;
+  // Primary key column values identifying the target row (for UPDATE and DELETE).
+  repeated ColumnValue keys = 2;
+  // New column values to apply (for INSERT and UPDATE).
+  repeated ColumnValue values = 3;
+}
+
+// ApplyChangesRequest applies pending mutations to a table.
+message ApplyChangesRequest {
+  // Session id.
+  string session_id = 1;
+  // Target table reference.
+  TableRef table_ref = 2;
+  // List of mutations to apply in one transaction.
+  repeated RowChange changes = 3;
+  // If true, returns generated SQL preview without executing statements.
+  bool dry_run = 4;
+  // Explicit confirmation flag required when modifying production connections.
+  bool confirm_production = 5;
+}
+
+// ApplyChangesResponse reports the outcome of applying table mutations.
+message ApplyChangesResponse {
+  // Generated SQL statements (e.g. BEGIN; INSERT...; UPDATE...; COMMIT;).
+  string generated_sql = 1;
+  // Total rows affected across all executed statements.
+  uint64 rows_affected = 2;
+  // True if the request was a preview dry run.
+  bool dry_run = 3;
+  // True if execution succeeded (or dry run completed without error).
+  bool success = 4;
+  // Detailed error message if the changes failed or were rejected.
+  string error_message = 5;
+}

@@ -140,6 +140,23 @@ class CollapsedFolders extends Notifier<Set<String>> {
 final collapsedFoldersProvider =
     NotifierProvider<CollapsedFolders, Set<String>>(CollapsedFolders.new);
 
+/// Connection ids collapsed in the sidebar tree.
+class CollapsedConnections extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const {};
+
+  void toggle(String id) =>
+      state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+
+  void expand(String id) => state = {...state}..remove(id);
+  void collapse(String id) => state = {...state, id};
+}
+
+final collapsedConnectionsProvider =
+    NotifierProvider<CollapsedConnections, Set<String>>(
+      CollapsedConnections.new,
+    );
+
 /// One visible row of the sidebar tree.
 sealed class TreeRow {
   const TreeRow(this.depth);

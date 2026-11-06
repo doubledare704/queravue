@@ -10,6 +10,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../connections/domain/cancellation.dart';
 import '../../editor/data/query_repository.dart';
 import '../../editor/domain/query_models.dart';
+import '../../schema/domain/schema_models.dart';
+import '../../table_view/application/pending_changes_controller.dart';
+import '../../table_view/domain/table_models.dart';
 import '../application/copy_service.dart';
 import '../application/result_window.dart';
 import '../domain/cell_format.dart';
@@ -25,9 +28,27 @@ const double kGridRowHeight = 28;
 /// on screen and reads rows through the window, which fetches pages from the
 /// core as the user scrolls.
 class ResultGrid extends ConsumerStatefulWidget {
-  const ResultGrid({super.key, required this.resultId});
+  const ResultGrid({
+    super.key,
+    required this.resultId,
+    this.sorts = const [],
+    this.onSort,
+    this.canEdit = false,
+    this.onCellDoubleTap,
+    this.onRowSelected,
+    this.pendingChanges,
+    this.tableDetails,
+  });
 
   final String resultId;
+  final List<SortClause> sorts;
+  final void Function(String column, {bool isMulti})? onSort;
+  final bool canEdit;
+  final void Function(int rowIndex, int colIndex, Object? currentValue)?
+  onCellDoubleTap;
+  final ValueChanged<int>? onRowSelected;
+  final PendingChangesState? pendingChanges;
+  final TableDetails? tableDetails;
 
   @override
   ConsumerState<ResultGrid> createState() => _ResultGridState();
@@ -203,6 +224,15 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
         if (_rows > 0 && _cols > 0) _select(GridSelection.all(_rows, _cols));
       case LogicalKeyboardKey.keyC when mod:
         unawaited(_copy(header: shift));
+      case LogicalKeyboardKey.enter:
+        if (_sel != null && widget.onCellDoubleTap != null) {
+          final r = _sel!.focusRow;
+          final c = _sel!.focusCol;
+          final row = _win.rowAt(r);
+          final v = row != null && c < row.length ? row[c] : null;
+          widget.onCellDoubleTap!(r, c, v);
+          return KeyEventResult.handled;
+        }
       case LogicalKeyboardKey.space when !mod:
         if (_sel != null) setState(() => _viewer = !_viewer);
       case LogicalKeyboardKey.escape when _viewer:
@@ -237,8 +267,10 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
     final cur = _sel ?? GridSelection.cell(r, math.max(c, 0));
     if (c == -1) {
       _select(cur.rows(r, extend: shift, cols: _cols));
+      widget.onRowSelected?.call(r);
     } else {
       _moveFocus(r, c, extend: shift);
+      widget.onRowSelected?.call(r);
     }
   }
 
@@ -263,6 +295,14 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
   void _onDoubleTap() {
     final hit = _hit(_lastDoubleTap);
     if (hit == null || hit.$2 < 0) return;
+    if (widget.onCellDoubleTap != null) {
+      final r = hit.$1;
+      final c = hit.$2;
+      final row = _win.rowAt(r);
+      final v = row != null && c < row.length ? row[c] : null;
+      widget.onCellDoubleTap!(r, c, v);
+      return;
+    }
     setState(() => _viewer = true);
   }
 
@@ -380,14 +420,34 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
       final r = vr - 1, c = vc - 1;
       if (vr == 0) {
         if (c < 0) return ColoredBox(color: headerBg);
+        final colName = cols[c].name;
+        final sortIdx = widget.sorts.indexWhere((s) => s.column == colName);
+        final sort = sortIdx >= 0 ? widget.sorts[sortIdx] : null;
+        String? sortIndicator;
+        if (sort != null) {
+          final arrow = sort.direction == SortDirection.asc ? '▲' : '▼';
+          final order = widget.sorts.length > 1 ? ' ${sortIdx + 1}' : '';
+          sortIndicator = '$arrow$order';
+        }
         return ColoredBox(
           color: headerBg,
           child: _HeaderCell(
             column: cols[c],
             style: text.copyWith(fontWeight: FontWeight.w600),
-            onTap: () => _select(
-              (sel ?? GridSelection.cell(0, c)).column(c, rows: win.rowCount),
-            ),
+            sortIndicator: sortIndicator,
+            onTap: () {
+              if (widget.onSort != null) {
+                final shift = HardwareKeyboard.instance.isShiftPressed;
+                widget.onSort!(colName, isMulti: shift);
+              } else {
+                _select(
+                  (sel ?? GridSelection.cell(0, c)).column(
+                    c,
+                    rows: win.rowCount,
+                  ),
+                );
+              }
+            },
             onResize: (d) => resizeColumn(c, d),
           ),
         );
@@ -405,8 +465,48 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
         );
       }
       final row = window.rowAt(r);
-      final v = row != null && c < row.length ? row[c] : null;
+      var v = row != null && c < row.length ? row[c] : null;
       final loading = row == null;
+
+      // Check pending changes
+      var isDeleted = false;
+      var isCellUpdated = false;
+      if (widget.tableDetails != null &&
+          widget.pendingChanges != null &&
+          row != null) {
+        final pkCols = widget.tableDetails!.primaryKeyColumns;
+        if (pkCols.isNotEmpty) {
+          final pkValues = <String, Object?>{};
+          for (final pk in pkCols) {
+            final colIdx = cols.indexWhere((col) => col.name == pk.name);
+            if (colIdx >= 0 && colIdx < row.length) {
+              pkValues[pk.name] = row[colIdx];
+            }
+          }
+          if (pkValues.length == pkCols.length) {
+            final pkKey = makePkKey(pkValues);
+            isDeleted = widget.pendingChanges!.isDeleted(pkKey);
+            if (widget.pendingChanges!.hasUpdatedValue(pkKey, cols[c].name)) {
+              isCellUpdated = true;
+              v = widget.pendingChanges!.getUpdatedValue(pkKey, cols[c].name);
+            }
+          }
+        }
+      }
+
+      TextStyle cellStyle = loading ? muted : (v == null ? nullStyle : text);
+      if (isDeleted) {
+        cellStyle = cellStyle.copyWith(
+          decoration: TextDecoration.lineThrough,
+          color: cs.error,
+        );
+      } else if (isCellUpdated) {
+        cellStyle = cellStyle.copyWith(
+          fontWeight: FontWeight.bold,
+          color: Colors.amber.shade800,
+        );
+      }
+
       final child = Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Align(
@@ -415,7 +515,7 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
               : Alignment.centerLeft,
           child: Text(
             loading ? '…' : cellPreview(v),
-            style: loading ? muted : (v == null ? nullStyle : text),
+            style: cellStyle,
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.ellipsis,
@@ -424,10 +524,18 @@ class _ResultGridState extends ConsumerState<ResultGrid> {
       );
       final selected = sel != null && sel.contains(r, c);
       final focused = sel != null && r == sel.focusRow && c == sel.focusCol;
-      if (!selected && !focused) return child;
+      Color? cellBg;
+      if (selected) {
+        cellBg = selColor;
+      } else if (isDeleted) {
+        cellBg = cs.errorContainer.withValues(alpha: 0.3);
+      } else if (isCellUpdated) {
+        cellBg = Colors.amber.withValues(alpha: 0.15);
+      }
+      if (!selected && !focused && cellBg == null) return child;
       return DecoratedBox(
         decoration: BoxDecoration(
-          color: selected ? selColor : null,
+          color: cellBg,
           border: focused ? Border.all(color: cs.primary, width: 1.5) : null,
         ),
         child: child,
@@ -528,12 +636,14 @@ class _HeaderCell extends StatelessWidget {
     required this.style,
     required this.onTap,
     required this.onResize,
+    this.sortIndicator,
   });
 
   final ResultColumn column;
   final TextStyle style;
   final VoidCallback onTap;
   final ValueChanged<double> onResize;
+  final String? sortIndicator;
 
   @override
   Widget build(BuildContext context) {
@@ -554,11 +664,29 @@ class _HeaderCell extends StatelessWidget {
                 alignment: column.kind.isNumeric
                     ? Alignment.centerRight
                     : Alignment.centerLeft,
-                child: Text(
-                  column.name,
-                  style: style,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        column.name,
+                        style: style,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (sortIndicator != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        sortIndicator!,
+                        style: style.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

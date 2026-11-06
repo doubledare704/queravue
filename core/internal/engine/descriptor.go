@@ -18,13 +18,16 @@ const (
 	CapConnect Capability = "connect"
 	// CapExecute: Executor (Iteration 2).
 	CapExecute Capability = "execute"
+	// CapSchemaInspector: SchemaInspector (Iteration 3).
+	CapSchemaInspector Capability = "schema_inspector"
 )
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
 // them. Registry tests use it to check that declared capabilities match what a
 // Conn implements.
 var CapabilityInterfaces = map[Capability]reflect.Type{
-	CapExecute: reflect.TypeFor[Executor](),
+	CapExecute:         reflect.TypeFor[Executor](),
+	CapSchemaInspector: reflect.TypeFor[SchemaInspector](),
 }
 
 // FieldKind tells the UI which input widget to render.

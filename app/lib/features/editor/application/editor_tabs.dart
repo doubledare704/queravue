@@ -6,18 +6,32 @@ import 'package:re_editor/re_editor.dart';
 
 import '../domain/query_models.dart';
 import '../domain/text_offsets.dart';
+import '../../schema/domain/schema_models.dart';
 import 'query_run.dart';
 
-/// One SQL editor tab. It owns the editing controller so text, cursor and
-/// undo history survive switching tabs.
+/// Distinguishes between SQL query tabs and table browse tabs.
+enum TabKind { query, table }
+
+/// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
-  EditorTab({required this.id, required this.connectionId, required this.title})
-    : controller = CodeLineEditingController();
+  EditorTab({
+    required this.id,
+    required this.connectionId,
+    required this.title,
+    this.kind = TabKind.query,
+    this.tableRef,
+    CodeLineEditingController? controller,
+  }) : controller = controller ?? CodeLineEditingController();
 
   final String id;
   final String connectionId;
   final String title;
+  final TabKind kind;
+  final TableRef? tableRef;
   final CodeLineEditingController controller;
+
+  bool get isQuery => kind == TabKind.query;
+  bool get isTable => kind == TabKind.table;
 }
 
 @immutable
@@ -77,6 +91,43 @@ class EditorTabs extends Notifier<EditorTabsState> {
       tabs: [...state.tabs, tab],
       activeByConnection: {...state.activeByConnection, connectionId: tab.id},
     );
+    return tab;
+  }
+
+  /// Opens a Table tab for [connectionId] and [tableRef]. If already open, focuses it.
+  EditorTab openTable(String connectionId, TableRef tableRef) {
+    final existing = state.tabs
+        .where(
+          (t) =>
+              t.isTable &&
+              t.connectionId == connectionId &&
+              t.tableRef == tableRef,
+        )
+        .firstOrNull;
+    if (existing != null) {
+      select(existing.id);
+      return existing;
+    }
+
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: tableRef.table,
+      kind: TabKind.table,
+      tableRef: tableRef,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  /// Opens a Query tab populated with SQL text.
+  EditorTab openQueryWithSql(String connectionId, String sql) {
+    final tab = open(connectionId);
+    tab.controller.text = sql;
     return tab;
   }
 

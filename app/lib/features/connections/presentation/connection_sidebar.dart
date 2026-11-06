@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../schema/application/schema_controller.dart';
+import '../../schema/presentation/schema_tree_view.dart';
+import '../application/connection_session.dart';
 import '../application/connections_controller.dart';
 import '../domain/models.dart';
 import 'connection_actions.dart';
@@ -46,7 +49,6 @@ class ConnectionSidebar extends ConsumerWidget {
               AsyncData(value: final rows) => ListView.builder(
                 key: const Key('connection-tree'),
                 itemCount: rows.length,
-                itemExtent: 32,
                 itemBuilder: (_, i) => switch (rows[i]) {
                   final FolderRow f => _FolderTile(row: f),
                   final ConnectionRow c => _ConnectionTile(row: c),
@@ -151,7 +153,7 @@ class _FolderTile extends ConsumerWidget {
   }
 }
 
-enum _MenuAction { connect, edit, duplicate, delete }
+enum _MenuAction { connect, disconnect, refresh, edit, duplicate, delete }
 
 class _ConnectionTile extends ConsumerWidget {
   const _ConnectionTile({required this.row});
@@ -163,6 +165,10 @@ class _ConnectionTile extends ConsumerWidget {
     switch (a) {
       case _MenuAction.connect:
         await connectTo(ref, p);
+      case _MenuAction.disconnect:
+        await ref.read(connectionSessionProvider(p.id).notifier).disconnect();
+      case _MenuAction.refresh:
+        await ref.read(schemaTreeProvider(p.id).notifier).refresh('root');
       case _MenuAction.edit:
         await showConnectionDialog(context, ref, initial: p);
       case _MenuAction.duplicate:
@@ -176,7 +182,31 @@ class _ConnectionTile extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Offset position,
+    bool isConnected,
   ) async {
+    final items = <PopupMenuEntry<_MenuAction>>[
+      if (!isConnected)
+        const PopupMenuItem(value: _MenuAction.connect, child: Text('Connect'))
+      else ...[
+        const PopupMenuItem(
+          value: _MenuAction.disconnect,
+          child: Text('Disconnect'),
+        ),
+        const PopupMenuItem(
+          value: _MenuAction.refresh,
+          child: Text('Refresh schema'),
+        ),
+      ],
+      const PopupMenuDivider(),
+      const PopupMenuItem(value: _MenuAction.edit, child: Text('Edit…')),
+      const PopupMenuItem(
+        value: _MenuAction.duplicate,
+        child: Text('Duplicate…'),
+      ),
+      const PopupMenuDivider(),
+      const PopupMenuItem(value: _MenuAction.delete, child: Text('Delete…')),
+    ];
+
     final a = await showMenu<_MenuAction>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -185,76 +215,134 @@ class _ConnectionTile extends ConsumerWidget {
         position.dx,
         position.dy,
       ),
-      items: _menuItems,
+      items: items,
     );
     if (a != null && context.mounted) await _run(context, ref, a);
   }
-
-  static const _menuItems = <PopupMenuEntry<_MenuAction>>[
-    PopupMenuItem(value: _MenuAction.connect, child: Text('Connect')),
-    PopupMenuItem(value: _MenuAction.edit, child: Text('Edit…')),
-    PopupMenuItem(value: _MenuAction.duplicate, child: Text('Duplicate…')),
-    PopupMenuDivider(),
-    PopupMenuItem(value: _MenuAction.delete, child: Text('Delete…')),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = row.profile;
     final selected = ref.watch(selectedConnectionProvider) == p.id;
     final status = ref.watch(connectionTestsProvider.select((m) => m[p.id]));
+    final session = ref.watch(connectionSessionProvider(p.id));
+    final isConnected = session.isConnected;
+    final isCollapsed = ref.watch(collapsedConnectionsProvider).contains(p.id);
+    final isExpanded = isConnected && !isCollapsed;
+
     final scheme = Theme.of(context).colorScheme;
     final dot = colorTagColor(p.color);
 
-    return GestureDetector(
-      onSecondaryTapUp: (d) => _showMenu(context, ref, d.globalPosition),
-      child: Material(
-        color: selected ? scheme.secondaryContainer : Colors.transparent,
-        // The menu button sits outside the InkWell: its double-tap
-        // recognizer would otherwise delay every tap on the button.
-        child: Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                key: Key('connection-${p.id}'),
-                onTap: () =>
-                    ref.read(selectedConnectionProvider.notifier).select(p.id),
-                onDoubleTap: () => connectTo(ref, p),
-                child: Padding(
-                  padding: EdgeInsets.only(left: 12 + row.depth * 16.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        key: Key('color-dot-${p.id}'),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: dot ?? Colors.transparent,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) =>
+              _showMenu(context, ref, d.globalPosition, isConnected),
+          child: Material(
+            color: selected ? scheme.secondaryContainer : Colors.transparent,
+            child: SizedBox(
+              height: 32,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      key: Key('connection-${p.id}'),
+                      onTap: () {
+                        ref
+                            .read(selectedConnectionProvider.notifier)
+                            .select(p.id);
+                        if (isConnected) {
+                          ref
+                              .read(collapsedConnectionsProvider.notifier)
+                              .toggle(p.id);
+                        }
+                      },
+                      onDoubleTap: () => connectTo(ref, p),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 12 + row.depth * 16.0),
+                        child: Row(
+                          children: [
+                            if (isConnected)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Icon(
+                                  isExpanded
+                                      ? Icons.expand_more
+                                      : Icons.chevron_right,
+                                  size: 16,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            Container(
+                              key: Key('color-dot-${p.id}'),
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: dot ?? Colors.transparent,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                p.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (p.production) const _ProdBadge(),
+                            _StatusIcon(status: status),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(p.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                  PopupMenuButton<_MenuAction>(
+                    key: Key('connection-menu-${p.id}'),
+                    tooltip: 'Actions',
+                    icon: const Icon(Icons.more_horiz, size: 16),
+                    padding: EdgeInsets.zero,
+                    onSelected: (a) => _run(context, ref, a),
+                    itemBuilder: (_) => [
+                      if (!isConnected)
+                        const PopupMenuItem(
+                          value: _MenuAction.connect,
+                          child: Text('Connect'),
+                        )
+                      else ...[
+                        const PopupMenuItem(
+                          value: _MenuAction.disconnect,
+                          child: Text('Disconnect'),
+                        ),
+                        const PopupMenuItem(
+                          value: _MenuAction.refresh,
+                          child: Text('Refresh schema'),
+                        ),
+                      ],
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: _MenuAction.edit,
+                        child: Text('Edit…'),
                       ),
-                      if (p.production) const _ProdBadge(),
-                      _StatusIcon(status: status),
+                      const PopupMenuItem(
+                        value: _MenuAction.duplicate,
+                        child: Text('Duplicate…'),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: _MenuAction.delete,
+                        child: Text('Delete…'),
+                      ),
                     ],
                   ),
-                ),
+                ],
               ),
             ),
-            PopupMenuButton<_MenuAction>(
-              key: Key('connection-menu-${p.id}'),
-              tooltip: 'Actions',
-              icon: const Icon(Icons.more_horiz, size: 16),
-              padding: EdgeInsets.zero,
-              onSelected: (a) => _run(context, ref, a),
-              itemBuilder: (_) => _menuItems,
-            ),
-          ],
+          ),
         ),
-      ),
+        if (isExpanded) SchemaTreeView(connectionId: p.id),
+      ],
     );
   }
 }

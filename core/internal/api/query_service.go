@@ -14,6 +14,7 @@ import (
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/session"
 	"github.com/doubledare704/queravue/core/internal/sqlsplit"
@@ -34,6 +35,7 @@ type QueryService struct {
 
 	sessions *session.Manager
 	results  *results.Manager
+	history  *history.Store
 	log      *slog.Logger
 }
 
@@ -43,6 +45,11 @@ func NewQueryService(s *session.Manager, r *results.Manager, log *slog.Logger) *
 		log = slog.Default()
 	}
 	return &QueryService{sessions: s, results: r, log: log}
+}
+
+// SetHistory configures query history recording.
+func (h *QueryService) SetHistory(store *history.Store) {
+	h.history = store
 }
 
 // Execute implements the RPC.
@@ -126,6 +133,30 @@ func (h *QueryService) runStatement(ctx context.Context, stream queravuev1.Query
 		execErr = err
 	}
 	rows, _, truncated := spool.State()
+	affected := sum.RowsAffected
+	if affected < 0 {
+		affected = 0
+	}
+
+	if h.history != nil {
+		var errStr string
+		if execErr != nil {
+			errStr = execErr.Error()
+		}
+		rowsCount := rows
+		if !sum.HasRows && affected > 0 {
+			rowsCount = uint64(affected)
+		}
+		_, _ = h.history.Append(context.Background(), history.Entry{
+			ConnectionID: sess.ConnectionID,
+			QueryText:    r.Text(text),
+			StartedAt:    time.Now().Add(-sum.Duration),
+			Duration:     sum.Duration,
+			RowsAffected: rowsCount,
+			Error:        errStr,
+		})
+	}
+
 	if execErr != nil {
 		if stream.Context().Err() != nil {
 			return false, status.FromContextError(stream.Context().Err()).Err()
@@ -145,10 +176,6 @@ func (h *QueryService) runStatement(ctx context.Context, stream queravuev1.Query
 		Progress: &queravuev1.Progress{StatementIndex: idx, RowsSpooled: rows, Done: true},
 	}}); err != nil {
 		return false, err
-	}
-	affected := sum.RowsAffected
-	if affected < 0 {
-		affected = 0
 	}
 	return true, send(&queravuev1.ExecuteResponse{Event: &queravuev1.ExecuteResponse_Summary{Summary: &queravuev1.Summary{
 		StatementIndex: idx,

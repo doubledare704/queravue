@@ -111,11 +111,19 @@ var kindToProto = map[engine.ValueKind]queravuev1.ValueKind{
 	engine.VArray:       queravuev1.ValueKind_VALUE_KIND_ARRAY,
 }
 
+// KindToProto converts an engine ValueKind to proto ValueKind.
+func KindToProto(k engine.ValueKind) queravuev1.ValueKind {
+	if pk, ok := kindToProto[k]; ok {
+		return pk
+	}
+	return queravuev1.ValueKind_VALUE_KIND_UNSPECIFIED
+}
+
 // ColumnsToProto converts engine columns to wire columns.
 func ColumnsToProto(cols []engine.Column) []*queravuev1.Column {
 	out := make([]*queravuev1.Column, len(cols))
 	for i, c := range cols {
-		out[i] = &queravuev1.Column{Name: validUTF8(c.Name), TypeName: c.TypeName, Kind: kindToProto[c.Kind]}
+		out[i] = &queravuev1.Column{Name: validUTF8(c.Name), TypeName: c.TypeName, Kind: KindToProto(c.Kind)}
 	}
 	return out
 }

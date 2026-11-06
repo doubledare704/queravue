@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/shortcuts.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/presentation/connection_details.dart';
+import '../../table_view/presentation/table_tab_view.dart';
 import '../application/editor_tabs.dart';
 import 'query_tab_view.dart';
 
@@ -62,7 +63,10 @@ class Workspace extends ConsumerWidget {
           child: IndexedStack(
             index: tabs.indexWhere((t) => t.id == active.id),
             children: [
-              for (final t in tabs) QueryTabView(key: ValueKey(t.id), tab: t),
+              for (final t in tabs)
+                t.isTable
+                    ? TableTabView(key: ValueKey(t.id), tab: t)
+                    : QueryTabView(key: ValueKey(t.id), tab: t),
             ],
           ),
         ),
@@ -103,6 +107,12 @@ class _TabButton extends StatelessWidget {
         ),
         child: Row(
           children: [
+            Icon(
+              tab.isTable ? Icons.table_chart_outlined : Icons.code,
+              size: 14,
+              color: selected ? cs.primary : cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 6),
             Text(tab.title, style: Theme.of(context).textTheme.labelLarge),
             IconButton(
               key: Key('close-${tab.id}'),

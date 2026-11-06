@@ -16,7 +16,9 @@ import (
 	"github.com/doubledare704/queravue/core/internal/api"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/results"
+	"github.com/doubledare704/queravue/core/internal/schema"
 	"github.com/doubledare704/queravue/core/internal/session"
 )
 
@@ -36,8 +38,10 @@ type Config struct {
 	Connections *connections.Service
 	// Sessions and Results back SessionService and QueryService. Both must be
 	// set to register them.
-	Sessions *session.Manager
-	Results  *results.Manager
+	Sessions    *session.Manager
+	Results     *results.Manager
+	History     *history.Store
+	SchemaCache *schema.Cache
 }
 
 // Serve listens on cfg.SocketPath and serves until ctx is cancelled, then
@@ -76,7 +80,20 @@ func Serve(ctx context.Context, cfg Config) error {
 	}
 	if cfg.Sessions != nil && cfg.Results != nil {
 		queravuev1.RegisterSessionServiceServer(srv, api.NewSessionService(cfg.Sessions))
-		queravuev1.RegisterQueryServiceServer(srv, api.NewQueryService(cfg.Sessions, cfg.Results, log))
+		querySvc := api.NewQueryService(cfg.Sessions, cfg.Results, log)
+		if cfg.History != nil {
+			querySvc.SetHistory(cfg.History)
+		}
+		queravuev1.RegisterQueryServiceServer(srv, querySvc)
+		schemaCache := cfg.SchemaCache
+		if schemaCache == nil {
+			schemaCache = schema.NewCache()
+		}
+		queravuev1.RegisterSchemaServiceServer(srv, api.NewSchemaService(cfg.Sessions, schemaCache))
+		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
+	}
+	if cfg.History != nil {
+		queravuev1.RegisterHistoryServiceServer(srv, api.NewHistoryService(cfg.History))
 	}
 
 	serveErr := make(chan error, 1)

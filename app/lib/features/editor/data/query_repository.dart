@@ -116,7 +116,7 @@ class GrpcQueryRepository implements QueryRepository {
       req.selection = pb.TextRange(start: sel.start, end: sel.end);
     }
     return _stream(() => _conn.queryService.execute(req))
-        .map(_eventFromProto)
+        .map(eventFromProto)
         .where((e) => e != null)
         .cast<ExecuteEvent>();
   }
@@ -217,7 +217,8 @@ QueryException _toException(GrpcError e) => QueryException(
   coreUnavailable: e.code == StatusCode.unavailable,
 );
 
-ExecuteEvent? _eventFromProto(pb.ExecuteResponse r) {
+/// Converts an ExecuteResponse protobuf message into an ExecuteEvent.
+ExecuteEvent? eventFromProto(pb.ExecuteResponse r) {
   switch (r.whichEvent()) {
     case pb.ExecuteResponse_Event.plan:
       return PlanEvent([
