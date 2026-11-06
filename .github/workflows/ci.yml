@@ -82,7 +82,18 @@ jobs:
         run: docker exec -i queravue-dev-postgres-1 psql -q -U queravue -d queravue < dev/seed/postgres/01_schema.sql
       - name: Seed CockroachDB (no init directory)
         if: matrix.service == 'cockroachdb'
-        run: docker exec -i queravue-dev-cockroachdb-1 ./cockroach sql --insecure < dev/seed/cockroachdb/01_schema.sql
+        run: |
+          docker exec -i queravue-dev-cockroachdb-1 ./cockroach sql --insecure < dev/seed/cockroachdb/01_schema.sql
+          # Table statistics reach the row-estimate view asynchronously; wait
+          # for them so the suite's estimate check does not race the seed.
+          for i in $(seq 1 60); do
+            n=$(docker exec queravue-dev-cockroachdb-1 ./cockroach sql --insecure -d queravue --format=csv \
+              -e "SELECT estimated_row_count FROM crdb_internal.table_row_statistics WHERE table_id = 'million_items'::regclass::int" | tail -1)
+            [ "${n:-0}" -gt 0 ] 2>/dev/null && exit 0
+            sleep 2
+          done
+          echo "row statistics did not appear within 2 minutes" >&2
+          exit 1
       - name: Integration tests
         working-directory: core
         run: go test -tags=integration -run '^${{ matrix.test }}$' ./internal/engine/${{ matrix.pkg }}/...
