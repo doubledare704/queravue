@@ -1,0 +1,245 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "google/protobuf/duration.proto";
+import "queravue/v1/document.proto";
+
+// ShellService runs mongosh-style JavaScript against sessions whose engine has
+// the "shell" capability (ADR 0010). A shell keeps its variables between Eval
+// calls. Values travel as MongoDB Extended JSON v2 text (ADR 0009).
+//
+// Unknown shells are NOT_FOUND and sessions without the capability are
+// FAILED_PRECONDITION. Script failures are reported in-band as ShellError
+// events.
+service ShellService {
+  // OpenShell starts a shell on an open session. Honours cancellation.
+  rpc OpenShell(OpenShellRequest) returns (OpenShellResponse);
+
+  // Eval runs code and streams its output events in order. The stream ends
+  // with a done event, or with an error event for a failure. Cancelling the
+  // call, or calling Cancel, interrupts the script and any driver operation in
+  // flight.
+  rpc Eval(EvalRequest) returns (stream EvalResponse);
+
+  // FetchCursor streams one page of the documents behind a cursor handle by
+  // re-running its query with skip and limit.
+  rpc FetchCursor(FetchCursorRequest) returns (stream FetchCursorResponse);
+
+  // Cancel interrupts the running Eval of a shell. Cancelling an idle shell
+  // succeeds.
+  rpc Cancel(ShellServiceCancelRequest) returns (ShellServiceCancelResponse);
+
+  // CloseShell frees the shell and its cursor handles. Closing an unknown or
+  // closed shell succeeds.
+  rpc CloseShell(CloseShellRequest) returns (CloseShellResponse);
+}
+
+// OpenShellRequest selects the session and starting database.
+message OpenShellRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Database that `db` points to initially. Empty means the connection's
+  // default database.
+  string database = 2;
+}
+
+// OpenShellResponse carries the new shell.
+message OpenShellResponse {
+  // Id of the new shell.
+  string shell_id = 1;
+  // Database that `db` points to.
+  string database = 2;
+}
+
+// EvalRequest is the input of Eval.
+message EvalRequest {
+  // Shell id from OpenShell.
+  string shell_id = 1;
+  // JavaScript source, one or more statements.
+  string code = 2;
+  // Set after the user confirmed a CONFIRMATION_REQUIRED error. Allows the
+  // gated operations of this call.
+  bool confirmed = 3;
+}
+
+// EvalResponse is one event of an Eval stream.
+message EvalResponse {
+  // The event.
+  oneof event {
+    // Output of print, printjson or console.log.
+    PrintLine print = 1;
+    // A value the script produced.
+    ResultItem result = 2;
+    // The script failed. This is the last event.
+    ShellError error = 3;
+    // The script finished. This is the last event.
+    EvalDone done = 4;
+  }
+}
+
+// PrintLevel is the console method that produced a print line.
+enum PrintLevel {
+  // Same as LOG.
+  PRINT_LEVEL_UNSPECIFIED = 0;
+  // print, printjson or console.log.
+  PRINT_LEVEL_LOG = 1;
+  // console.info.
+  PRINT_LEVEL_INFO = 2;
+  // console.warn.
+  PRINT_LEVEL_WARN = 3;
+  // console.error.
+  PRINT_LEVEL_ERROR = 4;
+}
+
+// PrintLine is one line of script output.
+message PrintLine {
+  // Output text, without the trailing newline.
+  string text = 1;
+  // Console method.
+  PrintLevel level = 2;
+}
+
+// ResultItem is a value produced by the script.
+message ResultItem {
+  // The value.
+  oneof value {
+    // A scalar as EJSON text, e.g. `5` or `"abc"`.
+    string scalar = 1;
+    // One document as canonical EJSON.
+    string document = 2;
+    // The outcome of a write operation.
+    WriteResult write = 3;
+    // A cursor the script did not consume.
+    CursorHandle cursor = 4;
+  }
+}
+
+// WriteResult is a mongosh-shaped write outcome.
+message WriteResult {
+  // Operation name, e.g. "insertOne" or "updateMany".
+  string operation = 1;
+  // The result object as canonical EJSON, with the fields mongosh prints
+  // (acknowledged, insertedId, insertedIds, matchedCount, modifiedCount,
+  // deletedCount, upsertedId, upsertedCount).
+  string result = 2;
+}
+
+// CursorKind says how a cursor handle is replayed.
+enum CursorKind {
+  // Not set.
+  CURSOR_KIND_UNSPECIFIED = 0;
+  // A find query: DocumentService.Find can page it.
+  CURSOR_KIND_FIND = 1;
+  // An aggregate pipeline: only FetchCursor can page it.
+  CURSOR_KIND_AGGREGATE = 2;
+}
+
+// CursorHandle is a replayable query, not a server-held cursor. It stays valid
+// until the shell is closed.
+message CursorHandle {
+  // Id to pass to FetchCursor.
+  string cursor_id = 1;
+  // Kind of query.
+  CursorKind kind = 2;
+  // Database name.
+  string database = 3;
+  // Collection or view name.
+  string collection = 4;
+  // For FIND: filter as EJSON text.
+  string filter = 5;
+  // For FIND: sort as EJSON text.
+  string sort = 6;
+  // For FIND: projection as EJSON text.
+  string projection = 7;
+  // For FIND: documents skipped by the script.
+  uint64 skip = 8;
+  // For FIND: limit set by the script. 0 means none.
+  uint64 limit = 9;
+  // For AGGREGATE: the pipeline as an EJSON array.
+  string pipeline = 10;
+}
+
+// ShellErrorKind classifies a script failure.
+enum ShellErrorKind {
+  // Unclassified failure.
+  SHELL_ERROR_KIND_UNSPECIFIED = 0;
+  // The code does not parse.
+  SHELL_ERROR_KIND_SYNTAX = 1;
+  // The script threw.
+  SHELL_ERROR_KIND_RUNTIME = 2;
+  // A gated operation on a production connection needs `confirmed`. Nothing
+  // was changed by that operation.
+  SHELL_ERROR_KIND_CONFIRMATION_REQUIRED = 3;
+  // Output or materialised documents exceeded the cap.
+  SHELL_ERROR_KIND_OUTPUT_LIMIT = 4;
+  // The wall-clock timeout was reached.
+  SHELL_ERROR_KIND_TIMEOUT = 5;
+  // The script was cancelled.
+  SHELL_ERROR_KIND_CANCELED = 6;
+  // The server rejected an operation.
+  SHELL_ERROR_KIND_SERVER = 7;
+  // The script used something the shell does not provide (load, require, an
+  // unsupported method).
+  SHELL_ERROR_KIND_UNSUPPORTED = 8;
+}
+
+// ShellError is a typed script failure. The message never contains secrets.
+message ShellError {
+  // Failure class.
+  ShellErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+  // JavaScript stack trace, if any.
+  string js_stack = 3;
+  // Line of the failure inside the submitted code, starting at 1. 0 if
+  // unknown.
+  uint32 line = 4;
+  // Column of the failure, starting at 1, in UTF-16 code units. 0 if unknown.
+  uint32 column = 5;
+  // For CONFIRMATION_REQUIRED: the operation to confirm, e.g.
+  // "deleteMany({}) on shop.orders".
+  string operation = 6;
+}
+
+// EvalDone ends a successful Eval.
+message EvalDone {
+  // Time the script ran.
+  google.protobuf.Duration duration = 1;
+}
+
+// FetchCursorResponse is one page chunk of a cursor.
+message FetchCursorResponse {
+  // Documents of this chunk, as in Find.
+  DocumentBatch batch = 1;
+}
+
+// FetchCursorRequest names a page of a cursor handle.
+message FetchCursorRequest {
+  // Shell id from OpenShell.
+  string shell_id = 1;
+  // Cursor id from a CursorHandle.
+  string cursor_id = 2;
+  // Documents to skip, added to the handle's own skip.
+  uint64 skip = 3;
+  // Maximum documents to return. 0 means the default of 50.
+  uint32 limit = 4;
+}
+
+// ShellServiceCancelRequest names the shell to interrupt.
+message ShellServiceCancelRequest {
+  // Shell id from OpenShell.
+  string shell_id = 1;
+}
+
+// ShellServiceCancelResponse is empty.
+message ShellServiceCancelResponse {}
+
+// CloseShellRequest names the shell to close.
+message CloseShellRequest {
+  // Shell id from OpenShell.
+  string shell_id = 1;
+}
+
+// CloseShellResponse is empty.
+message CloseShellResponse {}

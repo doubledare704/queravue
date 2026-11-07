@@ -108,4 +108,4 @@ See `docs/adr/0001-tech-stack.md` and `AGENTS.md`.
 - Code editor widget: re_editor vs. flutter_code_editor vs. custom.
 - State management: Riverpod (proposed) vs. Bloc.
 - Team features storage: Git-backed files vs. optional self-hosted sync later.
-- Mongo shell: goja subset vs. delegating to installed `mongosh`.
+- ~~Mongo shell: goja subset vs. delegating to installed `mongosh`.~~ Resolved: embedded goja, see [ADR 0010](docs/adr/0010-mongo-shell-runtime.md).
