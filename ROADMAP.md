@@ -46,12 +46,24 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 - Saved queries & scripts as files in a workspace folder (Git-friendly), with folders and search.
 - **Done when:** common mongosh snippets run unchanged.
 
-### It. 7 — Indexes, stats, validation, table management
-- Index manager (SQL + Mongo): list, create, drop, usage stats.
-- Collection/table statistics.
-- Mongo `$jsonSchema` validation editor.
-- SQL table designer: create/alter tables, columns, FKs → preview DDL → apply.
-- **Done when:** schema changes can be made visually with a DDL preview.
+### It. 7 — Indexes, stats, validation, table management ✅ done
+- ✅ Index manager (SQL + Mongo): list, create, drop, usage stats. Usage and size show "n/a" where a server keeps none.
+- ✅ Collection/table statistics.
+- ✅ Mongo `$jsonSchema` validation editor.
+- ✅ SQL table designer: create/alter tables and columns → preview DDL → apply. Foreign keys, unique and check constraints are built in the core but have no screen yet.
+- ✅ **Done when:** schema changes can be made visually with a DDL preview.
+
+**Status:** merged in PRs #19–#24 (ADRs 0012 and 0013, protocol version 7), CI green on each.
+- Core: `IndexService`, `StatsService`, `ValidationService`, `SchemaDesignService`; DDL builders per dialect with golden tests.
+- Live-server tests pass on PostgreSQL, CockroachDB, MySQL, MariaDB, TiDB, SQL Server, MongoDB and DocumentDB Local (shared `IndexLifecycle`, `TableStats`, `DDLRoundTrip` suites, Mongo validation tests).
+- UI: Indexes, Stats and Validation sections on table and collection tabs, gated by capability; designer tab. Widget tests plus the macOS end-to-end test `make test-e2e-designer` (real app and core, SQLite).
+
+**Known gaps (carry forward):**
+- Amazon DocumentDB and Cosmos DB for MongoDB are unverified; unsupported calls map to `UNSUPPORTED`.
+- SQLite column alters and constraint changes are reported as unsupported (no table rebuild).
+- The validation editor does not infer a starter schema from sample documents.
+- The Indexes, Stats and Validation panels have no end-to-end test against a running core; the designer on engines other than SQLite is untested end to end.
+- Online index creation (`CONCURRENTLY`, `ONLINE`) is not offered.
 
 ## Phase C — Productivity (it. 8–12)
 
