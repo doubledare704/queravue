@@ -279,6 +279,26 @@ func (s *ShellService) CloseShell(_ context.Context, req *queravuev1.CloseShellR
 	return &queravuev1.CloseShellResponse{}, nil
 }
 
+// CloseSession closes the shells of a session that has ended, so their
+// runtimes and cursors are freed at once instead of at the next shell call.
+func (s *ShellService) CloseSession(sessionID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, o := range s.shells {
+		if o.sessionID == sessionID {
+			o.sh.Close()
+			delete(s.shells, id)
+		}
+	}
+}
+
+// Len returns the number of open shells.
+func (s *ShellService) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.shells)
+}
+
 // Shutdown closes every open shell.
 func (s *ShellService) Shutdown() {
 	s.mu.Lock()
