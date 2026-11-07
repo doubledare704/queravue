@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos
+.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -43,6 +43,9 @@ test-e2e-mongo: core ## Mongo UI flow against the seeded docker replica set (mak
 
 test-e2e-designer: core ## Table designer flow on a SQLite file: design, review the DDL, apply, edit
 	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/designer_test.dart -d macos
+
+test-e2e-panels: db-up core ## Indexes, Stats and Validation sections on SQLite and the docker Mongo
+	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/panels_test.dart -d macos
 
 test-e2e-shell: db-up core ## Shell + workspace flow: save a script, restart the app, reopen and run it (docker Mongo)
 	cd app && QUERAVUE_WORKSPACE=$$(mktemp -d) QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/shell_workspace_test.dart -d macos
