@@ -39,6 +39,9 @@ type Config struct {
 	Connections *connections.Service
 	// Workspace backs WorkspaceService. Nil leaves the service unregistered.
 	Workspace *workspace.Service
+	// Shells backs ShellService. If nil, a handler is created when Sessions
+	// and Results are set; pass one to close shells when sessions close.
+	Shells *api.ShellService
 	// Sessions and Results back SessionService and QueryService. Both must be
 	// set to register them.
 	Sessions    *session.Manager
@@ -100,9 +103,12 @@ func Serve(ctx context.Context, cfg Config) error {
 			docSvc.SetHistory(cfg.History)
 		}
 		queravuev1.RegisterDocumentServiceServer(srv, docSvc)
-		shellSvc := api.NewShellService(cfg.Sessions, cfg.Connections, log)
-		if cfg.History != nil {
-			shellSvc.SetHistory(cfg.History)
+		shellSvc := cfg.Shells
+		if shellSvc == nil {
+			shellSvc = api.NewShellService(cfg.Sessions, cfg.Connections, log)
+			if cfg.History != nil {
+				shellSvc.SetHistory(cfg.History)
+			}
 		}
 		defer shellSvc.Shutdown()
 		queravuev1.RegisterShellServiceServer(srv, shellSvc)
