@@ -45,6 +45,14 @@ func (s *Service) noteWrite(abs, hash string) {
 	s.ownOps[abs] = time.Now()
 }
 
+// Called before touching the file: a watcher flush between the write and noteWrite must not see it as external.
+func (s *Service) beginOwnWrite(abs string) {
+	s.ownMu.Lock()
+	defer s.ownMu.Unlock()
+	delete(s.hashes, abs)
+	s.ownOps[abs] = time.Now()
+}
+
 func (s *Service) noteOp(abs string) {
 	s.ownMu.Lock()
 	defer s.ownMu.Unlock()

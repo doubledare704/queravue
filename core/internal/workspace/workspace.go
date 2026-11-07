@@ -368,6 +368,7 @@ func (s *Service) Write(rootID, rel, content string, check WriteCheck) (*File, e
 	if err := os.MkdirAll(filepath.Dir(abs), 0o750); err != nil {
 		return nil, ioError("write "+rel, err)
 	}
+	s.beginOwnWrite(abs)
 	if err := atomicWrite(abs, []byte(content), mode); err != nil {
 		return nil, ioError("write "+rel, err)
 	}
@@ -403,6 +404,7 @@ func (s *Service) Create(rootID, rel string, isDir bool, content string) (*File,
 		s.noteOp(abs)
 		return nil, nil
 	}
+	s.beginOwnWrite(abs)
 	f, err := os.OpenFile(abs, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // abs is resolved inside the workspace root
 	if err != nil {
 		return nil, ioError("create "+rel, err)
