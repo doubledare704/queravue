@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/schema.proto";
+
+// IndexService lists, creates and drops indexes on SQL tables and Mongo collections.
+// For Mongo, TableRef.database is the database, TableRef.table is the collection
+// and TableRef.schema is empty. The UI offers it only when the connection reports
+// the index_manager capability.
+service IndexService {
+  // ListIndexes returns every index on the table or collection, with usage
+  // statistics where the server provides them.
+  rpc ListIndexes(ListIndexesRequest) returns (ListIndexesResponse);
+
+  // CreateIndex builds an index. With dry_run it only returns the statement
+  // (SQL DDL, or the createIndexes command as shell text) without running it.
+  rpc CreateIndex(CreateIndexRequest) returns (CreateIndexResponse);
+
+  // DropIndex removes an index. Always needs confirmed=true; with dry_run it
+  // only returns the statement.
+  rpc DropIndex(DropIndexRequest) returns (DropIndexResponse);
+}
+
+// IndexKeyKind says how a key part is ordered or hashed.
+enum IndexKeyKind {
+  // Unspecified. Treated as ascending.
+  INDEX_KEY_KIND_UNSPECIFIED = 0;
+  // Ascending order.
+  INDEX_KEY_KIND_ASCENDING = 1;
+  // Descending order.
+  INDEX_KEY_KIND_DESCENDING = 2;
+  // Hashed key (Mongo hashed, PostgreSQL hash method uses IndexSpec.method instead).
+  INDEX_KEY_KIND_HASHED = 3;
+  // Full-text key (Mongo text index).
+  INDEX_KEY_KIND_TEXT = 4;
+  // Spherical geo key (Mongo 2dsphere).
+  INDEX_KEY_KIND_GEO_2DSPHERE = 5;
+}
+
+// IndexKey is one part of an index key.
+message IndexKey {
+  // Column name, Mongo field path, or an expression for expression indexes.
+  string name = 1;
+  // Ordering or key kind.
+  IndexKeyKind kind = 2;
+  // True if name is an expression rather than a column. SQL only.
+  bool is_expression = 3;
+}
+
+// IndexUsage reports how often the server used an index since its counters were reset.
+message IndexUsage {
+  // False when the engine or variant keeps no usage statistics; the other fields are then unset.
+  bool available = 1;
+  // Number of times the index was used for a scan or lookup.
+  optional uint64 scans = 2;
+  // Unix milliseconds of the last use, when the server records it.
+  optional int64 last_used_unix_ms = 3;
+  // Unix milliseconds since when the counters have been collecting, when known.
+  optional int64 tracking_since_unix_ms = 4;
+}
+
+// IndexSpec is the definition of an index, used for creation and for display.
+message IndexSpec {
+  // Index name. Empty on create lets the server choose.
+  string name = 1;
+  // Key parts in order.
+  repeated IndexKey keys = 2;
+  // True for a unique index.
+  bool unique = 3;
+  // Access method, for example "btree", "hash", "gin", "gist"; empty means the engine default.
+  string method = 4;
+  // Predicate of a partial index (SQL expression, or canonical EJSON filter for Mongo); empty if none.
+  string partial_predicate = 5;
+  // Non-key columns stored in the index (INCLUDE). SQL only.
+  repeated string include_columns = 6;
+  // Engine-specific options, such as Mongo "expireAfterSeconds", "sparse", "collation" (EJSON value text).
+  map<string, string> options = 7;
+}
+
+// IndexInfo is an existing index with its size and usage.
+message IndexInfo {
+  // Definition as the server reports it.
+  IndexSpec spec = 1;
+  // True for the index that backs the primary key (or Mongo's _id index).
+  bool is_primary = 2;
+  // Size on disk in bytes, when the server reports it.
+  optional uint64 size_bytes = 3;
+  // Usage statistics.
+  IndexUsage usage = 4;
+}
+
+// ListIndexesRequest selects the table or collection to inspect.
+message ListIndexesRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Table or collection.
+  TableRef table_ref = 2;
+}
+
+// ListIndexesResponse carries the indexes or an error.
+message ListIndexesResponse {
+  // Indexes, primary first.
+  repeated IndexInfo indexes = 1;
+  // Set when listing failed.
+  AdminError error = 2;
+}
+
+// CreateIndexRequest asks for a new index.
+message CreateIndexRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Table or collection.
+  TableRef table_ref = 2;
+  // Index to build.
+  IndexSpec spec = 3;
+  // If true, returns the statement without running it.
+  bool dry_run = 4;
+  // Required on connections flagged production; the core refuses without it.
+  bool confirmed = 5;
+}
+
+// CreateIndexResponse reports the statement and outcome of a create.
+message CreateIndexResponse {
+  // The statement that ran (or would run on dry_run): SQL DDL or Mongo shell text.
+  string statement = 1;
+  // True if nothing was executed.
+  bool dry_run = 2;
+  // Name the server gave the index; set after a real create.
+  string index_name = 3;
+  // Set when the call failed or was refused.
+  AdminError error = 4;
+}
+
+// DropIndexRequest asks to remove an index.
+message DropIndexRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Table or collection.
+  TableRef table_ref = 2;
+  // Name of the index to drop.
+  string index_name = 3;
+  // If true, returns the statement without running it.
+  bool dry_run = 4;
+  // Required on every connection: dropping an index can make queries slow until it is rebuilt.
+  bool confirmed = 5;
+}
+
+// DropIndexResponse reports the statement and outcome of a drop.
+message DropIndexResponse {
+  // The statement that ran (or would run on dry_run).
+  string statement = 1;
+  // True if nothing was executed.
+  bool dry_run = 2;
+  // Set when the call failed or was refused.
+  AdminError error = 3;
+}

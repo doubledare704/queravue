@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+// AdminErrorKind classifies a failed schema-administration call (indexes, stats,
+// validation, table design). Failures are returned in-band so the stream and
+// transport stay healthy.
+enum AdminErrorKind {
+  // Unspecified. Never sent.
+  ADMIN_ERROR_KIND_UNSPECIFIED = 0;
+  // The change was refused and nothing was changed. Repeat the request with
+  // confirmed=true after the user agrees.
+  ADMIN_ERROR_KIND_CONFIRMATION_REQUIRED = 1;
+  // The server or engine does not support the operation (for example
+  // collMod validators on a server that rejects them).
+  ADMIN_ERROR_KIND_UNSUPPORTED = 2;
+  // The request is malformed or names something that cannot be built, such as
+  // an index without keys or a validator that is not valid JSON.
+  ADMIN_ERROR_KIND_INVALID = 3;
+  // The table, collection, index or column does not exist.
+  ADMIN_ERROR_KIND_NOT_FOUND = 4;
+  // The index, column or table already exists.
+  ADMIN_ERROR_KIND_ALREADY_EXISTS = 5;
+  // The server rejected the operation; message carries its explanation.
+  ADMIN_ERROR_KIND_SERVER = 6;
+  // The operation was cancelled before it finished.
+  ADMIN_ERROR_KIND_CANCELED = 7;
+}
+
+// AdminError describes why a schema-administration call did nothing or stopped early.
+message AdminError {
+  // Failure category.
+  AdminErrorKind kind = 1;
+  // Human-readable explanation, safe to show to the user.
+  string message = 2;
+  // For CONFIRMATION_REQUIRED: what needs confirming, for example
+  // "drop index orders_status_idx" or "write to a production connection".
+  string operation = 3;
+  // For INVALID input that is text: 0-based UTF-16 offset of the failing character.
+  optional uint32 position = 4;
+}

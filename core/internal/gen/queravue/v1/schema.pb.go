@@ -87,6 +87,71 @@ func (SchemaObjectType) EnumDescriptor() ([]byte, []int) {
 	return file_queravue_v1_schema_proto_rawDescGZIP(), []int{0}
 }
 
+// ReferentialAction is what a foreign key does when the referenced row changes.
+type ReferentialAction int32
+
+const (
+	// Unknown or the engine default.
+	ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED ReferentialAction = 0
+	// Reject the change at the end of the statement.
+	ReferentialAction_REFERENTIAL_ACTION_NO_ACTION ReferentialAction = 1
+	// Reject the change immediately.
+	ReferentialAction_REFERENTIAL_ACTION_RESTRICT ReferentialAction = 2
+	// Apply the same change to the referencing rows.
+	ReferentialAction_REFERENTIAL_ACTION_CASCADE ReferentialAction = 3
+	// Set the referencing columns to NULL.
+	ReferentialAction_REFERENTIAL_ACTION_SET_NULL ReferentialAction = 4
+	// Set the referencing columns to their defaults.
+	ReferentialAction_REFERENTIAL_ACTION_SET_DEFAULT ReferentialAction = 5
+)
+
+// Enum value maps for ReferentialAction.
+var (
+	ReferentialAction_name = map[int32]string{
+		0: "REFERENTIAL_ACTION_UNSPECIFIED",
+		1: "REFERENTIAL_ACTION_NO_ACTION",
+		2: "REFERENTIAL_ACTION_RESTRICT",
+		3: "REFERENTIAL_ACTION_CASCADE",
+		4: "REFERENTIAL_ACTION_SET_NULL",
+		5: "REFERENTIAL_ACTION_SET_DEFAULT",
+	}
+	ReferentialAction_value = map[string]int32{
+		"REFERENTIAL_ACTION_UNSPECIFIED": 0,
+		"REFERENTIAL_ACTION_NO_ACTION":   1,
+		"REFERENTIAL_ACTION_RESTRICT":    2,
+		"REFERENTIAL_ACTION_CASCADE":     3,
+		"REFERENTIAL_ACTION_SET_NULL":    4,
+		"REFERENTIAL_ACTION_SET_DEFAULT": 5,
+	}
+)
+
+func (x ReferentialAction) Enum() *ReferentialAction {
+	p := new(ReferentialAction)
+	*p = x
+	return p
+}
+
+func (x ReferentialAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ReferentialAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_queravue_v1_schema_proto_enumTypes[1].Descriptor()
+}
+
+func (ReferentialAction) Type() protoreflect.EnumType {
+	return &file_queravue_v1_schema_proto_enumTypes[1]
+}
+
+func (x ReferentialAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ReferentialAction.Descriptor instead.
+func (ReferentialAction) EnumDescriptor() ([]byte, []int) {
+	return file_queravue_v1_schema_proto_rawDescGZIP(), []int{1}
+}
+
 // TableRef uniquely identifies a table or view within a connection.
 type TableRef struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -250,8 +315,12 @@ type ColumnDetails struct {
 	IsPrimaryKey bool `protobuf:"varint,6,opt,name=is_primary_key,json=isPrimaryKey,proto3" json:"is_primary_key,omitempty"`
 	// 1-based order within a composite primary key; 0 if not a primary key.
 	PrimaryKeyOrder uint32 `protobuf:"varint,7,opt,name=primary_key_order,json=primaryKeyOrder,proto3" json:"primary_key_order,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// True for an auto-generated value (identity, serial, auto_increment).
+	Identity bool `protobuf:"varint,8,opt,name=identity,proto3" json:"identity,omitempty"`
+	// Collation name, when the column has one that differs from the table default.
+	Collation     *string `protobuf:"bytes,9,opt,name=collation,proto3,oneof" json:"collation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ColumnDetails) Reset() {
@@ -331,6 +400,20 @@ func (x *ColumnDetails) GetPrimaryKeyOrder() uint32 {
 		return x.PrimaryKeyOrder
 	}
 	return 0
+}
+
+func (x *ColumnDetails) GetIdentity() bool {
+	if x != nil {
+		return x.Identity
+	}
+	return false
+}
+
+func (x *ColumnDetails) GetCollation() string {
+	if x != nil && x.Collation != nil {
+		return *x.Collation
+	}
+	return ""
 }
 
 // IndexDetails describes an index on a table.
@@ -419,8 +502,12 @@ type ForeignKeyDetails struct {
 	ReferencedTable string `protobuf:"bytes,4,opt,name=referenced_table,json=referencedTable,proto3" json:"referenced_table,omitempty"`
 	// Referenced column names in the target table.
 	ReferencedColumns []string `protobuf:"bytes,5,rep,name=referenced_columns,json=referencedColumns,proto3" json:"referenced_columns,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Action when a referenced row is deleted.
+	OnDelete ReferentialAction `protobuf:"varint,6,opt,name=on_delete,json=onDelete,proto3,enum=queravue.v1.ReferentialAction" json:"on_delete,omitempty"`
+	// Action when a referenced key is updated.
+	OnUpdate      ReferentialAction `protobuf:"varint,7,opt,name=on_update,json=onUpdate,proto3,enum=queravue.v1.ReferentialAction" json:"on_update,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ForeignKeyDetails) Reset() {
@@ -486,6 +573,20 @@ func (x *ForeignKeyDetails) GetReferencedColumns() []string {
 		return x.ReferencedColumns
 	}
 	return nil
+}
+
+func (x *ForeignKeyDetails) GetOnDelete() ReferentialAction {
+	if x != nil {
+		return x.OnDelete
+	}
+	return ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED
+}
+
+func (x *ForeignKeyDetails) GetOnUpdate() ReferentialAction {
+	if x != nil {
+		return x.OnUpdate
+	}
+	return ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED
 }
 
 // ListDatabasesRequest selects the session to inspect.
@@ -1107,7 +1208,7 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\x12row_count_estimate\x18\x03 \x01(\x03R\x10rowCountEstimate\x12\x16\n" +
 	"\x06capped\x18\x04 \x01(\bR\x06capped\x12\x1d\n" +
 	"\n" +
-	"size_bytes\x18\x05 \x01(\x04R\tsizeBytes\"\x96\x02\n" +
+	"size_bytes\x18\x05 \x01(\x04R\tsizeBytes\"\xe3\x02\n" +
 	"\rColumnDetails\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\ttype_name\x18\x02 \x01(\tR\btypeName\x12*\n" +
@@ -1115,20 +1216,26 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\bnullable\x18\x04 \x01(\bR\bnullable\x12(\n" +
 	"\rdefault_value\x18\x05 \x01(\tH\x00R\fdefaultValue\x88\x01\x01\x12$\n" +
 	"\x0eis_primary_key\x18\x06 \x01(\bR\fisPrimaryKey\x12*\n" +
-	"\x11primary_key_order\x18\a \x01(\rR\x0fprimaryKeyOrderB\x10\n" +
-	"\x0e_default_value\"x\n" +
+	"\x11primary_key_order\x18\a \x01(\rR\x0fprimaryKeyOrder\x12\x1a\n" +
+	"\bidentity\x18\b \x01(\bR\bidentity\x12!\n" +
+	"\tcollation\x18\t \x01(\tH\x01R\tcollation\x88\x01\x01B\x10\n" +
+	"\x0e_default_valueB\f\n" +
+	"\n" +
+	"_collation\"x\n" +
 	"\fIndexDetails\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acolumns\x18\x02 \x03(\tR\acolumns\x12\x1b\n" +
 	"\tis_unique\x18\x03 \x01(\bR\bisUnique\x12\x1d\n" +
 	"\n" +
-	"is_primary\x18\x04 \x01(\bR\tisPrimary\"\xc8\x01\n" +
+	"is_primary\x18\x04 \x01(\bR\tisPrimary\"\xc2\x02\n" +
 	"\x11ForeignKeyDetails\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\acolumns\x18\x02 \x03(\tR\acolumns\x12+\n" +
 	"\x11referenced_schema\x18\x03 \x01(\tR\x10referencedSchema\x12)\n" +
 	"\x10referenced_table\x18\x04 \x01(\tR\x0freferencedTable\x12-\n" +
-	"\x12referenced_columns\x18\x05 \x03(\tR\x11referencedColumns\"O\n" +
+	"\x12referenced_columns\x18\x05 \x03(\tR\x11referencedColumns\x12;\n" +
+	"\ton_delete\x18\x06 \x01(\x0e2\x1e.queravue.v1.ReferentialActionR\bonDelete\x12;\n" +
+	"\ton_update\x18\a \x01(\x0e2\x1e.queravue.v1.ReferentialActionR\bonUpdate\"O\n" +
 	"\x14ListDatabasesRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x18\n" +
@@ -1176,7 +1283,14 @@ const file_queravue_v1_schema_proto_rawDesc = "" +
 	"\x17SCHEMA_OBJECT_TYPE_VIEW\x10\x02\x12(\n" +
 	"$SCHEMA_OBJECT_TYPE_MATERIALIZED_VIEW\x10\x03\x12!\n" +
 	"\x1dSCHEMA_OBJECT_TYPE_COLLECTION\x10\x04\x12\"\n" +
-	"\x1eSCHEMA_OBJECT_TYPE_TIME_SERIES\x10\x052\xc1\x03\n" +
+	"\x1eSCHEMA_OBJECT_TYPE_TIME_SERIES\x10\x05*\xdf\x01\n" +
+	"\x11ReferentialAction\x12\"\n" +
+	"\x1eREFERENTIAL_ACTION_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cREFERENTIAL_ACTION_NO_ACTION\x10\x01\x12\x1f\n" +
+	"\x1bREFERENTIAL_ACTION_RESTRICT\x10\x02\x12\x1e\n" +
+	"\x1aREFERENTIAL_ACTION_CASCADE\x10\x03\x12\x1f\n" +
+	"\x1bREFERENTIAL_ACTION_SET_NULL\x10\x04\x12\"\n" +
+	"\x1eREFERENTIAL_ACTION_SET_DEFAULT\x10\x052\xc1\x03\n" +
 	"\rSchemaService\x12V\n" +
 	"\rListDatabases\x12!.queravue.v1.ListDatabasesRequest\x1a\".queravue.v1.ListDatabasesResponse\x12P\n" +
 	"\vListSchemas\x12\x1f.queravue.v1.ListSchemasRequest\x1a .queravue.v1.ListSchemasResponse\x12P\n" +
@@ -1197,53 +1311,56 @@ func file_queravue_v1_schema_proto_rawDescGZIP() []byte {
 	return file_queravue_v1_schema_proto_rawDescData
 }
 
-var file_queravue_v1_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_queravue_v1_schema_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_queravue_v1_schema_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_queravue_v1_schema_proto_goTypes = []any{
 	(SchemaObjectType)(0),           // 0: queravue.v1.SchemaObjectType
-	(*TableRef)(nil),                // 1: queravue.v1.TableRef
-	(*SchemaObject)(nil),            // 2: queravue.v1.SchemaObject
-	(*ColumnDetails)(nil),           // 3: queravue.v1.ColumnDetails
-	(*IndexDetails)(nil),            // 4: queravue.v1.IndexDetails
-	(*ForeignKeyDetails)(nil),       // 5: queravue.v1.ForeignKeyDetails
-	(*ListDatabasesRequest)(nil),    // 6: queravue.v1.ListDatabasesRequest
-	(*ListDatabasesResponse)(nil),   // 7: queravue.v1.ListDatabasesResponse
-	(*ListSchemasRequest)(nil),      // 8: queravue.v1.ListSchemasRequest
-	(*ListSchemasResponse)(nil),     // 9: queravue.v1.ListSchemasResponse
-	(*ListObjectsRequest)(nil),      // 10: queravue.v1.ListObjectsRequest
-	(*ListObjectsResponse)(nil),     // 11: queravue.v1.ListObjectsResponse
-	(*GetTableDetailsRequest)(nil),  // 12: queravue.v1.GetTableDetailsRequest
-	(*GetTableDetailsResponse)(nil), // 13: queravue.v1.GetTableDetailsResponse
-	(*RefreshSchemaRequest)(nil),    // 14: queravue.v1.RefreshSchemaRequest
-	(*RefreshSchemaResponse)(nil),   // 15: queravue.v1.RefreshSchemaResponse
-	(ValueKind)(0),                  // 16: queravue.v1.ValueKind
+	(ReferentialAction)(0),          // 1: queravue.v1.ReferentialAction
+	(*TableRef)(nil),                // 2: queravue.v1.TableRef
+	(*SchemaObject)(nil),            // 3: queravue.v1.SchemaObject
+	(*ColumnDetails)(nil),           // 4: queravue.v1.ColumnDetails
+	(*IndexDetails)(nil),            // 5: queravue.v1.IndexDetails
+	(*ForeignKeyDetails)(nil),       // 6: queravue.v1.ForeignKeyDetails
+	(*ListDatabasesRequest)(nil),    // 7: queravue.v1.ListDatabasesRequest
+	(*ListDatabasesResponse)(nil),   // 8: queravue.v1.ListDatabasesResponse
+	(*ListSchemasRequest)(nil),      // 9: queravue.v1.ListSchemasRequest
+	(*ListSchemasResponse)(nil),     // 10: queravue.v1.ListSchemasResponse
+	(*ListObjectsRequest)(nil),      // 11: queravue.v1.ListObjectsRequest
+	(*ListObjectsResponse)(nil),     // 12: queravue.v1.ListObjectsResponse
+	(*GetTableDetailsRequest)(nil),  // 13: queravue.v1.GetTableDetailsRequest
+	(*GetTableDetailsResponse)(nil), // 14: queravue.v1.GetTableDetailsResponse
+	(*RefreshSchemaRequest)(nil),    // 15: queravue.v1.RefreshSchemaRequest
+	(*RefreshSchemaResponse)(nil),   // 16: queravue.v1.RefreshSchemaResponse
+	(ValueKind)(0),                  // 17: queravue.v1.ValueKind
 }
 var file_queravue_v1_schema_proto_depIdxs = []int32{
 	0,  // 0: queravue.v1.SchemaObject.type:type_name -> queravue.v1.SchemaObjectType
-	16, // 1: queravue.v1.ColumnDetails.kind:type_name -> queravue.v1.ValueKind
-	2,  // 2: queravue.v1.ListObjectsResponse.objects:type_name -> queravue.v1.SchemaObject
-	1,  // 3: queravue.v1.GetTableDetailsRequest.table_ref:type_name -> queravue.v1.TableRef
-	1,  // 4: queravue.v1.GetTableDetailsResponse.table_ref:type_name -> queravue.v1.TableRef
-	0,  // 5: queravue.v1.GetTableDetailsResponse.type:type_name -> queravue.v1.SchemaObjectType
-	3,  // 6: queravue.v1.GetTableDetailsResponse.columns:type_name -> queravue.v1.ColumnDetails
-	4,  // 7: queravue.v1.GetTableDetailsResponse.indexes:type_name -> queravue.v1.IndexDetails
-	5,  // 8: queravue.v1.GetTableDetailsResponse.foreign_keys:type_name -> queravue.v1.ForeignKeyDetails
-	1,  // 9: queravue.v1.RefreshSchemaRequest.table_ref:type_name -> queravue.v1.TableRef
-	6,  // 10: queravue.v1.SchemaService.ListDatabases:input_type -> queravue.v1.ListDatabasesRequest
-	8,  // 11: queravue.v1.SchemaService.ListSchemas:input_type -> queravue.v1.ListSchemasRequest
-	10, // 12: queravue.v1.SchemaService.ListObjects:input_type -> queravue.v1.ListObjectsRequest
-	12, // 13: queravue.v1.SchemaService.GetTableDetails:input_type -> queravue.v1.GetTableDetailsRequest
-	14, // 14: queravue.v1.SchemaService.RefreshSchema:input_type -> queravue.v1.RefreshSchemaRequest
-	7,  // 15: queravue.v1.SchemaService.ListDatabases:output_type -> queravue.v1.ListDatabasesResponse
-	9,  // 16: queravue.v1.SchemaService.ListSchemas:output_type -> queravue.v1.ListSchemasResponse
-	11, // 17: queravue.v1.SchemaService.ListObjects:output_type -> queravue.v1.ListObjectsResponse
-	13, // 18: queravue.v1.SchemaService.GetTableDetails:output_type -> queravue.v1.GetTableDetailsResponse
-	15, // 19: queravue.v1.SchemaService.RefreshSchema:output_type -> queravue.v1.RefreshSchemaResponse
-	15, // [15:20] is the sub-list for method output_type
-	10, // [10:15] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	17, // 1: queravue.v1.ColumnDetails.kind:type_name -> queravue.v1.ValueKind
+	1,  // 2: queravue.v1.ForeignKeyDetails.on_delete:type_name -> queravue.v1.ReferentialAction
+	1,  // 3: queravue.v1.ForeignKeyDetails.on_update:type_name -> queravue.v1.ReferentialAction
+	3,  // 4: queravue.v1.ListObjectsResponse.objects:type_name -> queravue.v1.SchemaObject
+	2,  // 5: queravue.v1.GetTableDetailsRequest.table_ref:type_name -> queravue.v1.TableRef
+	2,  // 6: queravue.v1.GetTableDetailsResponse.table_ref:type_name -> queravue.v1.TableRef
+	0,  // 7: queravue.v1.GetTableDetailsResponse.type:type_name -> queravue.v1.SchemaObjectType
+	4,  // 8: queravue.v1.GetTableDetailsResponse.columns:type_name -> queravue.v1.ColumnDetails
+	5,  // 9: queravue.v1.GetTableDetailsResponse.indexes:type_name -> queravue.v1.IndexDetails
+	6,  // 10: queravue.v1.GetTableDetailsResponse.foreign_keys:type_name -> queravue.v1.ForeignKeyDetails
+	2,  // 11: queravue.v1.RefreshSchemaRequest.table_ref:type_name -> queravue.v1.TableRef
+	7,  // 12: queravue.v1.SchemaService.ListDatabases:input_type -> queravue.v1.ListDatabasesRequest
+	9,  // 13: queravue.v1.SchemaService.ListSchemas:input_type -> queravue.v1.ListSchemasRequest
+	11, // 14: queravue.v1.SchemaService.ListObjects:input_type -> queravue.v1.ListObjectsRequest
+	13, // 15: queravue.v1.SchemaService.GetTableDetails:input_type -> queravue.v1.GetTableDetailsRequest
+	15, // 16: queravue.v1.SchemaService.RefreshSchema:input_type -> queravue.v1.RefreshSchemaRequest
+	8,  // 17: queravue.v1.SchemaService.ListDatabases:output_type -> queravue.v1.ListDatabasesResponse
+	10, // 18: queravue.v1.SchemaService.ListSchemas:output_type -> queravue.v1.ListSchemasResponse
+	12, // 19: queravue.v1.SchemaService.ListObjects:output_type -> queravue.v1.ListObjectsResponse
+	14, // 20: queravue.v1.SchemaService.GetTableDetails:output_type -> queravue.v1.GetTableDetailsResponse
+	16, // 21: queravue.v1.SchemaService.RefreshSchema:output_type -> queravue.v1.RefreshSchemaResponse
+	17, // [17:22] is the sub-list for method output_type
+	12, // [12:17] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_queravue_v1_schema_proto_init() }
@@ -1258,7 +1375,7 @@ func file_queravue_v1_schema_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queravue_v1_schema_proto_rawDesc), len(file_queravue_v1_schema_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,

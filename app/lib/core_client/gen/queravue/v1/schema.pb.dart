@@ -224,6 +224,8 @@ class ColumnDetails extends $pb.GeneratedMessage {
     $core.String? defaultValue,
     $core.bool? isPrimaryKey,
     $core.int? primaryKeyOrder,
+    $core.bool? identity,
+    $core.String? collation,
   }) {
     final result = create();
     if (name != null) result.name = name;
@@ -233,6 +235,8 @@ class ColumnDetails extends $pb.GeneratedMessage {
     if (defaultValue != null) result.defaultValue = defaultValue;
     if (isPrimaryKey != null) result.isPrimaryKey = isPrimaryKey;
     if (primaryKeyOrder != null) result.primaryKeyOrder = primaryKeyOrder;
+    if (identity != null) result.identity = identity;
+    if (collation != null) result.collation = collation;
     return result;
   }
 
@@ -258,6 +262,8 @@ class ColumnDetails extends $pb.GeneratedMessage {
     ..aOB(6, _omitFieldNames ? '' : 'isPrimaryKey')
     ..aI(7, _omitFieldNames ? '' : 'primaryKeyOrder',
         fieldType: $pb.PbFieldType.OU3)
+    ..aOB(8, _omitFieldNames ? '' : 'identity')
+    ..aOS(9, _omitFieldNames ? '' : 'collation')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -348,6 +354,26 @@ class ColumnDetails extends $pb.GeneratedMessage {
   $core.bool hasPrimaryKeyOrder() => $_has(6);
   @$pb.TagNumber(7)
   void clearPrimaryKeyOrder() => $_clearField(7);
+
+  /// True for an auto-generated value (identity, serial, auto_increment).
+  @$pb.TagNumber(8)
+  $core.bool get identity => $_getBF(7);
+  @$pb.TagNumber(8)
+  set identity($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIdentity() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIdentity() => $_clearField(8);
+
+  /// Collation name, when the column has one that differs from the table default.
+  @$pb.TagNumber(9)
+  $core.String get collation => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set collation($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasCollation() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearCollation() => $_clearField(9);
 }
 
 /// IndexDetails describes an index on a table.
@@ -447,6 +473,8 @@ class ForeignKeyDetails extends $pb.GeneratedMessage {
     $core.String? referencedSchema,
     $core.String? referencedTable,
     $core.Iterable<$core.String>? referencedColumns,
+    ReferentialAction? onDelete,
+    ReferentialAction? onUpdate,
   }) {
     final result = create();
     if (name != null) result.name = name;
@@ -455,6 +483,8 @@ class ForeignKeyDetails extends $pb.GeneratedMessage {
     if (referencedTable != null) result.referencedTable = referencedTable;
     if (referencedColumns != null)
       result.referencedColumns.addAll(referencedColumns);
+    if (onDelete != null) result.onDelete = onDelete;
+    if (onUpdate != null) result.onUpdate = onUpdate;
     return result;
   }
 
@@ -476,6 +506,10 @@ class ForeignKeyDetails extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'referencedSchema')
     ..aOS(4, _omitFieldNames ? '' : 'referencedTable')
     ..pPS(5, _omitFieldNames ? '' : 'referencedColumns')
+    ..aE<ReferentialAction>(6, _omitFieldNames ? '' : 'onDelete',
+        enumValues: ReferentialAction.values)
+    ..aE<ReferentialAction>(7, _omitFieldNames ? '' : 'onUpdate',
+        enumValues: ReferentialAction.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -534,6 +568,26 @@ class ForeignKeyDetails extends $pb.GeneratedMessage {
   /// Referenced column names in the target table.
   @$pb.TagNumber(5)
   $pb.PbList<$core.String> get referencedColumns => $_getList(4);
+
+  /// Action when a referenced row is deleted.
+  @$pb.TagNumber(6)
+  ReferentialAction get onDelete => $_getN(5);
+  @$pb.TagNumber(6)
+  set onDelete(ReferentialAction value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasOnDelete() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearOnDelete() => $_clearField(6);
+
+  /// Action when a referenced key is updated.
+  @$pb.TagNumber(7)
+  ReferentialAction get onUpdate => $_getN(6);
+  @$pb.TagNumber(7)
+  set onUpdate(ReferentialAction value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasOnUpdate() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearOnUpdate() => $_clearField(7);
 }
 
 /// ListDatabasesRequest selects the session to inspect.

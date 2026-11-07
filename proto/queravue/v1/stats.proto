@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/schema.proto";
+
+// StatsService reports table and collection statistics. The UI offers it only
+// when the connection reports the stats capability.
+service StatsService {
+  // GetStats returns sizes, row estimates and engine-specific figures for one
+  // table or collection. It reads server metadata and never scans the data.
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+}
+
+// StatEntry is an engine-specific figure shown as a label and value.
+message StatEntry {
+  // Stable key, for example "last_autovacuum" or "avg_obj_size".
+  string key = 1;
+  // Label to show.
+  string label = 2;
+  // Value already formatted as text by the core.
+  string value = 3;
+}
+
+// TableStats holds the common figures; unknown ones are unset, never zero.
+message TableStats {
+  // Estimated row or document count.
+  optional int64 estimated_rows = 1;
+  // Bytes used by table or collection data.
+  optional uint64 data_bytes = 2;
+  // Bytes used by all indexes.
+  optional uint64 index_bytes = 3;
+  // Total bytes on disk, when the server reports a total that differs from data plus indexes.
+  optional uint64 total_bytes = 4;
+  // Engine-specific entries in display order.
+  repeated StatEntry extras = 5;
+}
+
+// GetStatsRequest selects the table or collection.
+message GetStatsRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Table or collection (Mongo: database + table as collection, schema empty).
+  TableRef table_ref = 2;
+}
+
+// GetStatsResponse carries the statistics or an error.
+message GetStatsResponse {
+  // Statistics; unset when error is set.
+  TableStats stats = 1;
+  // Set when the call failed.
+  AdminError error = 2;
+}
