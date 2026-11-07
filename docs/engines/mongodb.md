@@ -32,6 +32,10 @@ mongodb://x509user@host:27017/?tls=true&authMechanism=MONGODB-X509&tlsCertificat
 ## Shell
 The shell runs mongosh-style JavaScript on an embedded goja runtime in the core (ADR 0010). It works on MongoDB, DocumentDB and Cosmos DB connections and needs no `mongosh` install. Variables, functions and `let`/`const` persist between runs of one shell. Write one command per line or several statements per run; the value of the last expression becomes the result.
 
+**The shell tab.** A connection whose engine reports the `shell` capability gets a terminal button in the tab strip (⌘/Ctrl+⇧+T, or *New Mongo shell tab* in the palette); no engine ids are checked in the UI. The editor highlights JavaScript. ⌘/Ctrl+Enter, or *Run*, runs the selection, or the whole buffer when nothing is selected. The output pane shows print lines (log, info, warn and error in different colors), values and documents in shell style (`NumberLong("5")`, `ISODate("…")`), write results, and errors. Clicking an error moves the caret to its line and column in the editor. If the last expression is a cursor (`db.users.find()`, `db.users.aggregate([…])`), the result opens in the same table, tree and JSON views as a collection tab, with paging (20 to 500 per page); it is read-only. *Cancel* appears after 300 ms of running (Esc does the same). Every run is recorded in the query history. A script saved to the workspace opens here again from the workspace panel (see [workspace.md](../workspace.md)).
+
+**Production connections.** A destructive call (see Safety below) stops before anything changes and the app shows a dialog naming the operation and the connection. *Run on production* re-runs the same script with the operation allowed; *Cancel* leaves everything as it was.
+
 **Supported**
 - Globals: `db`, `use name` / `use("name")`, `show dbs`, `show collections`, `print`, `printjson`, `tojson`, `console.log/info/warn/error`, `sleep(ms)`.
 - Database: `getSiblingDB`, `getName`, `getCollection`, `getCollectionNames`, `runCommand`, `adminCommand`, `stats`, `version`, `serverStatus`, `createCollection`, `dropDatabase`.

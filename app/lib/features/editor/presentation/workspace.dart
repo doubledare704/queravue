@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +8,10 @@ import '../../../shared/shortcuts.dart';
 import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../documents/presentation/document_tab_view.dart';
+import '../../shell/presentation/shell_tab_view.dart';
+import '../../workspace/application/tab_files.dart';
+import '../../workspace/presentation/file_banner.dart';
+import '../application/editor_actions.dart';
 import '../../connections/presentation/connection_details.dart';
 import '../../table_view/presentation/table_tab_view.dart';
 import '../application/editor_tabs.dart';
@@ -50,6 +55,13 @@ class Workspace extends ConsumerWidget {
                     ],
                   ),
                 ),
+                if (ref.watch(connectionHasShellProvider(id)))
+                  IconButton(
+                    key: const Key('new-shell-tab'),
+                    tooltip: 'New Mongo shell ($primaryLabel⇧T)',
+                    icon: const Icon(Icons.terminal, size: 18),
+                    onPressed: () => openShellTab(ref),
+                  ),
                 if (!ref.watch(connectionIsDocumentOnlyProvider(id)))
                   IconButton(
                     key: const Key('new-tab'),
@@ -62,12 +74,15 @@ class Workspace extends ConsumerWidget {
           ),
         ),
         const Divider(height: 1),
+        FileChangeBanner(key: ValueKey('banner-${active.id}'), tab: active),
         Expanded(
           child: IndexedStack(
             index: tabs.indexWhere((t) => t.id == active.id),
             children: [
               for (final t in tabs)
-                t.isCollection
+                t.isShell
+                    ? ShellTabView(key: ValueKey(t.id), tab: t)
+                    : t.isCollection
                     ? DocumentTabView(key: ValueKey(t.id), tab: t)
                     : t.isTable
                     ? TableTabView(key: ValueKey(t.id), tab: t)
@@ -113,7 +128,9 @@ class _TabButton extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              tab.isCollection
+              tab.isShell
+                  ? Icons.terminal
+                  : tab.isCollection
                   ? Icons.data_object
                   : tab.isTable
                   ? Icons.table_chart_outlined
@@ -122,7 +139,7 @@ class _TabButton extends StatelessWidget {
               color: selected ? cs.primary : cs.onSurfaceVariant,
             ),
             const SizedBox(width: 6),
-            Text(tab.title, style: Theme.of(context).textTheme.labelLarge),
+            _TabTitle(tab: tab),
             IconButton(
               key: Key('close-${tab.id}'),
               tooltip: 'Close tab (${primaryLabel}W)',
@@ -134,6 +151,75 @@ class _TabButton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Tab title, with a dot while the buffer differs from its workspace file.
+class _TabTitle extends ConsumerStatefulWidget {
+  const _TabTitle({required this.tab});
+
+  final EditorTab tab;
+
+  @override
+  ConsumerState<_TabTitle> createState() => _TabTitleState();
+}
+
+class _TabTitleState extends ConsumerState<_TabTitle> {
+  @override
+  void initState() {
+    super.initState();
+    widget.tab.controller.addListener(_onEdit);
+  }
+
+  @override
+  void didUpdateWidget(_TabTitle old) {
+    super.didUpdateWidget(old);
+    if (old.tab.controller != widget.tab.controller) {
+      old.tab.controller.removeListener(_onEdit);
+      widget.tab.controller.addListener(_onEdit);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.tab.controller.removeListener(_onEdit);
+    super.dispose();
+  }
+
+  // The editor notifies while it is being built; rebuild after the frame.
+  void _onEdit() {
+    if (!mounted) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tab = widget.tab;
+    final file = ref.watch(tabFileProvider(tab.id));
+    final style = Theme.of(context).textTheme.labelLarge;
+    if (!isTabDirty(tab, file)) return Text(tab.title, style: style);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 4),
+          child: Icon(
+            Icons.circle,
+            key: Key('tab-dirty-${tab.id}'),
+            size: 8,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        Text(tab.title, style: style),
+      ],
     );
   }
 }

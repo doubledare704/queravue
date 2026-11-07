@@ -60,7 +60,20 @@ db.sessions.deleteMany({ expires: { $lt: new Date() } })
 ## Search
 `Search(text, tags)` streams script files as it finds them and stops when the call is cancelled or after 200 hits (configurable per request). Text matches the relative path, title, description, tags and file content, case-insensitively; every requested tag must be present. A content match reports the first matching line and a snippet.
 
+## In the app
+The sidebar switches between **Connections** and **Workspace**.
+
+- **Tree.** Every workspace folder is a root; folders load when opened. A file with a `title` header shows the title (the file name is in the tooltip). The row menu has new SQL file, new Mongo script, new folder, rename / move (type a new path inside the workspace) and delete (always confirmed). The panel refreshes when shown and follows changes made on disk.
+- **Search box.** Type text, or `#tag` words for tag filters (`daily #reports`). Results replace the tree until the box is cleared.
+- **Open.** A `.sql` file opens in the SQL editor and a `.mongo.js` file in a Mongo shell tab. The connection is the one named in the header (id or name); if it is missing or does not fit the file type, the selected connection is used; with neither, the app asks you to select one. Opening an open file focuses its tab.
+- **Save.** ⌘/Ctrl+S writes the tab to its file. A dot on the tab means the buffer differs from the file. If the file changed on disk, a dialog offers *Reload* or *Overwrite* (*Save anyway* if it was deleted).
+- **Save as.** ⌘/Ctrl+⇧+S, or ⌘/Ctrl+S on a tab that has no file. Pick the workspace and a path (folders are created; the extension is added if missing), an optional title, and whether to write the connection's name into a header (`-- connection: …` / `// connection: …`). Saving onto an existing file asks first.
+- **External changes.** While a tab is bound to a file, a change made on disk shows a banner with *Reload* and *Keep mine*; *Keep mine* lets the next save overwrite without asking again. A deleted file offers only *Keep mine* (saving recreates it). A rename of the file or its folder rebinds the tab.
+- **Shortcuts and palette.** ⌘/Ctrl+O quick open, ⌘/Ctrl+⇧+F search, ⌘/Ctrl+⇧+T new Mongo shell; the palette has Open workspace file, New SQL file, New Mongo script, Search workspace, Save and Save as.
+
 ## Testing
 ```bash
 cd core && go test ./internal/workspace/... ./internal/api/...
+cd app && flutter test test/features/workspace
+make test-e2e-shell    # real app and core, docker Mongo: save, restart, reopen, run
 ```

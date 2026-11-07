@@ -7,7 +7,9 @@ import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/schema.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/session.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/shell.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/table.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/workspace.pbgrpc.dart';
 import 'package:queravue/core_client/core_launcher.dart';
 
 class FakeCoreHandle implements CoreHandle {
@@ -132,6 +134,14 @@ class FakeCoreConnection implements CoreConnection {
   @override
   DocumentServiceClient get documentService =>
       throw UnimplementedError('use a fake DocumentRepository');
+
+  @override
+  ShellServiceClient get shellService =>
+      throw UnimplementedError('use a fake ShellRepository');
+
+  @override
+  WorkspaceServiceClient get workspaceService =>
+      throw UnimplementedError('use a fake WorkspaceRepository');
 
   @override
   Future<void> close() async {

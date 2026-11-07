@@ -10,7 +10,7 @@ import '../../schema/domain/schema_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table, collection }
+enum TabKind { query, table, collection, shell }
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -33,6 +33,17 @@ class EditorTab {
   bool get isQuery => kind == TabKind.query;
   bool get isTable => kind == TabKind.table;
   bool get isCollection => kind == TabKind.collection;
+  bool get isShell => kind == TabKind.shell;
+
+  /// The same tab, with its editor kept, under a new title.
+  EditorTab withTitle(String newTitle) => EditorTab(
+    id: id,
+    connectionId: connectionId,
+    title: newTitle,
+    kind: kind,
+    tableRef: tableRef,
+    controller: controller,
+  );
 }
 
 @immutable
@@ -153,6 +164,36 @@ class EditorTabs extends Notifier<EditorTabsState> {
       activeByConnection: {...state.activeByConnection, connectionId: tab.id},
     );
     return tab;
+  }
+
+  /// Opens a Mongo shell tab for [connectionId] and makes it active.
+  EditorTab openShell(String connectionId) {
+    final n = state.tabsFor(connectionId).where((t) => t.isShell).length + 1;
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: 'Shell $n',
+      kind: TabKind.shell,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  /// Renames a tab, e.g. after it was saved as a workspace file.
+  void retitle(String tabId, String title) {
+    final i = state.tabs.indexWhere((t) => t.id == tabId);
+    if (i < 0 || state.tabs[i].title == title) return;
+    final renamed = state.tabs[i].withTitle(title);
+    final live = _live.indexWhere((t) => t.id == tabId);
+    if (live >= 0) _live[live] = renamed;
+    state = EditorTabsState(
+      tabs: [...state.tabs]..[i] = renamed,
+      activeByConnection: state.activeByConnection,
+    );
   }
 
   /// Opens a Query tab populated with SQL text.
