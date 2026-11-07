@@ -97,6 +97,12 @@ func Serve(ctx context.Context, cfg Config) error {
 			docSvc.SetHistory(cfg.History)
 		}
 		queravuev1.RegisterDocumentServiceServer(srv, docSvc)
+		shellSvc := api.NewShellService(cfg.Sessions, cfg.Connections, log)
+		if cfg.History != nil {
+			shellSvc.SetHistory(cfg.History)
+		}
+		defer shellSvc.Shutdown()
+		queravuev1.RegisterShellServiceServer(srv, shellSvc)
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
 	}
 	if cfg.History != nil {

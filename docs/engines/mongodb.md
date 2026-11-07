@@ -29,8 +29,33 @@ mongodb://x509user@host:27017/?tls=true&authMechanism=MONGODB-X509&tlsCertificat
 - **Production connections** require a confirmation for deletes (enforced in the core).
 - **Cancel:** every find is cancellable; the server cursor is closed.
 
+## Shell
+The shell runs mongosh-style JavaScript on an embedded goja runtime in the core (ADR 0010). It works on MongoDB, DocumentDB and Cosmos DB connections and needs no `mongosh` install. Variables, functions and `let`/`const` persist between runs of one shell. Write one command per line or several statements per run; the value of the last expression becomes the result.
+
+**Supported**
+- Globals: `db`, `use name` / `use("name")`, `show dbs`, `show collections`, `print`, `printjson`, `tojson`, `console.log/info/warn/error`, `sleep(ms)`.
+- Database: `getSiblingDB`, `getName`, `getCollection`, `getCollectionNames`, `runCommand`, `adminCommand`, `stats`, `version`, `serverStatus`, `createCollection`, `dropDatabase`.
+- Collections: `db.users`, `db['my-coll']`, `db.a.b`, with `find`, `findOne`, `countDocuments`, `estimatedDocumentCount`, `distinct`, `aggregate`, `insertOne/Many`, `updateOne/Many`, `replaceOne`, `deleteOne/Many`, `findOneAndUpdate/Replace/Delete`, `bulkWrite`, `createIndex`, `getIndexes`, `dropIndex`, `drop`, `renameCollection`, `stats`.
+- Cursors: `limit`, `skip`, `sort`, `project`/`projection`, `batchSize`, `hint`, `maxTimeMS`, `toArray`, `forEach`, `map`, `hasNext`, `next`, `tryNext`, `count`, `size`, `itcount`, `pretty`, `explain`, `close`.
+- BSON: `ObjectId`, `ISODate`, `Date`, `NumberInt`, `NumberLong`, `NumberDecimal`, `UUID`, `BinData`, `Timestamp`, `MinKey`, `MaxKey`, `Double`, regex literals. All round-trip exactly through canonical EJSON.
+
+**Results.** A scalar or a document is returned as EJSON. A write returns the mongosh-shaped object (`acknowledged`, `insertedId`, `matchedCount`, ...). If the last expression is an unconsumed cursor (`db.users.find(...)`, `db.users.aggregate(...)`), nothing is read by the shell: the UI gets a cursor handle and pages it. `toArray()` is capped by the output limit (8 MiB per run by default) and fails with `OUTPUT_LIMIT` beyond it; `forEach` and `next` hold one batch, so memory stays flat on huge collections.
+
+**Differences from mongosh**
+- Synchronous API: no `await`, `Promise`-returning driver methods or callbacks. goja runs ES5.1 plus most of ES6; newer syntax is a syntax error.
+- No `require`, `load`, `process`, file system, network or timers; they fail with `UNSUPPORTED`. `sleep` is cancellable.
+- Integral doubles that fit an Int32 are written back as Int32 (as in the Node driver); `Double(2)` forces a double. `NumberLong` has no arithmetic beyond `toNumber()`.
+- `print` and `printjson` use the legacy shell style (`ObjectId("…")`, `NumberLong("…")`, `ISODate("…")`), not Node's `util.inspect`.
+- `insertOne`/`insertMany` do not modify the document you pass in. `cursor.map` returns the same cursor with the mapper attached.
+- A cursor result is a replayable query: paging re-runs it with `skip`/`limit`. A `$out`/`$merge` pipeline runs once, when `aggregate` is called.
+- Not implemented: sessions and transactions, change streams, `getMongo`, user and role helpers, `db.collection.help()`, `Symbol`, `DBRef`, `Code`.
+
+**Safety.** The shell stops with `CONFIRMATION_REQUIRED` (nothing changes) before `deleteMany({})`, `drop`, `updateMany` with an empty filter, `$out`/`$merge`, and `runCommand`/`adminCommand` with a write command on connections flagged production. `dropDatabase` asks on every connection. The UI re-runs the script with `confirmed` after the user agrees. A gated call cannot be caught with `try/catch`.
+
+**Limits and cancel.** Cancelling interrupts the running script, including a tight loop, and the server operation in flight. A timeout per run is optional and off by default.
+
 ## Limitations
-- No mongosh-style shell, aggregation builder, index manager or schema validation editor yet (see ROADMAP).
+- No aggregation builder, index manager or schema validation editor yet (see ROADMAP). The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 
@@ -38,6 +63,7 @@ mongodb://x509user@host:27017/?tls=true&authMechanism=MONGODB-X509&tlsCertificat
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
 docker compose -f dev/docker-compose.yml --profile seed up mongo-seed    # users, orders, 1M events
-cd core && go test -tags=integration ./internal/engine/mongo/...
+cd core && go test -tags=integration ./internal/engine/mongo/... ./internal/shell/...
 ```
+The shell's snippet corpus lives in `core/internal/shell/testdata/corpus`: each `name.js` has a `name.out` transcript produced by a real server. After changing shell behaviour on purpose, regenerate with `go test -tags=integration ./internal/shell -run TestSnippetCorpus -update` and review the diff. `make test-docdb` also runs a shell smoke test on the DocumentDB service.
 Auth, TLS and X.509 are covered by unit tests only: the dev server runs without authentication.

@@ -1,0 +1,15 @@
+out: {
+  "acknowledged": true,
+  "insertedCount": 1,
+  "matchedCount": 1,
+  "modifiedCount": 1,
+  "deletedCount": 1,
+  "upsertedCount": 1,
+  "insertedIds": {
+    "0": 2
+  },
+  "upsertedIds": {
+    "3": 3
+  }
+}
+value: [{"_id":{"$numberInt":"1"},"n":{"$numberInt":"10"}},{"_id":{"$numberInt":"3"},"n":{"$numberInt":"3"}}]

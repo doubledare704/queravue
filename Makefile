@@ -75,6 +75,7 @@ DOCDB_URI ?= mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllow
 test-docdb: ## DocumentDB smoke tests against the documentdb compose service (starts only that service)
 	$(COMPOSE) up -d --wait --wait-timeout 300 documentdb
 	cd core && QV_DOCDB_URI='$(DOCDB_URI)' go test -count=1 -tags=integration -run TestSmokeDocumentDB -v ./internal/engine/mongo/
+	cd core && QV_DOCDB_URI='$(DOCDB_URI)' go test -count=1 -tags=integration -run TestSmokeShellDocumentDB -v ./internal/shell/
 
 test-cosmos: ## Cosmos DB (Mongo API) smoke tests; needs QV_COSMOS_URI of a real account
 	@test -n "$$QV_COSMOS_URI" || { echo "set QV_COSMOS_URI (see docs/engines/cosmosdb.md)"; exit 2; }

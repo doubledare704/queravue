@@ -95,6 +95,8 @@ type Error struct {
 	// a 1-based character (rune) offset, or 0 if unknown. Only set for
 	// KindSQL errors.
 	Position int
+	// Code is the server's numeric error code, or 0 if it gave none.
+	Code int
 	// Current is the stored canonical EJSON document for KindConflict; nil if
 	// it was deleted.
 	Current *string

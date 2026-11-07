@@ -1,0 +1,5 @@
+out: {
+  "acknowledged": true,
+  "deletedCount": 2
+}
+value: [{"_id":{"$numberInt":"3"},"k":{"$numberInt":"2"}}]

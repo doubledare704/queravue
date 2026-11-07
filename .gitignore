@@ -40,3 +40,5 @@ dev/.env
 # Iteration 2 spikes: build output and run logs
 spikes/**/build/
 spikes/**/*.log
+
+!core/internal/shell/testdata/corpus/*.out

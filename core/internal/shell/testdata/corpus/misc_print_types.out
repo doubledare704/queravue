@@ -1,0 +1,7 @@
+out: null
+out: undefined
+out: true 1.5 s
+out: ObjectId("5f1d7f3e9b1c2a0012345678")
+out: NumberLong("12")
+out: [ 1, "a", { "b": null } ]
+out: ISODate("2020-01-01T00:00:00.000Z")

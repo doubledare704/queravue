@@ -1,0 +1,5 @@
+out: {
+  "acknowledged": true,
+  "deletedCount": 1
+}
+value: {"$numberInt":"1"}

@@ -1,0 +1,6 @@
+out: users
+out: qv_corpus_shell_collection_info.users
+out: qv_corpus_shell_collection_info.my-coll
+out: a.b
+out: x y
+value: "qv_corpus_shell_collection_info"

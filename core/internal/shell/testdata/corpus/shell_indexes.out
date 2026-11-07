@@ -1,0 +1,4 @@
+out: a_1
+out: custom
+out: _id_,a_1,custom
+value: {"$numberInt":"2"}

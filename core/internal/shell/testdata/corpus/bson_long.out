@@ -1,0 +1,7 @@
+out: {
+  "_id": 1,
+  "big": NumberLong("9007199254740993"),
+  "small": NumberLong("5")
+}
+out: 9007199254740993
+value: {"$numberInt":"6"}

@@ -1,0 +1,3 @@
+cursor find on t
+  {"_id":{"$numberInt":"3"},"k":"a"}
+  {"_id":{"$numberInt":"1"},"k":"a"}
