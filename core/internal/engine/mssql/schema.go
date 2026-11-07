@@ -189,7 +189,7 @@ WHERE s.name = @p1 AND o.name = @p2 AND o.type IN ('U', 'V')`, schema, table).Sc
 	// Columns.
 	//nolint:gosec // the only spliced parts are database names quoted by qdb
 	crows, err := conn.QueryContext(ctx,
-		`SELECT c.name, ty.name, c.max_length, c.precision, c.scale, c.is_nullable, dc.definition
+		`SELECT c.name, ty.name, c.max_length, c.precision, c.scale, c.is_nullable, dc.definition, c.is_identity, c.collation_name
 FROM `+d+`.sys.columns c
 JOIN `+d+`.sys.types ty ON ty.user_type_id = c.user_type_id
 LEFT JOIN `+d+`.sys.default_constraints dc ON dc.object_id = c.default_object_id
@@ -201,13 +201,16 @@ WHERE c.object_id = @p1 ORDER BY c.column_id`, objectID)
 	for crows.Next() {
 		var name, tyName string
 		var maxLen, prec, scale int
-		var nullable bool
-		var def sql.NullString
-		if err := crows.Scan(&name, &tyName, &maxLen, &prec, &scale, &nullable, &def); err != nil {
+		var nullable, identity bool
+		var def, collation sql.NullString
+		if err := crows.Scan(&name, &tyName, &maxLen, &prec, &scale, &nullable, &def, &identity, &collation); err != nil {
 			_ = crows.Close()
 			return details, c.execError(ctx, err)
 		}
-		cd := engine.ColumnDef{Name: name, TypeName: typeLabel(tyName, maxLen, prec, scale), Kind: kindOf(strings.ToUpper(tyName)), Nullable: nullable}
+		cd := engine.ColumnDef{Name: name, TypeName: typeLabel(tyName, maxLen, prec, scale), Kind: kindOf(strings.ToUpper(tyName)), Nullable: nullable, Identity: identity}
+		if collation.Valid {
+			cd.Collation = &collation.String
+		}
 		if def.Valid {
 			s := def.String
 			cd.DefaultValue = &s
@@ -267,7 +270,7 @@ ORDER BY i.name, ic.key_ordinal`, objectID)
 	// Foreign keys.
 	//nolint:gosec // the only spliced parts are database names quoted by qdb
 	frows, err := conn.QueryContext(ctx,
-		`SELECT fk.name, pc.name, rs.name, rt.name, rc.name
+		`SELECT fk.name, pc.name, rs.name, rt.name, rc.name, fk.delete_referential_action_desc, fk.update_referential_action_desc
 FROM `+d+`.sys.foreign_keys fk
 JOIN `+d+`.sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
 JOIN `+d+`.sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
@@ -281,14 +284,15 @@ ORDER BY fk.name, fkc.constraint_column_id`, objectID)
 	}
 	var fk *engine.ForeignKeyDef
 	for frows.Next() {
-		var name, col, refSchema, refTable, refCol string
-		if err := frows.Scan(&name, &col, &refSchema, &refTable, &refCol); err != nil {
+		var name, col, refSchema, refTable, refCol, onDelete, onUpdate string
+		if err := frows.Scan(&name, &col, &refSchema, &refTable, &refCol, &onDelete, &onUpdate); err != nil {
 			_ = frows.Close()
 			return details, c.execError(ctx, err)
 		}
 		if fk == nil || fk.Name != name {
 			details.ForeignKeys = append(details.ForeignKeys, engine.ForeignKeyDef{
 				Name: name, ReferencedSchema: refSchema, ReferencedTable: refTable,
+				OnDelete: engine.ParseReferentialAction(onDelete), OnUpdate: engine.ParseReferentialAction(onUpdate),
 			})
 			fk = &details.ForeignKeys[len(details.ForeignKeys)-1]
 		}

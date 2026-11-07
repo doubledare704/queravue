@@ -15,6 +15,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine/sqlite"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/history"
+	"github.com/doubledare704/queravue/core/internal/schema"
 	"github.com/doubledare704/queravue/core/internal/secrets"
 	"github.com/doubledare704/queravue/core/internal/session"
 )
@@ -22,6 +23,8 @@ import (
 type indexEnv struct {
 	indexes *api.IndexService
 	stats   *api.StatsService
+	design  *api.SchemaDesignService
+	schema  *api.SchemaService
 	sess    *session.Session
 	history *history.Store
 }
@@ -53,11 +56,14 @@ func setupIndexEnv(t *testing.T, production bool) indexEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cache := schema.NewCache()
 	store := connections.NewFileStore(dir)
 	_ = store.Save([]connections.Connection{{ID: "test-conn", Name: "T", EngineID: "sqlite", Production: production}})
 	connSvc := connections.NewService(reg, store, secrets.NewMemory())
 	return indexEnv{
 		indexes: api.NewIndexService(mgr, connSvc, hist, nil, nil),
+		design:  api.NewSchemaDesignService(mgr, connSvc, hist, cache, nil),
+		schema:  api.NewSchemaService(mgr, cache),
 		stats:   api.NewStatsService(mgr),
 		sess:    sess,
 		history: hist,

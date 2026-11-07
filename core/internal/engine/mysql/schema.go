@@ -136,7 +136,7 @@ FROM information_schema.tables WHERE table_schema = ? AND table_name = ?`, db, t
 
 	// Columns.
 	crows, err := conn.QueryContext(ctx,
-		`SELECT column_name, column_type, data_type, is_nullable, column_default
+		`SELECT column_name, column_type, data_type, is_nullable, column_default, extra, collation_name
 FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position`, db, table)
 	if err != nil {
 		return details, c.execError(ctx, err)
@@ -144,12 +144,16 @@ FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER 
 	notNull := map[string]bool{}
 	for crows.Next() {
 		var name, colType, dataType, nullable string
-		var def sql.NullString
-		if err := crows.Scan(&name, &colType, &dataType, &nullable, &def); err != nil {
+		var def, extra, collation sql.NullString
+		if err := crows.Scan(&name, &colType, &dataType, &nullable, &def, &extra, &collation); err != nil {
 			_ = crows.Close()
 			return details, c.execError(ctx, err)
 		}
-		cd := engine.ColumnDef{Name: name, TypeName: colType, Kind: columnKind(dataType, colType), Nullable: nullable == "YES"}
+		cd := engine.ColumnDef{Name: name, TypeName: colType, Kind: columnKind(dataType, colType), Nullable: nullable == "YES",
+			Identity: strings.Contains(strings.ToLower(extra.String), "auto_increment")}
+		if collation.Valid {
+			cd.Collation = &collation.String
+		}
 		if def.Valid {
 			d := def.String
 			cd.DefaultValue = &d
@@ -208,23 +212,27 @@ ORDER BY index_name, seq_in_index`, db, table)
 
 	// Foreign keys.
 	frows, err := conn.QueryContext(ctx,
-		`SELECT constraint_name, column_name, referenced_table_schema, referenced_table_name, referenced_column_name
-FROM information_schema.key_column_usage
-WHERE table_schema = ? AND table_name = ? AND referenced_table_name IS NOT NULL
-ORDER BY constraint_name, ordinal_position`, db, table)
+		`SELECT k.constraint_name, k.column_name, k.referenced_table_schema, k.referenced_table_name, k.referenced_column_name,
+       r.delete_rule, r.update_rule
+FROM information_schema.key_column_usage k
+JOIN information_schema.referential_constraints r
+  ON r.constraint_schema = k.constraint_schema AND r.constraint_name = k.constraint_name AND r.table_name = k.table_name
+WHERE k.table_schema = ? AND k.table_name = ? AND k.referenced_table_name IS NOT NULL
+ORDER BY k.constraint_name, k.ordinal_position`, db, table)
 	if err != nil {
 		return details, c.execError(ctx, err)
 	}
 	var fk *engine.ForeignKeyDef
 	for frows.Next() {
-		var name, col, refSchema, refTable, refCol string
-		if err := frows.Scan(&name, &col, &refSchema, &refTable, &refCol); err != nil {
+		var name, col, refSchema, refTable, refCol, onDelete, onUpdate string
+		if err := frows.Scan(&name, &col, &refSchema, &refTable, &refCol, &onDelete, &onUpdate); err != nil {
 			_ = frows.Close()
 			return details, c.execError(ctx, err)
 		}
 		if fk == nil || fk.Name != name {
 			details.ForeignKeys = append(details.ForeignKeys, engine.ForeignKeyDef{
 				Name: name, ReferencedSchema: refSchema, ReferencedTable: refTable,
+				OnDelete: engine.ParseReferentialAction(onDelete), OnUpdate: engine.ParseReferentialAction(onUpdate),
 			})
 			fk = &details.ForeignKeys[len(details.ForeignKeys)-1]
 		}

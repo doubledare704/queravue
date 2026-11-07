@@ -222,3 +222,6 @@ func parseBanner(banner, serverVersion string) engine.ServerInfo {
 
 // Dialect implements sqldialect.Provider.
 func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.Postgres }
+
+// TransactionalDDL is false on CockroachDB, which limits schema changes inside a transaction.
+func (c *Conn) TransactionalDDL() bool { return c.variant != VariantCockroach }

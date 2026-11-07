@@ -63,6 +63,7 @@ func Run(t *testing.T, tg Target) {
 	t.Run("IndexLifecycle", func(t *testing.T) { indexLifecycle(t, tg) })
 	t.Run("ListIndexesOfMissingTable", func(t *testing.T) { listIndexesOfMissingTable(t, tg) })
 	t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
+	t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })
 	if !tg.SkipEdit {
 		t.Run("EditAndRollback", func(t *testing.T) { editRollback(t, tg) })
 	}

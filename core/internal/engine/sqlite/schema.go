@@ -216,6 +216,8 @@ func (c *Conn) DescribeTable(ctx context.Context, database, schema, table string
 			refTable string
 			from     string
 			to       string
+			onDelete string
+			onUpdate string
 		}
 		fkGroups := make(map[int][]fkPart)
 		for fkRows.Next() {
@@ -228,6 +230,8 @@ func (c *Conn) DescribeTable(ctx context.Context, database, schema, table string
 					refTable: refTable,
 					from:     from,
 					to:       to,
+					onDelete: onDelete,
+					onUpdate: onUpdate,
 				})
 			}
 		}
@@ -247,6 +251,8 @@ func (c *Conn) DescribeTable(ctx context.Context, database, schema, table string
 				ReferencedSchema:  target,
 				ReferencedTable:   parts[0].refTable,
 				ReferencedColumns: toCols,
+				OnDelete:          engine.ParseReferentialAction(parts[0].onDelete),
+				OnUpdate:          engine.ParseReferentialAction(parts[0].onUpdate),
 			})
 		}
 	}
