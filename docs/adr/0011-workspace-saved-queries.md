@@ -38,6 +38,8 @@ Writes go to a temp file in the same directory and are renamed over the target. 
 `Search(text, tags)` matches file names, titles, tags and full text, case-insensitively. Results stream as they are found and the call is cancellable. `.git` and files over a size cap (default 2 MiB) are skipped.
 
 ### 8. Contract
+`protocol_version` becomes 6 when the service is served (5 added `ShellService`).
+
 `WorkspaceService`: `GetRoots`, `SetRoots`, `ListTree`, `Read`, `Write`, `Create`, `Rename` (also moves), `Delete`, `Search` (server stream), `Watch` (server stream). Failures are in-band `WorkspaceError`. `Delete` removes the file; the UI always confirms.
 
 ## Consequences
