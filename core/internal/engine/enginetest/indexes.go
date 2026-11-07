@@ -83,6 +83,43 @@ func indexLifecycle(t *testing.T, tg Target) {
 	}
 }
 
+func onlineIndexBuild(t *testing.T, tg Target) {
+	c := tg.connect(t)
+	im, _ := engine.As[engine.IndexManager](c)
+	d, ok := sqldialect.Of(c)
+	if !ok {
+		t.Fatal("connection has no dialect")
+	}
+	table := d.QualifyTableIn(tg.Database, tg.Schema, probeTable)
+	exec(t, c, "DROP TABLE IF EXISTS "+table)
+	exec(t, c, "CREATE TABLE "+table+" (a INT NOT NULL, b VARCHAR(50))")
+	t.Cleanup(func() { exec(t, c, "DROP TABLE IF EXISTS "+table) })
+	exec(t, c, "INSERT INTO "+table+" (a, b) VALUES (1, 'x'), (2, 'y')")
+
+	spec := engine.IndexSpec{Name: "qv_probe_online", Keys: []engine.IndexKey{{Name: "b"}}, Options: map[string]string{sqldialect.OptionOnline: "true"}}
+	sql, warnings, err := d.CreateIndex(tg.Database, tg.Schema, probeTable, spec)
+	if err != nil {
+		t.Fatalf("build: %v", err)
+	}
+	if len(warnings) == 0 {
+		t.Error("an online build carries a warning")
+	}
+	exec(t, c, sql)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	got, err := im.ListIndexes(ctx, tg.Database, tg.Schema, probeTable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ix := range got {
+		if ix.Spec.Name == "qv_probe_online" {
+			return
+		}
+	}
+	t.Errorf("the online index is not listed after %q", sql)
+}
+
 func listIndexesOfMissingTable(t *testing.T, tg Target) {
 	c := tg.connect(t)
 	im, _ := engine.As[engine.IndexManager](c)

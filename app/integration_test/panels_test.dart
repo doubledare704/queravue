@@ -169,6 +169,21 @@ void main() {
       await tester.enterText(find.byKey(const Key('index-name')), 'ix_title');
       await tester.enterText(find.byKey(const Key('index-keys')), 'title');
       await tester.pump();
+      await tester.tap(find.byKey(const Key('index-online')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('index-preview')));
+      await _pumpUntil(
+        tester,
+        'the online refusal',
+        () => _present(const Key('index-error')),
+      );
+      expect(
+        (find.byKey(const Key('index-error')).evaluate().first.widget as Text)
+            .data,
+        contains('cannot build an index online'),
+      );
+      await tester.tap(find.byKey(const Key('index-online')));
+      await tester.pump();
       await tester.tap(find.byKey(const Key('index-preview')));
       await _pumpUntil(
         tester,

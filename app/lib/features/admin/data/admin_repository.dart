@@ -101,6 +101,7 @@ class GrpcAdminRepository implements AdminRepository {
           unique: draft.unique,
           method: draft.method,
           partialPredicate: draft.partialPredicate,
+          options: [if (draft.online) const MapEntry('online', 'true')],
           keys: [
             for (final k in draft.keys)
               ipb.IndexKey(

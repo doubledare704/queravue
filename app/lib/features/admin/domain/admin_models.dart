@@ -79,6 +79,7 @@ class IndexDraft {
     this.unique = false,
     this.method = '',
     this.partialPredicate = '',
+    this.online = false,
   });
 
   final String name;
@@ -86,6 +87,9 @@ class IndexDraft {
   final bool unique;
   final String method;
   final String partialPredicate;
+
+  /// Build without blocking writes, where the server can.
+  final bool online;
 }
 
 class IndexStatement {

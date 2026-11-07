@@ -45,6 +45,22 @@ Widget _host(
   );
 }
 
+Widget _hostFor(Widget child, FakeAdminRepository repo, EngineSpec engine) =>
+    ProviderScope(
+      overrides: [
+        adminRepositoryProvider.overrideWithValue(repo),
+        adminSessionIdProvider.overrideWith((ref, id) => Future.value('s1')),
+        ...fakeCoreOverrides(
+          FakeConnectionsRepository(
+            initial: [
+              ConnectionProfile(id: 'c1', name: 'DB', engineId: engine.id),
+            ],
+          )..engines = [engine],
+        ),
+      ],
+      child: MaterialApp(home: Scaffold(body: child)),
+    );
+
 void main() {
   testWidgets('indexes panel lists indexes and shows n/a without usage', (
     tester,
@@ -234,5 +250,45 @@ void main() {
   test('lineAndColumn counts lines in UTF-16 units', () {
     expect(lineAndColumn('ab\ncd', 4), (line: 2, column: 2));
     expect(lineAndColumn('x', 99), (line: 1, column: 2));
+  });
+
+  testWidgets('an index can be built online on a SQL connection', (
+    tester,
+  ) async {
+    final repo = FakeAdminRepository();
+    await tester.pumpWidget(_host(const IndexesPanel(target: _target), repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-index')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('index-keys')), 'a');
+    await tester.tap(find.byKey(const Key('index-online')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('index-preview')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('index-create')));
+    await tester.pumpAndSettle();
+    expect(repo.drafts.map((d) => d.online), [true, true]);
+  });
+
+  testWidgets('a document engine has no online option', (tester) async {
+    final repo = FakeAdminRepository();
+    await tester.pumpWidget(
+      _hostFor(
+        const IndexesPanel(target: _target),
+        repo,
+        const EngineSpec(
+          id: 'mongodb',
+          displayName: 'MongoDB',
+          family: 'mongodb',
+          supportsUri: true,
+          capabilities: {'document_store'},
+          fields: [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('new-index')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('index-online')), findsNothing);
   });
 }

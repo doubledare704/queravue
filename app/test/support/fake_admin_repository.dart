@@ -12,6 +12,7 @@ class FakeAdminRepository implements AdminRepository {
   AdminError? setValidationError;
 
   final calls = <String>[];
+  final drafts = <IndexDraft>[];
   final confirmations = <bool>[];
 
   @override
@@ -35,6 +36,7 @@ class FakeAdminRepository implements AdminRepository {
     final statement =
         'CREATE INDEX ${draft.name.isEmpty ? 'auto' : draft.name} ON ${ref.table} (${draft.keys.map((k) => k.label).join(', ')});';
     calls.add(dryRun ? 'create-dry' : 'create');
+    drafts.add(draft);
     if (!dryRun) {
       confirmations.add(confirmed);
       indexes = [

@@ -44,7 +44,7 @@ Statistics are read from server metadata and never scan data. Unknown figures ar
 - `CreateIndex` and `DropIndex` support `dry_run`, which returns the statement without running it: SQL DDL, or the `createIndexes`/`dropIndexes` command as shell text.
 - Every write on a connection flagged `production` needs `confirmed=true`, the ADR 0009 §8 mechanism, checked in the API layer where the flag lives.
 - `DropIndex` needs `confirmed=true` on every connection, because dropping an index can make queries slow until it is rebuilt.
-- `CreateIndex` on a big table can lock writes on some engines; the preview carries a warning, for example `CREATE INDEX` without `CONCURRENTLY` on PostgreSQL. Online creation (`CONCURRENTLY`, `ONLINE = ON`) is not offered yet: PostgreSQL's `CONCURRENTLY` cannot run inside a transaction block, so it needs its own execution path.
+- `CreateIndex` on a big table can lock writes on some engines; the preview carries a warning, for example `CREATE INDEX` without `CONCURRENTLY` on PostgreSQL. Online creation is offered through an option; see the addendum at the end.
 - Every applied change is recorded in the query history as the statement that ran.
 
 ### 6. Protocol version
@@ -54,3 +54,11 @@ Statistics are read from server metadata and never scan data. Unknown figures ar
 - SQL engines gain no write code for indexes; correctness of generated DDL is covered by golden tests per dialect (ADR 0013).
 - Usage statistics differ in meaning between engines (since restart, since reset, since the last stats reset). The UI shows the "since" time when known and does not compare engines.
 - Cosmos DB behaviour is unverified, as elsewhere.
+
+## Addendum: building an index online
+`IndexSpec.Options["online"] = "true"` (`sqldialect.OptionOnline`; the proto already carries `options`, so no contract change) asks for a build that does not block writes:
+- PostgreSQL and CockroachDB: `CREATE INDEX CONCURRENTLY`. It cannot run inside a transaction block, which holds because index creation runs as a single statement and not under `SchemaDesignService`'s transaction. A failed or cancelled build leaves an INVALID index; the preview says so.
+- MySQL, MariaDB, TiDB: `ALGORITHM=INPLACE LOCK=NONE`, so the server refuses instead of locking.
+- SQL Server: `WITH (ONLINE = ON)`, only on editions that support it (Enterprise, Developer); the preview says so.
+- SQLite: refused with "cannot build an index online".
+The UI shows a "Build online" option on every connection that is not document-only. Mongo builds indexes without blocking writes already.
