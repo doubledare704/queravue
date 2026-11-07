@@ -13,9 +13,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/doubledare704/queravue/core/internal/api"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine/engines"
 	"github.com/doubledare704/queravue/core/internal/history"
@@ -96,9 +98,20 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		return err
 	}
 	defer spools.Shutdown()
+	// The shell service needs the session manager, which needs this hook.
+	var closeShells atomic.Pointer[func(string)]
 	sessions := session.NewManager(connSvc, session.WithIdleTimeout(*sessionIdle), session.WithLogger(log),
-		session.WithOnClose(spools.CloseSession))
+		session.WithOnClose(func(id string) {
+			spools.CloseSession(id)
+			if f := closeShells.Load(); f != nil {
+				(*f)(id)
+			}
+		}))
 	defer sessions.Shutdown()
+	shells := api.NewShellService(sessions, connSvc, log)
+	shells.SetHistory(histStore)
+	closeShellsOfSession := shells.CloseSession
+	closeShells.Store(&closeShellsOfSession)
 
 	workspaceSvc := workspace.NewService(workspace.Options{ConfigDir: actualConfigDir, DefaultRoot: getenv("QUERAVUE_WORKSPACE")})
 
@@ -117,6 +130,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		Sessions:        sessions,
 		Results:         spools,
 		History:         histStore,
+		Shells:          shells,
 		Workspace:       workspaceSvc,
 	})
 	if err != nil {

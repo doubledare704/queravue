@@ -196,3 +196,38 @@ func TestShellServiceCloseAndCancelAreIdempotent(t *testing.T) {
 		}
 	}
 }
+
+func TestShellServiceClosesShellsWhenTheirSessionCloses(t *testing.T) {
+	var svc *api.ShellService
+	mgr := session.NewManager(shellOpener{conn: &fakeShellConn{}}, session.WithOnClose(func(id string) {
+		if svc != nil {
+			svc.CloseSession(id)
+		}
+	}))
+	t.Cleanup(mgr.Shutdown)
+	svc = api.NewShellService(mgr, nil, nil)
+	t.Cleanup(svc.Shutdown)
+	one, err := mgr.Open(context.Background(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	two, err := mgr.Open(context.Background(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	openShell(t, svc, one.ID)
+	openShell(t, svc, one.ID)
+	keep := openShell(t, svc, two.ID)
+	if svc.Len() != 3 {
+		t.Fatalf("Len = %d, want 3", svc.Len())
+	}
+
+	mgr.Close(one.ID)
+	if svc.Len() != 1 {
+		t.Fatalf("Len = %d after closing a session, want 1: its shells must go at once", svc.Len())
+	}
+	st := &evalStream{ctx: context.Background()}
+	if err := svc.Eval(&queravuev1.EvalRequest{ShellId: keep, Code: "1"}, st); err != nil {
+		t.Fatalf("the other session's shell broke: %v", err)
+	}
+}

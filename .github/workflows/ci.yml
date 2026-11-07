@@ -156,3 +156,46 @@ jobs:
       - name: dart format
         run: dart format --output=none --set-exit-if-changed $(find lib test integration_test -name '*.dart' -not -path '*/gen/*')
       - run: flutter test
+
+  shell-e2e:
+    name: Shell + workspace (real app and core)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      # Docker is not available on macOS runners: run mongod natively.
+      QUERAVUE_SECRETS: memory
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - name: Start MongoDB (single-node replica set)
+        run: |
+          brew tap mongodb/brew
+          brew install mongodb-community@7.0 mongosh
+          mkdir -p "$RUNNER_TEMP/mongo-data"
+          "$(brew --prefix mongodb-community@7.0)/bin/mongod" --replSet rs0 --bind_ip 127.0.0.1 \
+            --dbpath "$RUNNER_TEMP/mongo-data" --logpath "$RUNNER_TEMP/mongod.log" --fork
+          mongosh --quiet --eval "rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]})"
+          for i in $(seq 1 60); do
+            mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)' && exit 0
+            sleep 1
+          done
+          echo "MongoDB did not become primary" >&2
+          tail -50 "$RUNNER_TEMP/mongod.log" >&2
+          exit 1
+      - name: Build the core
+        run: cd core && CGO_ENABLED=0 go build -o bin/queravued ./cmd/queravued
+      - run: cd app && flutter pub get
+      - name: Save a Mongo script, restart the app, reopen it and run it
+        working-directory: app
+        run: |
+          export QUERAVUE_WORKSPACE="$RUNNER_TEMP/workspace"
+          export QUERAVUE_CONFIG_DIR="$RUNNER_TEMP/config"
+          flutter test integration_test/shell_workspace_test.dart -d macos
