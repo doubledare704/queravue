@@ -120,6 +120,7 @@ const (
 	InputSort
 	InputProjection
 	InputDocument
+	InputValidator
 )
 
 // Error implements error.

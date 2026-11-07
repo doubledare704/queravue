@@ -64,8 +64,14 @@ The core lists, creates and drops indexes (`IndexService`) and reports `collStat
 - **Create and drop** run `createIndexes` and `dropIndexes`. A dry run returns the same call as shell text. The `_id` index cannot be dropped. Dropping always needs confirmation; creating needs it on production connections.
 - **Statistics:** estimated documents, storage size, total index size, and extras (uncompressed size, average document size, index count, reusable storage). Servers that reject `collStats` return an `UNSUPPORTED` error (codes 59, 115 and 238), which the UI reports instead of failing.
 
+## Validation
+The core reads and replaces a collection's validator (`ValidationService`, capability `validation`); see [ADR 0013](../adr/0013-ddl-table-design-and-validation.md).
+- **Read:** the validator as canonical EJSON, with `validationLevel` (off, moderate, strict) and `validationAction` (error, warn) from the collection options.
+- **Write:** `collMod` with the validator, level and action. Empty validator text removes the rule. A dry run returns the command as shell text. Syntax errors in the validator return `INVALID` with a UTF-16 position into the text; the server's own rejection of a schema comes back as the server's message. Production connections need confirmation.
+- The validator is parsed as relaxed EJSON, so plain numbers such as `"minimum": 0` are accepted.
+
 ## Limitations
-- No aggregation builder or schema validation editor yet, and no index manager screen yet (the core serves `IndexService` and `StatsService`, the UI comes later in iteration 7). The shell has no autocomplete yet.
+- No aggregation builder yet, and no index, statistics or validation screens yet (the core serves `IndexService`, `StatsService` and `ValidationService`, the UI comes later in iteration 7). The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 

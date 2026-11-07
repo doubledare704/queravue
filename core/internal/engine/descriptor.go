@@ -28,6 +28,8 @@ const (
 	CapIndexManager Capability = "index_manager"
 	// CapStats: StatsProvider (Iteration 7).
 	CapStats Capability = "stats"
+	// CapValidation: ValidationManager (Iteration 7).
+	CapValidation Capability = "validation"
 )
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
@@ -40,6 +42,7 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapShell:           reflect.TypeFor[ShellBackend](),
 	CapIndexManager:    reflect.TypeFor[IndexManager](),
 	CapStats:           reflect.TypeFor[StatsProvider](),
+	CapValidation:      reflect.TypeFor[ValidationManager](),
 }
 
 // FieldKind tells the UI which input widget to render.
