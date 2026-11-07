@@ -23,7 +23,7 @@ The UI sends `SchemaChange` steps (`create_table`, `drop_table`, `rename_table`,
 `AlterColumn` carries `before` and `after`, and the builder emits only what differs, so the preview shows the real change.
 
 ### 3. Operations an engine cannot do
-The builder returns `UNSUPPORTED` with the reason instead of a partial translation. On SQLite that covers altering a column, adding a foreign key, unique or check constraint to an existing table, and dropping a constraint. The documented rebuild recipe (create new table, copy rows, drop old, rename) is deferred: SQLite does not expose inline `CHECK` and `UNIQUE` constraints, so a rebuild could silently lose them. Other engines reject what they cannot do themselves: SQL Server default changes need the default's constraint name (`UNSUPPORTED`), MySQL has no `SET DEFAULT` for foreign keys, SQL Server has no `RESTRICT`, and PostgreSQL and SQL Server cannot toggle identity in place.
+The builder returns `UNSUPPORTED` with the reason instead of a partial translation. On SQLite that covers adding a foreign key, unique or check constraint to an existing table, and dropping a constraint. Altering a column is done by a table rebuild that rewrites the table's own `CREATE TABLE` text, so no constraint is lost; see [ADR 0014](0014-sqlite-column-alter-by-rebuild.md). Other engines reject what they cannot do themselves: SQL Server default changes need the default's constraint name (`UNSUPPORTED`), MySQL has no `SET DEFAULT` for foreign keys, SQL Server has no `RESTRICT`, and PostgreSQL and SQL Server cannot toggle identity in place.
 
 ### 4. Preview, apply, transactions
 - `PreviewDDL` returns the exact statements and warnings, and runs nothing.
@@ -56,6 +56,6 @@ Additive only, no renumbering: `ColumnDetails.identity`, `ColumnDetails.collatio
 ## Consequences
 - One golden test suite per dialect pins the generated DDL; enginetest apply-and-describe checks that the server accepts it and reports the result back.
 - MySQL-family users can end up with a partly applied script after a failure; the UI states this up front in the preview and after a failed run.
-- SQLite alters are intentionally narrower than other engines; column changes beyond add, drop and rename are reported as unsupported.
+- SQLite alters are narrower than other engines: a column alter is a table rebuild that cannot be combined with other changes (ADR 0014), and constraint changes on an existing table are unsupported.
 - The designer models columns, keys, unique and check constraints and indexes. Triggers, partitions, table options and engine-specific storage settings are not designed here; users run them in the SQL editor.
 - The designer edits columns (name, type, default, nullability, auto-generated, primary key on a new table) and constraints: it lists an existing table's foreign keys (with their delete and update actions) and can drop them, and stages new foreign keys, unique and check constraints. Existing unique and check constraints are not listed (the schema details do not report them; unique indexes are in the Indexes section). SQLite cannot add constraints to an existing table, so the core reports those changes as unsupported there; on a new table they are part of the create. A new table's primary key and an existing column's auto-generated flag cannot be changed in the designer.

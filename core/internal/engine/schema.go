@@ -75,6 +75,17 @@ type ForeignKeyDef struct {
 	OnUpdate          ReferentialAction
 }
 
+// TableRebuild holds what rebuilding a table (copy into a new table, swap)
+// needs. Only SQLite reports it.
+type TableRebuild struct {
+	// CreateSQL is the table's own CREATE TABLE text.
+	CreateSQL string
+	// DependentSQL recreates the table's indexes and triggers after a swap.
+	DependentSQL []string
+	// Blockers say why a rebuild would be unsafe.
+	Blockers []string
+}
+
 // TableDetails contains comprehensive schema metadata for a single table.
 type TableDetails struct {
 	Database           string
@@ -87,6 +98,7 @@ type TableDetails struct {
 	EstimatedRows      int64
 	CanEdit            bool
 	EditDisabledReason string
+	Rebuild            *TableRebuild
 }
 
 // SchemaInspector is implemented by Conns with CapSchemaInspector.
