@@ -127,6 +127,18 @@ class ValidationModel {
   final String action;
 }
 
+class StarterSchema {
+  const StarterSchema({
+    required this.text,
+    required this.sampled,
+    this.usedFallback = false,
+  });
+
+  final String text;
+  final int sampled;
+  final bool usedFallback;
+}
+
 String formatBytes(int bytes) {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   var value = bytes.toDouble();

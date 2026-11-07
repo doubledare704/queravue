@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../connections/application/connection_session.dart';
+import '../../documents/data/document_repository.dart';
+import '../../documents/domain/models.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../schema/domain/schema_models.dart';
 import '../data/admin_repository.dart';
 import '../domain/admin_models.dart';
+import '../domain/schema_starter.dart';
 
 class AdminTarget {
   const AdminTarget(this.connectionId, this.ref);
@@ -159,6 +162,32 @@ class ValidationController extends _AdminLoader<ValidationModel> {
     AdminRepository repo,
     String sessionId,
   ) => repo.getValidation(sessionId, target.ref);
+
+  /// A validator inferred from a sample of the collection. The editor shows
+  /// it for the user to change; nothing here applies it.
+  Future<AdminResult<StarterSchema>> starterFromSample() => run((
+    repo,
+    sessionId,
+  ) async {
+    try {
+      final sample = await ref
+          .read(documentRepositoryProvider)
+          .sampleFields(
+            CollectionTarget(sessionId, target.ref.database, target.ref.table),
+          );
+      return AdminResult.ok(
+        StarterSchema(
+          text: starterValidator(sample.fields),
+          sampled: sample.sampled,
+          usedFallback: sample.usedFallback,
+        ),
+      );
+    } on DocumentFailure catch (e) {
+      return AdminResult.failed(
+        AdminError(kind: AdminErrorKind.server, message: e.error.message),
+      );
+    }
+  });
 
   Future<AdminResult<String>> preview(ValidationModel rule) =>
       run((repo, id) => repo.setValidation(id, target.ref, rule, dryRun: true));

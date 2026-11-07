@@ -32,6 +32,7 @@ class _ValidationPanelState extends ConsumerState<ValidationPanel> {
   bool _loaded = false;
   bool _busy = false;
   String? _command;
+  String? _starterNote;
   AdminError? _error;
 
   ValidationController get _controller =>
@@ -50,6 +51,57 @@ class _ValidationPanelState extends ConsumerState<ValidationPanel> {
     _loaded = true;
     _command = null;
     _error = null;
+    _starterNote = null;
+  }
+
+  Future<void> _useSample() async {
+    if (_text.text.trim().isNotEmpty && !await _confirmReplace()) return;
+    setState(() => _busy = true);
+    final result = await _controller.starterFromSample();
+    if (!mounted) return;
+    final starter = result.value;
+    setState(() {
+      _busy = false;
+      _error = result.error;
+      if (starter == null) return;
+      if (starter.sampled == 0) {
+        _error = const AdminError(
+          kind: AdminErrorKind.invalid,
+          message: 'The collection has no documents to learn from.',
+        );
+        return;
+      }
+      _text.text = starter.text;
+      _command = null;
+      _starterNote =
+          'Inferred from ${starter.sampled} sampled documents'
+          '${starter.usedFallback ? ' (the first ones, not a random sample)' : ''}. '
+          'Review it before applying: it is not applied automatically.';
+    });
+  }
+
+  Future<bool> _confirmReplace() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Replace the editor text?'),
+        content: const Text(
+          'The text in the editor is replaced by a schema inferred from the collection.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('validation-starter-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
   }
 
   Future<void> _preview() async {
@@ -140,34 +192,54 @@ class _ValidationPanelState extends ConsumerState<ValidationPanel> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Level'),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                key: const Key('validation-level'),
-                value: _level,
-                items: const [
-                  DropdownMenuItem(value: '', child: Text('default')),
-                  DropdownMenuItem(value: 'off', child: Text('off')),
-                  DropdownMenuItem(value: 'moderate', child: Text('moderate')),
-                  DropdownMenuItem(value: 'strict', child: Text('strict')),
-                ],
-                onChanged: (v) => setState(() => _level = v ?? ''),
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('Level'),
+                    DropdownButton<String>(
+                      key: const Key('validation-level'),
+                      value: _level,
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('default')),
+                        DropdownMenuItem(value: 'off', child: Text('off')),
+                        DropdownMenuItem(
+                          value: 'moderate',
+                          child: Text('moderate'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'strict',
+                          child: Text('strict'),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => _level = v ?? ''),
+                    ),
+                    const SizedBox(width: 16),
+                    const Text('Action'),
+                    DropdownButton<String>(
+                      key: const Key('validation-action'),
+                      value: _action,
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('default')),
+                        DropdownMenuItem(value: 'error', child: Text('error')),
+                        DropdownMenuItem(value: 'warn', child: Text('warn')),
+                      ],
+                      onChanged: (v) => setState(() => _action = v ?? ''),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      key: const Key('validation-starter'),
+                      onPressed: _busy ? null : _useSample,
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      label: const Text('Start from sample'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 24),
-              const Text('Action'),
-              const SizedBox(width: 8),
-              DropdownButton<String>(
-                key: const Key('validation-action'),
-                value: _action,
-                items: const [
-                  DropdownMenuItem(value: '', child: Text('default')),
-                  DropdownMenuItem(value: 'error', child: Text('error')),
-                  DropdownMenuItem(value: 'warn', child: Text('warn')),
-                ],
-                onChanged: (v) => setState(() => _action = v ?? ''),
-              ),
-              const Spacer(),
               IconButton(
                 key: const Key('validation-reload'),
                 tooltip: 'Reload from server',
@@ -197,6 +269,15 @@ class _ValidationPanelState extends ConsumerState<ValidationPanel> {
               ),
             ),
           ),
+          if (_starterNote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _starterNote!,
+                key: const Key('validation-starter-note'),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+              ),
+            ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),

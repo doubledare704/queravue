@@ -48,6 +48,13 @@ Future<void> _settle(WidgetTester tester) async {
   }
 }
 
+Future<void> _type(WidgetTester tester, String text) async {
+  final field = find.byKey(const Key('validation-text'));
+  await tester.tap(field);
+  await tester.pump();
+  await tester.enterText(field, text);
+}
+
 bool _present(Key key) => find.byKey(key).evaluate().isNotEmpty;
 
 String _statementOnScreen() =>
@@ -284,8 +291,27 @@ void main() {
         () => _present(const Key('validation-text')),
       );
       final admin = container.read(adminRepositoryProvider);
-      await tester.enterText(
-        find.byKey(const Key('validation-text')),
+      await tester.tap(find.byKey(const Key('validation-starter')));
+      await _pumpUntil(
+        tester,
+        'the sample starter',
+        () => _present(const Key('validation-starter-note')),
+      );
+      final starter = tester
+          .widget<TextField>(find.byKey(const Key('validation-text')))
+          .controller!
+          .text;
+      expect(starter, contains(r'$jsonSchema'));
+      expect(starter, contains('"name"'));
+      expect(
+        (await tester.runAsync(() => admin.getValidation(session.id, ref)))!
+            .value!
+            .validator,
+        isEmpty,
+        reason: 'the starter is not applied',
+      );
+      await _type(
+        tester,
         '{"\$jsonSchema":{"bsonType":"object","required":["name"]}}',
       );
       await tester.pump();
@@ -303,10 +329,7 @@ void main() {
       );
       expect(applied!.value!.validator, contains(r'$jsonSchema'));
 
-      tester
-          .widget<TextField>(find.byKey(const Key('validation-text')))
-          .controller!
-          .clear();
+      await _type(tester, '');
       await tester.pump();
       await tester.tap(find.byKey(const Key('validation-apply')));
       await _settle(tester);
@@ -315,11 +338,7 @@ void main() {
       );
       expect(removed!.value!.validator, isEmpty);
 
-      tester
-              .widget<TextField>(find.byKey(const Key('validation-text')))
-              .controller!
-              .text =
-          '{"a": ';
+      await _type(tester, '{"a": ');
       await tester.pump();
       await tester.tap(find.byKey(const Key('validation-apply')));
       await _pumpUntil(

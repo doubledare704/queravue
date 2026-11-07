@@ -68,10 +68,11 @@ The core lists, creates and drops indexes (`IndexService`) and reports `collStat
 The core reads and replaces a collection's validator (`ValidationService`, capability `validation`); see [ADR 0013](../adr/0013-ddl-table-design-and-validation.md).
 - **Read:** the validator as canonical EJSON, with `validationLevel` (off, moderate, strict) and `validationAction` (error, warn) from the collection options.
 - **Write:** `collMod` with the validator, level and action. Empty validator text removes the rule. A dry run returns the command as shell text. Syntax errors in the validator return `INVALID` with a UTF-16 position into the text; the server's own rejection of a schema comes back as the server's message. Production connections need confirmation.
+- **Start from sample:** uses the same 100-document sample as the table view. It never applies anything, asks before replacing text you wrote, and says how many documents it read (and when it had to fall back to the first documents).
 - The validator is parsed as relaxed EJSON, so plain numbers such as `"minimum": 0` are accepted.
 
 ## Limitations
-- No aggregation builder yet. The validation editor starts from the collection's current validator; it does not infer a schema from sample documents yet. The shell has no autocomplete yet.
+- No aggregation builder yet. The validation editor starts from the collection's current validator; "Start from sample" fills it with a `$jsonSchema` inferred from a sample of documents (types per field, `required` for fields every sampled document had), for you to edit. The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 

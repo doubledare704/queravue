@@ -61,7 +61,6 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 **Known gaps (carry forward):**
 - Amazon DocumentDB and Cosmos DB for MongoDB are unverified; unsupported calls map to `UNSUPPORTED`.
 - SQLite column alters and constraint changes are reported as unsupported (no table rebuild).
-- The validation editor does not infer a starter schema from sample documents.
 - The Indexes, Stats and Validation panels have no end-to-end test against a running core; the designer on engines other than SQLite is untested end to end.
 - Online index creation (`CONCURRENTLY`, `ONLINE`) is not offered.
 
