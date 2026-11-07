@@ -160,6 +160,7 @@ class GrpcSchemaRepository implements SchemaRepository {
         defaultValue: c.hasDefaultValue() ? c.defaultValue : null,
         isPrimaryKey: c.isPrimaryKey,
         primaryKeyOrder: c.primaryKeyOrder,
+        identity: c.identity,
       );
     }).toList();
 

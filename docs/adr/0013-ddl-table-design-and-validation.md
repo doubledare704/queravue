@@ -58,3 +58,4 @@ Additive only, no renumbering: `ColumnDetails.identity`, `ColumnDetails.collatio
 - MySQL-family users can end up with a partly applied script after a failure; the UI states this up front in the preview and after a failed run.
 - SQLite alters are intentionally narrower than other engines; column changes beyond add, drop and rename are reported as unsupported.
 - The designer models columns, keys, unique and check constraints and indexes. Triggers, partitions, table options and engine-specific storage settings are not designed here; users run them in the SQL editor.
+- The first designer screen edits columns (name, type, default, nullability, auto-generated, primary key on a new table). Foreign keys, unique and check constraints are supported by `SchemaDesignService` but have no screen yet; indexes are managed in the Indexes panel. A new table's primary key and an existing column's auto-generated flag cannot be changed in the designer.

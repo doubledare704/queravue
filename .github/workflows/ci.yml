@@ -200,3 +200,8 @@ jobs:
           export QUERAVUE_WORKSPACE="$RUNNER_TEMP/workspace"
           export QUERAVUE_CONFIG_DIR="$RUNNER_TEMP/config"
           flutter test integration_test/shell_workspace_test.dart -d macos
+      - name: Design a table, review its DDL, apply it and edit it
+        working-directory: app
+        run: |
+          export QUERAVUE_CONFIG_DIR="$RUNNER_TEMP/designer-config"
+          flutter test integration_test/designer_test.dart -d macos

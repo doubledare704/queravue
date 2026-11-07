@@ -220,9 +220,18 @@ class _DropIndexDialog extends ConsumerStatefulWidget {
 }
 
 class _DropIndexDialogState extends ConsumerState<_DropIndexDialog> {
-  late final Future<AdminResult<IndexStatement>> _preview = ref
-      .read(indexesProvider(widget.target).notifier)
-      .previewDrop(widget.name);
+  late final Future<AdminResult<IndexStatement>> _preview;
+
+  @override
+  void initState() {
+    super.initState();
+    _preview = Future.microtask(
+      () => ref
+          .read(indexesProvider(widget.target).notifier)
+          .previewDrop(widget.name),
+    );
+  }
+
   bool _busy = false;
   AdminError? _error;
 

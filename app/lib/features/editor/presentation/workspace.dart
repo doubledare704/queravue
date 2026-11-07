@@ -8,6 +8,7 @@ import '../../../shared/shortcuts.dart';
 import '../../connections/application/connection_session.dart';
 import '../../admin/presentation/admin_host.dart';
 import '../../connections/application/connections_controller.dart';
+import '../../designer/presentation/designer_tab_view.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
 import '../../workspace/application/tab_files.dart';
@@ -83,6 +84,8 @@ class Workspace extends ConsumerWidget {
               for (final t in tabs)
                 t.isShell
                     ? ShellTabView(key: ValueKey(t.id), tab: t)
+                    : t.isDesigner
+                    ? DesignerTabView(key: ValueKey(t.id), tab: t)
                     : t.isCollection
                     ? AdminHost(
                         key: ValueKey(t.id),
