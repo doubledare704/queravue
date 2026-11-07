@@ -52,14 +52,102 @@ class ColumnDraft {
   );
 }
 
+class ForeignKeyDraft {
+  const ForeignKeyDraft({
+    this.name = '',
+    required this.columns,
+    this.referencedSchema = '',
+    required this.referencedTable,
+    required this.referencedColumns,
+    this.onDelete = ReferentialAction.unspecified,
+    this.onUpdate = ReferentialAction.unspecified,
+  });
+
+  final String name;
+  final List<String> columns;
+  final String referencedSchema;
+  final String referencedTable;
+  final List<String> referencedColumns;
+  final ReferentialAction onDelete;
+  final ReferentialAction onUpdate;
+
+  String get summary =>
+      '(${columns.join(', ')}) → $referencedTable (${referencedColumns.join(', ')})';
+}
+
+class UniqueDraft {
+  const UniqueDraft({this.name = '', required this.columns});
+
+  final String name;
+  final List<String> columns;
+}
+
+class CheckDraft {
+  const CheckDraft({this.name = '', required this.expression});
+
+  final String name;
+  final String expression;
+}
+
+/// Constraints staged in the designer, on top of the table's columns.
+class ConstraintDrafts {
+  const ConstraintDrafts({
+    this.foreignKeys = const [],
+    this.uniques = const [],
+    this.checks = const [],
+    this.dropped = const [],
+  });
+
+  final List<ForeignKeyDraft> foreignKeys;
+  final List<UniqueDraft> uniques;
+  final List<CheckDraft> checks;
+
+  /// Names of existing constraints to drop.
+  final List<String> dropped;
+
+  bool get isEmpty =>
+      foreignKeys.isEmpty &&
+      uniques.isEmpty &&
+      checks.isEmpty &&
+      dropped.isEmpty;
+}
+
 sealed class SchemaChangeModel {
   const SchemaChangeModel();
 }
 
 class CreateTableChange extends SchemaChangeModel {
-  const CreateTableChange(this.columns);
+  const CreateTableChange(
+    this.columns, {
+    this.constraints = const ConstraintDrafts(),
+  });
 
   final List<ColumnDraft> columns;
+  final ConstraintDrafts constraints;
+}
+
+class AddForeignKeyChange extends SchemaChangeModel {
+  const AddForeignKeyChange(this.foreignKey);
+
+  final ForeignKeyDraft foreignKey;
+}
+
+class AddUniqueChange extends SchemaChangeModel {
+  const AddUniqueChange(this.unique);
+
+  final UniqueDraft unique;
+}
+
+class AddCheckChange extends SchemaChangeModel {
+  const AddCheckChange(this.check);
+
+  final CheckDraft check;
+}
+
+class DropConstraintChange extends SchemaChangeModel {
+  const DropConstraintChange(this.name);
+
+  final String name;
 }
 
 class AddColumnChange extends SchemaChangeModel {
@@ -126,13 +214,16 @@ class DdlApplied {
   final bool transactional;
 }
 
-/// Turns the designer's columns into ordered changes: renames, alters, adds,
-/// then drops. A new table is a single create.
+/// Turns the designer's edits into ordered changes: constraint drops, column
+/// renames, alters, adds and drops, then new constraints. A new table is a single create.
 List<SchemaChangeModel> diffDesign({
   TableDetails? original,
   required List<ColumnDraft> columns,
+  ConstraintDrafts constraints = const ConstraintDrafts(),
 }) {
-  if (original == null) return [CreateTableChange(columns)];
+  if (original == null) {
+    return [CreateTableChange(columns, constraints: constraints)];
+  }
   final before = {
     for (final c in original.columns) c.name: ColumnDraft.fromDetails(c),
   };
@@ -166,5 +257,14 @@ List<SchemaChangeModel> diffDesign({
     for (final name in before.keys)
       if (!kept.contains(name)) DropColumnChange(name),
   ];
-  return [...renames, ...alters, ...adds, ...drops];
+  return [
+    for (final name in constraints.dropped) DropConstraintChange(name),
+    ...renames,
+    ...alters,
+    ...adds,
+    ...drops,
+    for (final u in constraints.uniques) AddUniqueChange(u),
+    for (final c in constraints.checks) AddCheckChange(c),
+    for (final f in constraints.foreignKeys) AddForeignKeyChange(f),
+  ];
 }

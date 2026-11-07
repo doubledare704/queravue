@@ -17,6 +17,7 @@ class DesignerState {
     this.tableName = '',
     this.original,
     this.columns = const [],
+    this.constraints = const ConstraintDrafts(),
     this.loading = true,
     this.error,
   });
@@ -27,6 +28,7 @@ class DesignerState {
   final String tableName;
   final TableDetails? original;
   final List<ColumnDraft> columns;
+  final ConstraintDrafts constraints;
   final bool loading;
   final String? error;
 
@@ -39,8 +41,11 @@ class DesignerState {
         )
       : tableRef;
 
-  List<SchemaChangeModel> get changes =>
-      diffDesign(original: original, columns: columns);
+  List<SchemaChangeModel> get changes => diffDesign(
+    original: original,
+    columns: columns,
+    constraints: constraints,
+  );
 
   bool get hasChanges => isNew ? columns.isNotEmpty : changes.isNotEmpty;
 
@@ -48,6 +53,7 @@ class DesignerState {
     String? tableName,
     TableDetails? original,
     List<ColumnDraft>? columns,
+    ConstraintDrafts? constraints,
     bool? loading,
     String? error,
     bool clearError = false,
@@ -58,6 +64,7 @@ class DesignerState {
     tableName: tableName ?? this.tableName,
     original: original ?? this.original,
     columns: columns ?? this.columns,
+    constraints: constraints ?? this.constraints,
     loading: loading ?? this.loading,
     error: clearError ? null : (error ?? this.error),
   );
@@ -123,6 +130,7 @@ class DesignerController extends Notifier<DesignerState> {
       state = state.copyWith(
         original: details,
         columns: [for (final c in details.columns) ColumnDraft.fromDetails(c)],
+        constraints: const ConstraintDrafts(),
         loading: false,
       );
     } catch (e) {
@@ -154,6 +162,49 @@ class DesignerController extends Notifier<DesignerState> {
     final columns = [...state.columns]..removeAt(index);
     state = state.copyWith(columns: columns);
   }
+
+  void _setConstraints({
+    List<ForeignKeyDraft>? foreignKeys,
+    List<UniqueDraft>? uniques,
+    List<CheckDraft>? checks,
+    List<String>? dropped,
+  }) {
+    final c = state.constraints;
+    state = state.copyWith(
+      constraints: ConstraintDrafts(
+        foreignKeys: foreignKeys ?? c.foreignKeys,
+        uniques: uniques ?? c.uniques,
+        checks: checks ?? c.checks,
+        dropped: dropped ?? c.dropped,
+      ),
+    );
+  }
+
+  void addForeignKey(ForeignKeyDraft fk) =>
+      _setConstraints(foreignKeys: [...state.constraints.foreignKeys, fk]);
+
+  void addUnique(UniqueDraft u) =>
+      _setConstraints(uniques: [...state.constraints.uniques, u]);
+
+  void addCheck(CheckDraft c) =>
+      _setConstraints(checks: [...state.constraints.checks, c]);
+
+  void removeStagedForeignKey(int i) => _setConstraints(
+    foreignKeys: [...state.constraints.foreignKeys]..removeAt(i),
+  );
+
+  void removeStagedUnique(int i) =>
+      _setConstraints(uniques: [...state.constraints.uniques]..removeAt(i));
+
+  void removeStagedCheck(int i) =>
+      _setConstraints(checks: [...state.constraints.checks]..removeAt(i));
+
+  /// Marks an existing foreign key to be dropped.
+  void dropConstraint(String name) =>
+      _setConstraints(dropped: [...state.constraints.dropped, name]);
+
+  void keepConstraint(String name) =>
+      _setConstraints(dropped: [...state.constraints.dropped]..remove(name));
 
   String? validate() {
     if (state.isNew && state.tableName.trim().isEmpty) {

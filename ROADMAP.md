@@ -50,7 +50,7 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 - ✅ Index manager (SQL + Mongo): list, create, drop, usage stats. Usage and size show "n/a" where a server keeps none.
 - ✅ Collection/table statistics.
 - ✅ Mongo `$jsonSchema` validation editor.
-- ✅ SQL table designer: create/alter tables and columns → preview DDL → apply. Foreign keys, unique and check constraints are built in the core but have no screen yet.
+- ✅ SQL table designer: create/alter tables, columns and constraints (foreign keys, unique, check) → preview DDL → apply.
 - ✅ **Done when:** schema changes can be made visually with a DDL preview.
 
 **Status:** merged in PRs #19–#24 (ADRs 0012 and 0013, protocol version 7), CI green on each.

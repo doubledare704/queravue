@@ -6,6 +6,7 @@ import '../../admin/presentation/admin_widgets.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../application/designer_controller.dart';
 import '../domain/design_models.dart';
+import 'constraints_section.dart';
 
 class DesignerTabView extends ConsumerWidget {
   const DesignerTabView({super.key, required this.tab});
@@ -98,16 +99,19 @@ class DesignerTabView extends ConsumerWidget {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            itemCount: state.columns.length,
-            itemBuilder: (context, i) => _ColumnRow(
-              key: ValueKey('col-$i-${state.columns[i].originalName}'),
-              index: i,
-              column: state.columns[i],
-              existing: !state.isNew,
-              onChanged: (c) => controller.updateColumn(i, c),
-              onRemove: () => controller.removeColumn(i),
-            ),
+          child: ListView(
+            children: [
+              for (var i = 0; i < state.columns.length; i++)
+                _ColumnRow(
+                  key: ValueKey('col-$i-${state.columns[i].originalName}'),
+                  index: i,
+                  column: state.columns[i],
+                  existing: !state.isNew,
+                  onChanged: (c) => controller.updateColumn(i, c),
+                  onRemove: () => controller.removeColumn(i),
+                ),
+              ConstraintsSection(tabId: tab.id),
+            ],
           ),
         ),
       ],

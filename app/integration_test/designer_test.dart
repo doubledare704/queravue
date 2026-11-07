@@ -125,6 +125,19 @@ void main() {
       await tester.enterText(find.byKey(const Key('col-name-1')), 'title');
       await tester.enterText(find.byKey(const Key('col-type-1')), 'text');
       await tester.pump();
+      await tester.tap(find.byKey(const Key('add-unique')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('unique-columns')), 'title');
+      await tester.tap(find.byKey(const Key('unique-save')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('add-check')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('check-expression')),
+        "title <> ''",
+      );
+      await tester.tap(find.byKey(const Key('check-save')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('designer-review')));
       await _pumpUntil(
         tester,
@@ -134,6 +147,8 @@ void main() {
       final createSql = _previewedStatements();
       expect(createSql.single, startsWith('CREATE TABLE'));
       expect(createSql.single, contains('"title" text'));
+      expect(createSql.single, contains('UNIQUE ("title")'));
+      expect(createSql.single, contains("CHECK (title <> '')"));
       await tester.tap(find.byKey(const Key('ddl-apply')));
       await _pumpUntil(
         tester,
