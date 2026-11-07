@@ -20,6 +20,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/schema"
 	"github.com/doubledare704/queravue/core/internal/session"
+	"github.com/doubledare704/queravue/core/internal/workspace"
 )
 
 // Config configures Serve.
@@ -36,6 +37,8 @@ type Config struct {
 	OnListening func()
 	// Connections backs ConnectionService. Nil leaves the service unregistered.
 	Connections *connections.Service
+	// Workspace backs WorkspaceService. Nil leaves the service unregistered.
+	Workspace *workspace.Service
 	// Sessions and Results back SessionService and QueryService. Both must be
 	// set to register them.
 	Sessions    *session.Manager
@@ -104,6 +107,9 @@ func Serve(ctx context.Context, cfg Config) error {
 		defer shellSvc.Shutdown()
 		queravuev1.RegisterShellServiceServer(srv, shellSvc)
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
+	}
+	if cfg.Workspace != nil {
+		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))
 	}
 	if cfg.History != nil {
 		queravuev1.RegisterHistoryServiceServer(srv, api.NewHistoryService(cfg.History))

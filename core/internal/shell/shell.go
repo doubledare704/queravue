@@ -303,6 +303,11 @@ func (s *Shell) evaluate(ctx context.Context, code string) *Error {
 		err = s.emitResult(v)
 	}
 	if err == nil {
+		// A native such as sleep returns early on cancel without raising; the
+		// script must still report that it was cut short.
+		if ctx.Err() != nil {
+			return contextError(ctx)
+		}
 		return nil
 	}
 	return s.runtimeError(ctx, err, src)

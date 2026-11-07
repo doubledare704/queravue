@@ -24,6 +24,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/server"
 	"github.com/doubledare704/queravue/core/internal/session"
 	"github.com/doubledare704/queravue/core/internal/version"
+	"github.com/doubledare704/queravue/core/internal/workspace"
 )
 
 func main() {
@@ -99,6 +100,8 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		session.WithOnClose(spools.CloseSession))
 	defer sessions.Shutdown()
 
+	workspaceSvc := workspace.NewService(workspace.Options{ConfigDir: actualConfigDir, DefaultRoot: getenv("QUERAVUE_WORKSPACE")})
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	if *stdinEOF {
@@ -114,6 +117,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		Sessions:        sessions,
 		Results:         spools,
 		History:         histStore,
+		Workspace:       workspaceSvc,
 	})
 	if err != nil {
 		return err
