@@ -61,6 +61,7 @@ func Run(t *testing.T, tg Target) {
 	t.Run("SchemaTree", func(t *testing.T) { schemaTree(t, tg) })
 	t.Run("TablePageFilterSort", func(t *testing.T) { tablePage(t, tg) })
 	t.Run("IndexLifecycle", func(t *testing.T) { indexLifecycle(t, tg) })
+	t.Run("OnlineIndexBuild", func(t *testing.T) { onlineIndexBuild(t, tg) })
 	t.Run("ListIndexesOfMissingTable", func(t *testing.T) { listIndexesOfMissingTable(t, tg) })
 	t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
 	t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })

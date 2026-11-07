@@ -62,7 +62,6 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 - Amazon DocumentDB and Cosmos DB for MongoDB are unverified; unsupported calls map to `UNSUPPORTED`.
 - SQLite constraint changes on an existing table are unsupported; a column alter is a table rebuild that must be applied on its own (ADR 0014).
 - The Indexes, Stats and Validation panels have no end-to-end test against a running core; the designer on engines other than SQLite is untested end to end.
-- Online index creation (`CONCURRENTLY`, `ONLINE`) is not offered.
 
 ## Phase C — Productivity (it. 8–12)
 

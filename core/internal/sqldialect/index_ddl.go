@@ -20,7 +20,15 @@ type indexSyntax struct {
 	schemaOnNewIndex bool
 	dropNeedsTable   bool
 	largeTableNote   string
+	concurrently     bool
+	onlineSuffix     string
+	onlineNote       string
 }
+
+// OptionOnline in IndexSpec.Options asks for a build that does not block writes.
+const OptionOnline = "online"
+
+func (x indexSyntax) canBuildOnline() bool { return x.concurrently || x.onlineSuffix != "" }
 
 func (x indexSyntax) create(database, schema, table string, spec engine.IndexSpec) (string, []string, error) {
 	if len(spec.Keys) == 0 {
@@ -34,6 +42,10 @@ func (x indexSyntax) create(database, schema, table string, spec engine.IndexSpe
 	}
 	if spec.PartialPredicate != "" && !x.partial {
 		return "", nil, fmt.Errorf("%s does not support partial indexes", x.dialect.ID())
+	}
+	online := spec.Options[OptionOnline] == "true"
+	if online && !x.canBuildOnline() {
+		return "", nil, fmt.Errorf("%s cannot build an index online", x.dialect.ID())
 	}
 	keys := make([]string, 0, len(spec.Keys))
 	for _, k := range spec.Keys {
@@ -54,6 +66,9 @@ func (x indexSyntax) create(database, schema, table string, spec engine.IndexSpe
 		b.WriteString("UNIQUE ")
 	}
 	b.WriteString("INDEX ")
+	if online && x.concurrently {
+		b.WriteString("CONCURRENTLY ")
+	}
 	if x.schemaOnNewIndex {
 		b.WriteString(x.indexName(schema, name))
 		b.WriteString(" ON " + x.dialect.QuoteIdent(table))
@@ -78,10 +93,16 @@ func (x indexSyntax) create(database, schema, table string, spec engine.IndexSpe
 	if spec.PartialPredicate != "" {
 		b.WriteString(" WHERE " + spec.PartialPredicate)
 	}
+	if online {
+		b.WriteString(x.onlineSuffix)
+	}
 	b.WriteString(";")
 
 	var warnings []string
-	if x.largeTableNote != "" {
+	switch {
+	case online:
+		warnings = append(warnings, x.onlineNote)
+	case x.largeTableNote != "":
 		warnings = append(warnings, x.largeTableNote)
 	}
 	return b.String(), warnings, nil
@@ -147,10 +168,16 @@ func sanitizeNamePart(s string) string {
 
 var (
 	postgresIndexes = indexSyntax{dialect: Postgres, method: true, include: true, partial: true, expressions: true, descending: true, qualifyDropName: true,
-		largeTableNote: "CREATE INDEX blocks writes to the table while it builds."}
-	mysqlIndexes = indexSyntax{dialect: MySQL, method: true, methodAfterKeys: true, expressions: true, descending: true, dropNeedsTable: true}
+		largeTableNote: "CREATE INDEX blocks writes to the table while it builds.",
+		concurrently:   true,
+		onlineNote:     "CONCURRENTLY does not block writes but takes longer. If it fails or is cancelled it leaves an INVALID index that must be dropped before retrying."}
+	mysqlIndexes = indexSyntax{dialect: MySQL, method: true, methodAfterKeys: true, expressions: true, descending: true, dropNeedsTable: true,
+		onlineSuffix: " ALGORITHM=INPLACE LOCK=NONE",
+		onlineNote:   "ALGORITHM=INPLACE, LOCK=NONE makes the server refuse the build instead of locking the table if it cannot be done online."}
 	mssqlIndexes = indexSyntax{dialect: MSSQL, include: true, partial: true, descending: true, dropNeedsTable: true,
-		largeTableNote: "Unless ONLINE is used, CREATE INDEX blocks writes to the table while it builds."}
+		largeTableNote: "Unless ONLINE is used, CREATE INDEX blocks writes to the table while it builds.",
+		onlineSuffix:   " WITH (ONLINE = ON)",
+		onlineNote:     "ONLINE = ON needs an edition of SQL Server that supports online index operations (Enterprise or Developer)."}
 	sqliteIndexes = indexSyntax{dialect: SQLite, partial: true, expressions: true, descending: true, qualifyDropName: true, schemaOnNewIndex: true}
 )
 

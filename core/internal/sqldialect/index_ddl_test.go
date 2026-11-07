@@ -117,3 +117,50 @@ func TestDropIndexSQL(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateIndexOnline(t *testing.T) {
+	online := func(spec engine.IndexSpec) engine.IndexSpec {
+		spec.Options = map[string]string{sqldialect.OptionOnline: "true"}
+		return spec
+	}
+	tests := []struct {
+		name string
+		d    sqldialect.Dialect
+		spec engine.IndexSpec
+		want string
+	}{
+		{"postgres", sqldialect.Postgres, online(engine.IndexSpec{Name: "ix", Keys: asc("a")}),
+			`CREATE INDEX CONCURRENTLY "ix" ON "orders" ("a");`},
+		{"postgres unique partial", sqldialect.Postgres, online(engine.IndexSpec{Name: "ix", Unique: true, Keys: asc("a"), PartialPredicate: "a > 0"}),
+			`CREATE UNIQUE INDEX CONCURRENTLY "ix" ON "orders" ("a") WHERE a > 0;`},
+		{"mysql", sqldialect.MySQL, online(engine.IndexSpec{Name: "ix", Method: "HASH", Keys: asc("a")}),
+			"CREATE INDEX `ix` ON `orders` (`a`) USING HASH ALGORITHM=INPLACE LOCK=NONE;"},
+		{"mssql", sqldialect.MSSQL, online(engine.IndexSpec{Name: "ix", Keys: asc("a"), PartialPredicate: "[a] > 0"}),
+			"CREATE INDEX [ix] ON [orders] ([a]) WHERE [a] > 0 WITH (ONLINE = ON);"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, warnings, err := tt.d.CreateIndex("", "", "orders", tt.spec)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("got  %s\nwant %s", got, tt.want)
+			}
+			if len(warnings) != 1 || strings.Contains(warnings[0], "blocks writes") {
+				t.Errorf("warnings = %v, want only the online note", warnings)
+			}
+		})
+	}
+}
+
+func TestCreateIndexOnlineIsRefusedWhereItIsNotSupported(t *testing.T) {
+	spec := engine.IndexSpec{Name: "ix", Keys: asc("a"), Options: map[string]string{sqldialect.OptionOnline: "true"}}
+	if _, _, err := sqldialect.SQLite.CreateIndex("", "main", "orders", spec); err == nil {
+		t.Error("SQLite accepted an online build")
+	}
+	spec.Options[sqldialect.OptionOnline] = "false"
+	if sql, _, err := sqldialect.SQLite.CreateIndex("", "main", "orders", spec); err != nil || strings.Contains(sql, "ONLINE") {
+		t.Errorf("online=false: %q %v", sql, err)
+	}
+}

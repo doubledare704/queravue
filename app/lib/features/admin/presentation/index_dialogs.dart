@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../connections/application/connection_session.dart';
 import '../application/admin_controllers.dart';
 import '../domain/admin_models.dart';
 import 'admin_widgets.dart';
@@ -43,6 +44,7 @@ class _CreateIndexDialogState extends ConsumerState<_CreateIndexDialog> {
   final _method = TextEditingController();
   final _predicate = TextEditingController();
   bool _unique = false;
+  bool _online = false;
   bool _busy = false;
   IndexStatement? _preview;
   AdminError? _error;
@@ -56,6 +58,7 @@ class _CreateIndexDialogState extends ConsumerState<_CreateIndexDialog> {
     unique: _unique,
     method: _method.text.trim(),
     partialPredicate: _predicate.text.trim(),
+    online: _online,
   );
 
   void _edited() => setState(() {
@@ -101,6 +104,9 @@ class _CreateIndexDialogState extends ConsumerState<_CreateIndexDialog> {
   Widget build(BuildContext context) {
     final production = ref.watch(
       adminIsProductionProvider(widget.target.connectionId),
+    );
+    final documentOnly = ref.watch(
+      connectionIsDocumentOnlyProvider(widget.target.connectionId),
     );
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
@@ -153,6 +159,20 @@ class _CreateIndexDialogState extends ConsumerState<_CreateIndexDialog> {
                 },
                 title: const Text('Unique'),
               ),
+              if (!documentOnly)
+                CheckboxListTile(
+                  key: const Key('index-online'),
+                  contentPadding: EdgeInsets.zero,
+                  value: _online,
+                  onChanged: (v) {
+                    _online = v ?? false;
+                    _edited();
+                  },
+                  title: const Text('Build online'),
+                  subtitle: const Text(
+                    'Does not block writes while the index builds, where the server supports it.',
+                  ),
+                ),
               if (production)
                 Text(
                   'This is a production connection.',
