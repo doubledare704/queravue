@@ -166,6 +166,24 @@ func smoke(t *testing.T, envVar string, v Variant) {
 		t.Fatalf("drop index: %v", err)
 	}
 
+	// 6. Validator. collMod must work or surface as an unsupported error.
+	rule := engine.ValidationRule{Validator: `{"$jsonSchema":{"bsonType":"object","required":["name"]}}`, Level: "moderate", Action: "warn"}
+	if _, err := c.SetValidation(ctx, db, coll, rule, false); err != nil {
+		var se *engine.Error
+		if !errors.As(err, &se) || se.Kind != engine.KindUnsupported {
+			t.Fatalf("collMod validator = %v, want success or an unsupported error", err)
+		}
+		t.Logf("collMod validator unsupported: %v", err)
+	} else {
+		got, err := c.GetValidation(ctx, db, coll)
+		if err != nil || !strings.Contains(got.Validator, "$jsonSchema") || got.Level != "moderate" || got.Action != "warn" {
+			t.Fatalf("read back validator: %+v %v", got, err)
+		}
+		if _, err := c.SetValidation(ctx, db, coll, engine.ValidationRule{Level: "off"}, false); err != nil {
+			t.Fatalf("remove validator: %v", err)
+		}
+	}
+
 	if n, err := c.Delete(ctx, db, coll, ids, engine.WriteOptions{}); err != nil || n != 2 {
 		t.Fatalf("delete = %d, %v", n, err)
 	}
