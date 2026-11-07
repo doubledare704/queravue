@@ -205,3 +205,8 @@ jobs:
         run: |
           export QUERAVUE_CONFIG_DIR="$RUNNER_TEMP/designer-config"
           flutter test integration_test/designer_test.dart -d macos
+      - name: Indexes, Stats and Validation sections against the real core
+        working-directory: app
+        run: |
+          export QUERAVUE_CONFIG_DIR="$RUNNER_TEMP/panels-config"
+          flutter test integration_test/panels_test.dart -d macos
