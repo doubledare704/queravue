@@ -28,7 +28,13 @@ func BuildDDL(d Dialect, target Target, current *engine.TableDetails, changes []
 	if d.ID() == "mysql" {
 		b.warn("This server commits each DDL statement as it runs. If a statement fails, the earlier ones stay applied.")
 	}
+	if err := b.rebuildIfNeeded(changes); err != nil {
+		return Script{}, err
+	}
 	for i, ch := range changes {
+		if b.rebuilt {
+			break
+		}
 		if err := b.apply(ch); err != nil {
 			var u *UnsupportedError
 			if errors.As(err, &u) {
@@ -48,6 +54,37 @@ type ddlBuilder struct {
 	target  Target
 	current *engine.TableDetails
 	script  Script
+	rebuilt bool
+}
+
+// rebuildIfNeeded handles SQLite column alters, which are done by rebuilding
+// the table. They must be the only changes in the script: anything else
+// would be lost or reordered by the rebuild (ADR 0014).
+func (b *ddlBuilder) rebuildIfNeeded(changes []Change) error {
+	if !b.is("sqlite") {
+		return nil
+	}
+	var alters []AlterColumn
+	for _, ch := range changes {
+		if a, ok := ch.(AlterColumn); ok {
+			alters = append(alters, a)
+		}
+	}
+	if len(alters) == 0 {
+		return nil
+	}
+	if len(alters) != len(changes) {
+		return &UnsupportedError{Reason: "SQLite alters a column by rebuilding the table, so it cannot be combined with other changes: apply the column alters on their own, then the rest"}
+	}
+	if err := b.rebuildSQLite(alters); err != nil {
+		var u *UnsupportedError
+		if errors.As(err, &u) {
+			return err
+		}
+		return fmt.Errorf("alter column: %w", err)
+	}
+	b.rebuilt = true
+	return nil
 }
 
 func (b *ddlBuilder) warn(msg string) { b.script.Warnings = append(b.script.Warnings, msg) }

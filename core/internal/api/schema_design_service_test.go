@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 )
 
@@ -134,15 +135,20 @@ func TestSchemaDesignCreatesTable(t *testing.T) {
 	}
 }
 
+func alterNote(from, to string) *queravuev1.SchemaChange {
+	return &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AlterColumn{AlterColumn: &queravuev1.AlterColumn{
+		Before: &queravuev1.ColumnSpec{Name: "note", TypeName: from, Nullable: true},
+		After:  &queravuev1.ColumnSpec{Name: "note", TypeName: to, Nullable: true},
+	}}}
+}
+
 func TestSchemaDesignReportsUnsupportedAndInvalidChanges(t *testing.T) {
 	e, ref := designEnv(t, false)
-	alter := &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AlterColumn{AlterColumn: &queravuev1.AlterColumn{
-		Before: &queravuev1.ColumnSpec{Name: "note", TypeName: "TEXT", Nullable: true},
-		After:  &queravuev1.ColumnSpec{Name: "note", TypeName: "VARCHAR(10)", Nullable: true},
-	}}}
-	resp, _ := e.design.PreviewDDL(context.Background(), &queravuev1.PreviewDDLRequest{SessionId: e.sess.ID, TableRef: ref, Changes: []*queravuev1.SchemaChange{alter}})
-	if resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED || len(resp.GetStatements()) != 0 {
-		t.Errorf("alter on SQLite: %+v", resp)
+	mixed, _ := e.design.PreviewDDL(context.Background(), &queravuev1.PreviewDDLRequest{
+		SessionId: e.sess.ID, TableRef: ref, Changes: []*queravuev1.SchemaChange{alterNote("TEXT", "VARCHAR(10)"), addColumn("x", "TEXT")},
+	})
+	if mixed.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED || len(mixed.GetStatements()) != 0 {
+		t.Errorf("alter combined with another change: %+v", mixed)
 	}
 	empty, _ := e.design.PreviewDDL(context.Background(), &queravuev1.PreviewDDLRequest{SessionId: e.sess.ID, TableRef: ref})
 	if empty.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID {
@@ -151,5 +157,90 @@ func TestSchemaDesignReportsUnsupportedAndInvalidChanges(t *testing.T) {
 	unset, _ := e.design.PreviewDDL(context.Background(), &queravuev1.PreviewDDLRequest{SessionId: e.sess.ID, TableRef: ref, Changes: []*queravuev1.SchemaChange{{}}})
 	if unset.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID {
 		t.Errorf("empty change: %+v", unset.GetError())
+	}
+}
+
+func runSQL(t *testing.T, e indexEnv, sql string) error {
+	t.Helper()
+	ex, _ := engine.As[engine.Executor](e.sess.Conn)
+	_, err := ex.Execute(context.Background(), engine.Statement{SQL: sql}, nilSink{})
+	return err
+}
+
+func TestSchemaDesignAltersASQLiteColumnByRebuildingTheTable(t *testing.T) {
+	e, _ := designEnv(t, false)
+	for _, stmt := range []string{
+		`CREATE TABLE stock (id INTEGER PRIMARY KEY, sku TEXT NOT NULL UNIQUE, qty INTEGER CHECK (qty >= 0), note TEXT)`,
+		`CREATE INDEX stock_note ON stock (note)`,
+		`INSERT INTO stock (sku, qty, note) VALUES ('a', 1, 'x'), ('b', 2, NULL)`,
+	} {
+		if err := runSQL(t, e, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ref := &queravuev1.TableRef{Table: "stock"}
+	resp, err := e.design.ApplyDDL(context.Background(), &queravuev1.ApplyDDLRequest{
+		SessionId: e.sess.ID, TableRef: ref, Confirmed: true,
+		Changes: []*queravuev1.SchemaChange{alterNote("TEXT", "VARCHAR(40)")},
+	})
+	if err != nil || resp.GetError() != nil || !resp.GetTransactional() {
+		t.Fatalf("ApplyDDL: %v %+v", err, resp)
+	}
+	if got := columnNames(t, e, "stock"); len(got) != 4 || got[3] != "note" {
+		t.Errorf("columns = %v", got)
+	}
+	if err := runSQL(t, e, `INSERT INTO stock (sku, qty) VALUES ('c', -1)`); err == nil {
+		t.Error("the CHECK constraint did not survive the rebuild")
+	}
+	if err := runSQL(t, e, `INSERT INTO stock (sku, qty) VALUES ('a', 5)`); err == nil {
+		t.Error("the UNIQUE constraint did not survive the rebuild")
+	}
+	if err := runSQL(t, e, `INSERT INTO stock (sku, qty) VALUES (NULL, 5)`); err == nil {
+		t.Error("NOT NULL did not survive the rebuild")
+	}
+	details, err := e.schema.GetTableDetails(context.Background(), &queravuev1.GetTableDetailsRequest{SessionId: e.sess.ID, TableRef: ref, Refresh: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := details.GetColumns()[3].GetTypeName(); got != "VARCHAR(40)" {
+		t.Errorf("note type = %q", got)
+	}
+	var indexed bool
+	for _, ix := range details.GetIndexes() {
+		indexed = indexed || ix.GetName() == "stock_note"
+	}
+	if !indexed {
+		t.Error("the index was not recreated")
+	}
+}
+
+func TestSchemaDesignRebuildFailureRollsBack(t *testing.T) {
+	e, _ := designEnv(t, false)
+	for _, stmt := range []string{
+		`CREATE TABLE stock (id INTEGER PRIMARY KEY, note TEXT)`,
+		`INSERT INTO stock (note) VALUES (NULL)`,
+	} {
+		if err := runSQL(t, e, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	notNull := &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AlterColumn{AlterColumn: &queravuev1.AlterColumn{
+		Before: &queravuev1.ColumnSpec{Name: "note", TypeName: "TEXT", Nullable: true},
+		After:  &queravuev1.ColumnSpec{Name: "note", TypeName: "TEXT", Nullable: false},
+	}}}
+	resp, _ := e.design.ApplyDDL(context.Background(), &queravuev1.ApplyDDLRequest{
+		SessionId: e.sess.ID, TableRef: &queravuev1.TableRef{Table: "stock"}, Confirmed: true, Changes: []*queravuev1.SchemaChange{notNull},
+	})
+	if resp.GetError() == nil {
+		t.Fatal("NOT NULL over an existing NULL was accepted")
+	}
+	if got := columnNames(t, e, "stock"); len(got) != 2 {
+		t.Errorf("columns after the rollback = %v", got)
+	}
+	if err := runSQL(t, e, `SELECT * FROM qv_rebuild_stock`); err == nil {
+		t.Error("the temporary table was left behind")
+	}
+	if err := runSQL(t, e, `INSERT INTO stock (note) VALUES (NULL)`); err != nil {
+		t.Errorf("the original table is not intact: %v", err)
 	}
 }

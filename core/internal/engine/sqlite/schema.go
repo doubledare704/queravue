@@ -290,6 +290,9 @@ func (c *Conn) DescribeTable(ctx context.Context, database, schema, table string
 		}
 	}
 
+	if details.Type == engine.ObjectTypeTable {
+		details.Rebuild = c.tableRebuild(ctx, target, table)
+	}
 	return details, nil
 }
 
