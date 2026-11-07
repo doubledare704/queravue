@@ -7,11 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core_client/core_providers.dart';
 import 'features/command_palette/command_palette.dart';
 import 'features/connections/presentation/connection_actions.dart';
-import 'features/connections/presentation/connection_sidebar.dart';
 import 'features/editor/application/editor_actions.dart';
 import 'features/editor/domain/query_models.dart';
 import 'features/editor/presentation/workspace.dart';
 import 'features/history/presentation/history_dialog.dart';
+import 'features/workspace/presentation/left_sidebar.dart';
+import 'features/workspace/presentation/workspace_flows.dart';
 import 'shared/shortcuts.dart';
 import 'shared/widgets/status_bar.dart';
 
@@ -86,7 +87,14 @@ class HomeScreen extends ConsumerWidget {
         primary(LogicalKeyboardKey.keyT): () => openQueryTab(ref),
         primary(LogicalKeyboardKey.keyW): () => closeQueryTab(ref),
         primary(LogicalKeyboardKey.keyY): () => showHistoryDialog(context, ref),
-        primary(LogicalKeyboardKey.keyY): () => showHistoryDialog(context, ref),
+        primary(LogicalKeyboardKey.keyS): () => saveActiveTabFlow(context, ref),
+        primaryShortcut(LogicalKeyboardKey.keyS, shift: true): () =>
+            saveActiveTabAsFlow(context, ref),
+        primary(LogicalKeyboardKey.keyO): () => quickOpenFlow(context, ref),
+        primaryShortcut(LogicalKeyboardKey.keyF, shift: true): () =>
+            searchWorkspaceFlow(ref),
+        primaryShortcut(LogicalKeyboardKey.keyT, shift: true): () =>
+            openShellTab(ref),
       },
       child: Focus(
         autofocus: true,
@@ -94,7 +102,7 @@ class HomeScreen extends ConsumerWidget {
           body: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(width: 260, child: ConnectionSidebar()),
+              const SizedBox(width: 260, child: LeftSidebar()),
               VerticalDivider(
                 width: 1,
                 color: Theme.of(context).colorScheme.outlineVariant,

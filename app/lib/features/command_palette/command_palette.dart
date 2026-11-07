@@ -8,6 +8,8 @@ import '../documents/application/document_actions.dart';
 import '../editor/application/editor_actions.dart';
 import '../editor/domain/query_models.dart';
 import '../history/presentation/history_dialog.dart';
+import '../workspace/domain/workspace_models.dart';
+import '../workspace/presentation/workspace_flows.dart';
 
 /// One palette entry.
 class PaletteCommand {
@@ -90,6 +92,49 @@ final paletteCommandsProvider = Provider<List<PaletteCommand>>((ref) {
       title: 'Query history',
       shortcut: '⌘Y',
       run: showHistoryDialog,
+    ),
+    PaletteCommand(
+      id: 'shell.new',
+      title: 'New Mongo shell tab',
+      subtitle: 'MongoDB connections',
+      shortcut: '⌘⇧T',
+      run: (context, ref) async => openShellTab(ref),
+    ),
+    PaletteCommand(
+      id: 'workspace.open',
+      title: 'Open workspace file',
+      shortcut: '⌘O',
+      run: quickOpenFlow,
+    ),
+    PaletteCommand(
+      id: 'workspace.newSql',
+      title: 'New SQL file',
+      subtitle: 'Create in the workspace and open',
+      run: (context, ref) => newScriptFlow(context, ref, FileKind.sql),
+    ),
+    PaletteCommand(
+      id: 'workspace.newMongo',
+      title: 'New Mongo script',
+      subtitle: 'Create in the workspace and open',
+      run: (context, ref) => newScriptFlow(context, ref, FileKind.mongo),
+    ),
+    PaletteCommand(
+      id: 'workspace.search',
+      title: 'Search workspace',
+      shortcut: '⌘⇧F',
+      run: (context, ref) async => searchWorkspaceFlow(ref),
+    ),
+    PaletteCommand(
+      id: 'workspace.save',
+      title: 'Save to workspace',
+      shortcut: '⌘S',
+      run: saveActiveTabFlow,
+    ),
+    PaletteCommand(
+      id: 'workspace.saveAs',
+      title: 'Save to workspace as…',
+      shortcut: '⌘⇧S',
+      run: saveActiveTabAsFlow,
     ),
     for (final c in conns)
       PaletteCommand(

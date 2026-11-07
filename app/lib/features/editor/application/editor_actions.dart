@@ -4,6 +4,8 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../domain/query_models.dart';
 import '../../documents/application/document_tab_controller.dart';
+import '../../shell/application/shell_actions.dart';
+import '../../shell/application/shell_tab_controller.dart';
 import 'editor_tabs.dart';
 
 /// Opens an editor tab for the selected connection (⌘T).
@@ -11,6 +13,14 @@ void openQueryTab(WidgetRef ref) {
   final id = ref.read(selectedConnectionProvider);
   if (id != null && !ref.read(connectionIsDocumentOnlyProvider(id))) {
     ref.read(editorTabsProvider.notifier).open(id);
+  }
+}
+
+/// Opens a Mongo shell tab for the selected connection (⌘⇧T).
+void openShellTab(WidgetRef ref) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id != null && ref.read(connectionHasShellProvider(id))) {
+    ref.read(editorTabsProvider.notifier).openShell(id);
   }
 }
 
@@ -30,6 +40,8 @@ Future<void> runActiveTab(WidgetRef ref, ExecuteMode mode) async {
       .activeFor(ref.read(selectedConnectionProvider));
   if (tab != null && tab.isCollection) {
     await ref.read(documentTabProvider(tab.id).notifier).runDraft();
+  } else if (tab != null && tab.isShell) {
+    await runShellTab(ref, tab);
   } else if (tab != null) {
     await ref.read(editorTabsProvider.notifier).run(tab.id, mode);
   }
@@ -42,6 +54,8 @@ Future<void> cancelActiveTab(WidgetRef ref) async {
       .activeFor(ref.read(selectedConnectionProvider));
   if (tab != null && tab.isCollection) {
     await ref.read(documentTabProvider(tab.id).notifier).cancel();
+  } else if (tab != null && tab.isShell) {
+    await ref.read(shellTabProvider(tab.id).notifier).cancel();
   } else if (tab != null) {
     await ref.read(editorTabsProvider.notifier).cancel(tab.id);
   }

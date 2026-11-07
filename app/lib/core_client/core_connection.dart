@@ -11,7 +11,9 @@ import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
 import 'gen/queravue/v1/schema.pbgrpc.dart';
 import 'gen/queravue/v1/session.pbgrpc.dart';
+import 'gen/queravue/v1/shell.pbgrpc.dart';
 import 'gen/queravue/v1/table.pbgrpc.dart';
+import 'gen/queravue/v1/workspace.pbgrpc.dart';
 
 export 'gen/queravue/v1/core.pb.dart' show HealthResponse;
 export 'gen/queravue/v1/core.pbenum.dart' show HealthStatus;
@@ -58,6 +60,12 @@ abstract interface class CoreConnection {
   /// Client for browsing and editing documents.
   DocumentServiceClient get documentService;
 
+  /// Client for the Mongo shell.
+  ShellServiceClient get shellService;
+
+  /// Client for the workspace of saved queries and scripts.
+  WorkspaceServiceClient get workspaceService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -77,6 +85,8 @@ class GrpcCoreConnection implements CoreConnection {
     tableService = TableServiceClient(_channel, options: _auth);
     historyService = HistoryServiceClient(_channel, options: _auth);
     documentService = DocumentServiceClient(_channel, options: _auth);
+    shellService = ShellServiceClient(_channel, options: _auth);
+    workspaceService = WorkspaceServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -121,6 +131,12 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final DocumentServiceClient documentService;
+
+  @override
+  late final ShellServiceClient shellService;
+
+  @override
+  late final WorkspaceServiceClient workspaceService;
 
   @override
   Future<CoreInfo> hello() async {
