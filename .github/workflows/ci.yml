@@ -127,6 +127,16 @@ jobs:
           # Read only by TestSmokeDocumentDB; dev-only credentials from compose.
           QV_DOCDB_URI: mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllowInvalidCertificates=true&directConnection=true
         run: go test -tags=integration -run '^${{ matrix.test }}$' ./internal/engine/${{ matrix.pkg }}/...
+      - name: Mongo shell corpus
+        if: matrix.service == 'mongo'
+        working-directory: core
+        run: go test -count=1 -tags=integration ./internal/shell/...
+      - name: Mongo shell smoke (DocumentDB)
+        if: matrix.service == 'documentdb'
+        working-directory: core
+        env:
+          QV_DOCDB_URI: mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllowInvalidCertificates=true&directConnection=true
+        run: go test -count=1 -tags=integration -run TestSmokeShellDocumentDB ./internal/shell/...
 
   app:
     name: App (Flutter)

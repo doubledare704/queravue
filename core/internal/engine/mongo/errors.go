@@ -31,7 +31,14 @@ func classify(op string, err error, secret engine.Secret) *engine.Error {
 	low := strings.ToLower(msg)
 
 	var cmd mongo.CommandError
+	var write mongo.WriteException
+	var bulk mongo.BulkWriteException
+	code := 0
 	switch {
+	case errors.As(err, &write) && len(write.WriteErrors) > 0:
+		kind, msg, code = engine.KindServer, write.WriteErrors[0].Message, write.WriteErrors[0].Code
+	case errors.As(err, &bulk) && len(bulk.WriteErrors) > 0:
+		kind, msg, code = engine.KindServer, bulk.WriteErrors[0].Message, bulk.WriteErrors[0].Code
 	case errors.Is(err, context.Canceled):
 		kind, msg = engine.KindCanceled, "operation canceled"
 	case errors.As(err, &cmd) && (cmd.Code == codeUnauthorized || cmd.Code == codeAuthenticationFailed ||
@@ -62,5 +69,8 @@ func classify(op string, err error, secret engine.Secret) *engine.Error {
 			kind, msg = engine.KindServer, cmd.Message
 		}
 	}
-	return &engine.Error{Kind: kind, Engine: ID, Op: op, Msg: engine.Redact(msg, secret), Err: err}
+	if code == 0 && cmd.Code != 0 {
+		code = int(cmd.Code)
+	}
+	return &engine.Error{Kind: kind, Engine: ID, Op: op, Msg: engine.Redact(msg, secret), Err: err, Code: code}
 }
