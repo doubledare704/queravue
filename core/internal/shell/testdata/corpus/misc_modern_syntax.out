@@ -1,0 +1,2 @@
+out: doubled: 2-4-6
+value: {"$numberInt":"3"}

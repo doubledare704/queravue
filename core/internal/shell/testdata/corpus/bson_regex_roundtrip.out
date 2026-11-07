@@ -1,0 +1,6 @@
+out: ab+c
+out: true
+out: {
+  "_id": 1,
+  "re": /ab+c/i
+}

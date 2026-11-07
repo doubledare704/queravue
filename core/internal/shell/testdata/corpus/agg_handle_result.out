@@ -1,0 +1,3 @@
+cursor aggregate on t
+  {"_id":{"$numberInt":"1"},"k":"a","upper":"A"}
+  {"_id":{"$numberInt":"2"},"k":"b","upper":"B"}

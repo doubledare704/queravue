@@ -1,0 +1,1 @@
+value: [{"_id":"a","total":{"$numberInt":"4"},"c":{"$numberInt":"2"}},{"_id":"b","total":{"$numberInt":"5"},"c":{"$numberInt":"1"}}]

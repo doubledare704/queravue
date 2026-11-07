@@ -1,0 +1,1 @@
+doc: {"_id":{"$numberInt":"1"},"a":{"$numberInt":"4"},"tags":["x","y"],"n":{"$numberInt":"9"},"c":{"$numberInt":"3"}}

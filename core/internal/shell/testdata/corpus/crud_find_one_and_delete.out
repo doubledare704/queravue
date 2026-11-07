@@ -1,0 +1,5 @@
+out: {
+  "_id": 2,
+  "n": 1
+}
+value: {"$numberInt":"1"}

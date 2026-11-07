@@ -1,0 +1,1 @@
+doc: {"_id":{"$numberInt":"1"},"at":{"$date":{"$numberLong":"86400000"}}}

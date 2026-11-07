@@ -1,0 +1,7 @@
+out: 68656c6c6f
+out: 3
+out: {
+  "_id": 1,
+  "raw": BinData(0,"aGVsbG8="),
+  "custom": BinData(128,"AQID")
+}

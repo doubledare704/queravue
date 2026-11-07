@@ -1,0 +1,4 @@
+out: log 1
+info: info
+warn: warn
+error: error

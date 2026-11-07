@@ -1,0 +1,5 @@
+out: {
+  "_id": 1,
+  "b": 2
+}
+doc: {"_id":{"$numberInt":"1"},"b":{"$numberInt":"2"}}

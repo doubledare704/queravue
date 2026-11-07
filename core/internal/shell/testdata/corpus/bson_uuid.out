@@ -1,0 +1,5 @@
+out: 01234567-89ab-cdef-0123-456789abcdef
+out: {
+  "_id": UUID("01234567-89ab-cdef-0123-456789abcdef"),
+  "tag": "u"
+}
