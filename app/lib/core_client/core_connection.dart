@@ -8,11 +8,14 @@ import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
 import 'gen/queravue/v1/document.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
+import 'gen/queravue/v1/index.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
 import 'gen/queravue/v1/schema.pbgrpc.dart';
 import 'gen/queravue/v1/session.pbgrpc.dart';
 import 'gen/queravue/v1/shell.pbgrpc.dart';
+import 'gen/queravue/v1/stats.pbgrpc.dart';
 import 'gen/queravue/v1/table.pbgrpc.dart';
+import 'gen/queravue/v1/validation.pbgrpc.dart';
 import 'gen/queravue/v1/workspace.pbgrpc.dart';
 
 export 'gen/queravue/v1/core.pb.dart' show HealthResponse;
@@ -66,6 +69,15 @@ abstract interface class CoreConnection {
   /// Client for the workspace of saved queries and scripts.
   WorkspaceServiceClient get workspaceService;
 
+  /// Client for listing, creating and dropping indexes.
+  IndexServiceClient get indexService;
+
+  /// Client for table and collection statistics.
+  StatsServiceClient get statsService;
+
+  /// Client for Mongo collection validators.
+  ValidationServiceClient get validationService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -87,6 +99,9 @@ class GrpcCoreConnection implements CoreConnection {
     documentService = DocumentServiceClient(_channel, options: _auth);
     shellService = ShellServiceClient(_channel, options: _auth);
     workspaceService = WorkspaceServiceClient(_channel, options: _auth);
+    indexService = IndexServiceClient(_channel, options: _auth);
+    statsService = StatsServiceClient(_channel, options: _auth);
+    validationService = ValidationServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -137,6 +152,15 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final WorkspaceServiceClient workspaceService;
+
+  @override
+  late final IndexServiceClient indexService;
+
+  @override
+  late final StatsServiceClient statsService;
+
+  @override
+  late final ValidationServiceClient validationService;
 
   @override
   Future<CoreInfo> hello() async {

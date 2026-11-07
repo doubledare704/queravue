@@ -4,11 +4,14 @@ import 'package:queravue/core_client/core_connection.dart';
 import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/index.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/schema.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/session.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/shell.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/stats.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/table.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/validation.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/workspace.pbgrpc.dart';
 import 'package:queravue/core_client/core_launcher.dart';
 
@@ -142,6 +145,18 @@ class FakeCoreConnection implements CoreConnection {
   @override
   WorkspaceServiceClient get workspaceService =>
       throw UnimplementedError('use a fake WorkspaceRepository');
+
+  @override
+  IndexServiceClient get indexService =>
+      throw UnimplementedError('use a fake AdminRepository');
+
+  @override
+  StatsServiceClient get statsService =>
+      throw UnimplementedError('use a fake AdminRepository');
+
+  @override
+  ValidationServiceClient get validationService =>
+      throw UnimplementedError('use a fake AdminRepository');
 
   @override
   Future<void> close() async {
