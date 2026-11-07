@@ -71,7 +71,7 @@ The core reads and replaces a collection's validator (`ValidationService`, capab
 - The validator is parsed as relaxed EJSON, so plain numbers such as `"minimum": 0` are accepted.
 
 ## Limitations
-- No aggregation builder yet, and no index, statistics or validation screens yet (the core serves `IndexService`, `StatsService` and `ValidationService`, the UI comes later in iteration 7). The shell has no autocomplete yet.
+- No aggregation builder yet. The validation editor starts from the collection's current validator; it does not infer a schema from sample documents yet. The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 

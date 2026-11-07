@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/shortcuts.dart';
 import '../../connections/application/connection_session.dart';
+import '../../admin/presentation/admin_host.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
@@ -83,9 +84,17 @@ class Workspace extends ConsumerWidget {
                 t.isShell
                     ? ShellTabView(key: ValueKey(t.id), tab: t)
                     : t.isCollection
-                    ? DocumentTabView(key: ValueKey(t.id), tab: t)
+                    ? AdminHost(
+                        key: ValueKey(t.id),
+                        tab: t,
+                        child: DocumentTabView(tab: t),
+                      )
                     : t.isTable
-                    ? TableTabView(key: ValueKey(t.id), tab: t)
+                    ? AdminHost(
+                        key: ValueKey(t.id),
+                        tab: t,
+                        child: TableTabView(tab: t),
+                      )
                     : QueryTabView(key: ValueKey(t.id), tab: t),
             ],
           ),
