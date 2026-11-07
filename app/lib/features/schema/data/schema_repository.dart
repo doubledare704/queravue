@@ -183,6 +183,8 @@ class GrpcSchemaRepository implements SchemaRepository {
             referencedSchema: fk.referencedSchema,
             referencedTable: fk.referencedTable,
             referencedColumns: fk.referencedColumns,
+            onDelete: _action(fk.onDelete),
+            onUpdate: _action(fk.onUpdate),
           ),
         )
         .toList();
@@ -231,3 +233,15 @@ class GrpcSchemaRepository implements SchemaRepository {
     _ => ColumnKind.unknown,
   };
 }
+
+ReferentialAction _action(pb.ReferentialAction a) => switch (a) {
+  pb.ReferentialAction.REFERENTIAL_ACTION_NO_ACTION =>
+    ReferentialAction.noAction,
+  pb.ReferentialAction.REFERENTIAL_ACTION_RESTRICT =>
+    ReferentialAction.restrict,
+  pb.ReferentialAction.REFERENTIAL_ACTION_CASCADE => ReferentialAction.cascade,
+  pb.ReferentialAction.REFERENTIAL_ACTION_SET_NULL => ReferentialAction.setNull,
+  pb.ReferentialAction.REFERENTIAL_ACTION_SET_DEFAULT =>
+    ReferentialAction.setDefault,
+  _ => ReferentialAction.unspecified,
+};

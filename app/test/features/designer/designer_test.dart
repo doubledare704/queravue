@@ -27,6 +27,16 @@ class _OrdersSchema extends EmptySchemaRepository {
     tableRef: tableRef,
     type: SchemaObjectType.table,
     canEdit: true,
+    foreignKeys: const [
+      ForeignKeyDetails(
+        name: 'fk_cust',
+        columns: ['id'],
+        referencedSchema: 'public',
+        referencedTable: 'customers',
+        referencedColumns: ['id'],
+        onDelete: ReferentialAction.cascade,
+      ),
+    ],
     columns: const [
       ColumnDetails(
         name: 'id',
@@ -291,5 +301,151 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('ddl-destructive')), findsOneWidget);
     expect(find.text('Apply (destructive)'), findsOneWidget);
+  });
+
+  test('orders constraint drops first and new constraints last', () {
+    final original = TableDetails(
+      tableRef: const TableRef(table: 'orders'),
+      type: SchemaObjectType.table,
+      canEdit: true,
+      columns: const [
+        ColumnDetails(
+          name: 'id',
+          typeName: 'integer',
+          kind: ColumnKind.integer,
+          nullable: false,
+          isPrimaryKey: true,
+        ),
+      ],
+    );
+    final changes = diffDesign(
+      original: original,
+      columns: [
+        _col('id', 'integer', nullable: false),
+        const ColumnDraft(name: 'qty', typeName: 'int'),
+      ],
+      constraints: const ConstraintDrafts(
+        dropped: ['fk_old'],
+        uniques: [
+          UniqueDraft(columns: ['qty']),
+        ],
+        checks: [CheckDraft(expression: 'qty > 0')],
+        foreignKeys: [
+          ForeignKeyDraft(
+            columns: ['qty'],
+            referencedTable: 'q',
+            referencedColumns: ['id'],
+          ),
+        ],
+      ),
+    );
+    expect(changes.map((c) => c.runtimeType), [
+      DropConstraintChange,
+      AddColumnChange,
+      AddUniqueChange,
+      AddCheckChange,
+      AddForeignKeyChange,
+    ]);
+  });
+
+  testWidgets('stages a foreign key, a unique and a check constraint', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final (_, _, design) = await _open(tester);
+
+    await tester.ensureVisible(find.byKey(const Key('add-fk')));
+    await tester.tap(find.byKey(const Key('add-fk')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('fk-columns')), 'note');
+    await tester.enterText(find.byKey(const Key('fk-ref-table')), 'notes');
+    await tester.enterText(find.byKey(const Key('fk-ref-columns')), 'id');
+    await tester.tap(find.byKey(const Key('fk-on-delete')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('SET NULL').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('fk-save')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('(note) → notes (id)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('add-unique')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('unique-columns')), 'note');
+    await tester.tap(find.byKey(const Key('unique-save')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-check')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('check-expression')),
+      "note <> ''",
+    );
+    await tester.tap(find.byKey(const Key('check-save')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('designer-review')));
+    await tester.pumpAndSettle();
+    expect(design.previews.single.map((c) => c.runtimeType), [
+      AddUniqueChange,
+      AddCheckChange,
+      AddForeignKeyChange,
+    ]);
+    final fk = design.previews.single.last as AddForeignKeyChange;
+    expect(fk.foreignKey.onDelete, ReferentialAction.setNull);
+    expect(fk.foreignKey.referencedTable, 'notes');
+  });
+
+  testWidgets('an invalid foreign key is not staged', (tester) async {
+    await _open(tester);
+    await tester.ensureVisible(find.byKey(const Key('add-fk')));
+    await tester.tap(find.byKey(const Key('add-fk')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('fk-columns')), 'a, b');
+    await tester.enterText(find.byKey(const Key('fk-ref-table')), 't');
+    await tester.enterText(find.byKey(const Key('fk-ref-columns')), 'id');
+    await tester.tap(find.byKey(const Key('fk-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('fk-save')), findsOneWidget);
+  });
+
+  testWidgets('lists an existing foreign key and drops it', (tester) async {
+    final (_, _, design) = await _open(tester);
+    expect(find.textContaining('fk_cust'), findsOneWidget);
+    expect(find.textContaining('ON DELETE CASCADE'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('drop-fk-fk_cust')));
+    await tester.tap(find.byKey(const Key('drop-fk-fk_cust')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('keep-fk-fk_cust')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('designer-review')));
+    await tester.pumpAndSettle();
+    final sent = design.previews.single.single as DropConstraintChange;
+    expect(sent.name, 'fk_cust');
+  });
+
+  testWidgets('a new table carries its constraints in the create', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final (_, _, design) = await _open(tester, newTable: true);
+    await tester.enterText(
+      find.byKey(const Key('designer-table-name')),
+      'things',
+    );
+    await tester.ensureVisible(find.byKey(const Key('add-check')));
+    await tester.tap(find.byKey(const Key('add-check')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('check-expression')), 'id > 0');
+    await tester.tap(find.byKey(const Key('check-save')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('designer-review')));
+    await tester.pumpAndSettle();
+    final create = design.previews.single.single as CreateTableChange;
+    expect(create.constraints.checks.single.expression, 'id > 0');
   });
 }

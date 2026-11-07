@@ -111,6 +111,20 @@ class IndexDetails {
   final bool isPrimary;
 }
 
+/// What a foreign key does when the referenced row changes.
+enum ReferentialAction {
+  unspecified('default'),
+  noAction('NO ACTION'),
+  restrict('RESTRICT'),
+  cascade('CASCADE'),
+  setNull('SET NULL'),
+  setDefault('SET DEFAULT');
+
+  const ReferentialAction(this.label);
+
+  final String label;
+}
+
 /// Describes a foreign key constraint.
 @immutable
 class ForeignKeyDetails {
@@ -120,7 +134,12 @@ class ForeignKeyDetails {
     required this.referencedSchema,
     required this.referencedTable,
     required this.referencedColumns,
+    this.onDelete = ReferentialAction.unspecified,
+    this.onUpdate = ReferentialAction.unspecified,
   });
+
+  final ReferentialAction onDelete;
+  final ReferentialAction onUpdate;
 
   final String name;
   final List<String> columns;
