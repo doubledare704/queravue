@@ -683,12 +683,14 @@ class CreateIndexResponse extends $pb.GeneratedMessage {
     $core.bool? dryRun,
     $core.String? indexName,
     $2.AdminError? error,
+    $core.Iterable<$core.String>? warnings,
   }) {
     final result = create();
     if (statement != null) result.statement = statement;
     if (dryRun != null) result.dryRun = dryRun;
     if (indexName != null) result.indexName = indexName;
     if (error != null) result.error = error;
+    if (warnings != null) result.warnings.addAll(warnings);
     return result;
   }
 
@@ -710,6 +712,7 @@ class CreateIndexResponse extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'indexName')
     ..aOM<$2.AdminError>(4, _omitFieldNames ? '' : 'error',
         subBuilder: $2.AdminError.create)
+    ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -772,6 +775,10 @@ class CreateIndexResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(4);
   @$pb.TagNumber(4)
   $2.AdminError ensureError() => $_ensure(3);
+
+  /// Cautions about running the statement, for example that it blocks writes while the index builds.
+  @$pb.TagNumber(5)
+  $pb.PbList<$core.String> get warnings => $_getList(4);
 }
 
 /// DropIndexRequest asks to remove an index.

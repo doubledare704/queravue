@@ -113,6 +113,8 @@ func Serve(ctx context.Context, cfg Config) error {
 		defer shellSvc.Shutdown()
 		queravuev1.RegisterShellServiceServer(srv, shellSvc)
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
+		queravuev1.RegisterIndexServiceServer(srv, api.NewIndexService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log))
+		queravuev1.RegisterStatsServiceServer(srv, api.NewStatsService(cfg.Sessions))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

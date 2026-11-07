@@ -598,7 +598,9 @@ type CreateIndexResponse struct {
 	// Name the server gave the index; set after a real create.
 	IndexName string `protobuf:"bytes,3,opt,name=index_name,json=indexName,proto3" json:"index_name,omitempty"`
 	// Set when the call failed or was refused.
-	Error         *AdminError `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	Error *AdminError `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	// Cautions about running the statement, for example that it blocks writes while the index builds.
+	Warnings      []string `protobuf:"bytes,5,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -657,6 +659,13 @@ func (x *CreateIndexResponse) GetIndexName() string {
 func (x *CreateIndexResponse) GetError() *AdminError {
 	if x != nil {
 		return x.Error
+	}
+	return nil
+}
+
+func (x *CreateIndexResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
 	}
 	return nil
 }
@@ -857,13 +866,14 @@ const file_queravue_v1_index_proto_rawDesc = "" +
 	"\ttable_ref\x18\x02 \x01(\v2\x15.queravue.v1.TableRefR\btableRef\x12*\n" +
 	"\x04spec\x18\x03 \x01(\v2\x16.queravue.v1.IndexSpecR\x04spec\x12\x17\n" +
 	"\adry_run\x18\x04 \x01(\bR\x06dryRun\x12\x1c\n" +
-	"\tconfirmed\x18\x05 \x01(\bR\tconfirmed\"\x9a\x01\n" +
+	"\tconfirmed\x18\x05 \x01(\bR\tconfirmed\"\xb6\x01\n" +
 	"\x13CreateIndexResponse\x12\x1c\n" +
 	"\tstatement\x18\x01 \x01(\tR\tstatement\x12\x17\n" +
 	"\adry_run\x18\x02 \x01(\bR\x06dryRun\x12\x1d\n" +
 	"\n" +
 	"index_name\x18\x03 \x01(\tR\tindexName\x12-\n" +
-	"\x05error\x18\x04 \x01(\v2\x17.queravue.v1.AdminErrorR\x05error\"\xbb\x01\n" +
+	"\x05error\x18\x04 \x01(\v2\x17.queravue.v1.AdminErrorR\x05error\x12\x1a\n" +
+	"\bwarnings\x18\x05 \x03(\tR\bwarnings\"\xbb\x01\n" +
 	"\x10DropIndexRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x122\n" +

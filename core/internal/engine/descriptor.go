@@ -24,6 +24,10 @@ const (
 	CapDocumentStore Capability = "document_store"
 	// CapShell: ShellBackend (Iteration 6).
 	CapShell Capability = "shell"
+	// CapIndexManager: IndexManager (Iteration 7).
+	CapIndexManager Capability = "index_manager"
+	// CapStats: StatsProvider (Iteration 7).
+	CapStats Capability = "stats"
 )
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
@@ -34,6 +38,8 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapSchemaInspector: reflect.TypeFor[SchemaInspector](),
 	CapDocumentStore:   reflect.TypeFor[DocumentStore](),
 	CapShell:           reflect.TypeFor[ShellBackend](),
+	CapIndexManager:    reflect.TypeFor[IndexManager](),
+	CapStats:           reflect.TypeFor[StatsProvider](),
 }
 
 // FieldKind tells the UI which input widget to render.

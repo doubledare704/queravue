@@ -17,6 +17,9 @@ const (
 	codeUserNotFound         = 11
 	codeAtlasAuthFailed      = 8000
 	codeCommandOnView        = 166
+	codeCommandNotFound      = 59
+	codeCommandNotSupported  = 115
+	codeNotImplemented       = 238
 )
 
 // classify turns a driver error into a typed *engine.Error whose message is
@@ -58,8 +61,9 @@ func classify(op string, err error, secret engine.Secret) *engine.Error {
 		kind = engine.KindTimeout
 	case mongo.IsNetworkError(err):
 		kind = engine.KindNetwork
-	case errors.As(err, &cmd) && cmd.Code == codeCommandOnView:
-		kind = engine.KindUnsupported
+	case errors.As(err, &cmd) && (cmd.Code == codeCommandOnView || cmd.Code == codeCommandNotFound ||
+		cmd.Code == codeCommandNotSupported || cmd.Code == codeNotImplemented):
+		kind, msg = engine.KindUnsupported, cmd.Message
 	case mongo.IsDuplicateKeyError(err):
 		kind = engine.KindServer
 	default:
