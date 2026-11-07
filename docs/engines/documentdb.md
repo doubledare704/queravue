@@ -41,7 +41,7 @@ Run manually on 2026-11-06 with `make test-docdb` (smoke test `TestSmokeDocument
 |---|---|---|
 | DocumentDB Local `ghcr.io/documentdb/documentdb/documentdb-local:pg17-1.0.0`, arm64, username/password auth, TLS self-signed | 7.0.0 | pass |
 
-Verified: connect and ping with TLS and SCRAM credentials; `buildInfo`; insert of `Int32`, `Int64`, `Double` and `Date` values and find returning them type for type; filter, sort and projection; exact count; collection listing; replace with `expected_document`; field update with set and unset; conflict on a stale replace with the current document attached; delete; `$sample` (no fallback needed).
+Verified: connect and ping with TLS and SCRAM credentials; `buildInfo`; insert of `Int32`, `Int64`, `Double` and `Date` values and find returning them type for type; filter, sort and projection; exact count; collection listing; replace with `expected_document`; field update with set and unset; conflict on a stale replace with the current document attached; delete; `$sample` (no fallback needed); index create, list and drop, with `$indexStats` usage and per-index sizes, and `collStats` (DocumentDB Local 7.0.0).
 
 **Not verified:** Amazon DocumentDB (no AWS account used), `listDatabases` as a user without that privilege, large result streaming, retryable writes.
 

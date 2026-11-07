@@ -58,8 +58,14 @@ The shell runs mongosh-style JavaScript on an embedded goja runtime in the core 
 
 **Limits and cancel.** Cancelling interrupts the running script, including a tight loop, and the server operation in flight. A timeout per run is optional and off by default.
 
+## Indexes and statistics
+The core lists, creates and drops indexes (`IndexService`) and reports `collStats` figures (`StatsService`); see [ADR 0012](../adr/0012-indexes-and-stats.md).
+- **List:** `listIndexes` with key kinds (ascending, descending, hashed, text, 2dsphere), unique, the partial filter as canonical EJSON, and `sparse`, `expireAfterSeconds`, `hidden` and `collation` as options. Usage comes from `$indexStats` (operations and the time counting started) and sizes from `collStats.indexSizes`; either is shown as unavailable when the server rejects it.
+- **Create and drop** run `createIndexes` and `dropIndexes`. A dry run returns the same call as shell text. The `_id` index cannot be dropped. Dropping always needs confirmation; creating needs it on production connections.
+- **Statistics:** estimated documents, storage size, total index size, and extras (uncompressed size, average document size, index count, reusable storage). Servers that reject `collStats` return an `UNSUPPORTED` error (codes 59, 115 and 238), which the UI reports instead of failing.
+
 ## Limitations
-- No aggregation builder, index manager or schema validation editor yet (see ROADMAP). The shell has no autocomplete yet.
+- No aggregation builder or schema validation editor yet, and no index manager screen yet (the core serves `IndexService` and `StatsService`, the UI comes later in iteration 7). The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 

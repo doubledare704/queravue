@@ -293,6 +293,7 @@ const CreateIndexResponse$json = {
       '6': '.queravue.v1.AdminError',
       '10': 'error'
     },
+    {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
   ],
 };
 
@@ -300,7 +301,8 @@ const CreateIndexResponse$json = {
 final $typed_data.Uint8List createIndexResponseDescriptor = $convert.base64Decode(
     'ChNDcmVhdGVJbmRleFJlc3BvbnNlEhwKCXN0YXRlbWVudBgBIAEoCVIJc3RhdGVtZW50EhcKB2'
     'RyeV9ydW4YAiABKAhSBmRyeVJ1bhIdCgppbmRleF9uYW1lGAMgASgJUglpbmRleE5hbWUSLQoF'
-    'ZXJyb3IYBCABKAsyFy5xdWVyYXZ1ZS52MS5BZG1pbkVycm9yUgVlcnJvcg==');
+    'ZXJyb3IYBCABKAsyFy5xdWVyYXZ1ZS52MS5BZG1pbkVycm9yUgVlcnJvchIaCgh3YXJuaW5ncx'
+    'gFIAMoCVIId2FybmluZ3M=');
 
 @$core.Deprecated('Use dropIndexRequestDescriptor instead')
 const DropIndexRequest$json = {

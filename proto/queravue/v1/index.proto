@@ -131,6 +131,8 @@ message CreateIndexResponse {
   string index_name = 3;
   // Set when the call failed or was refused.
   AdminError error = 4;
+  // Cautions about running the statement, for example that it blocks writes while the index builds.
+  repeated string warnings = 5;
 }
 
 // DropIndexRequest asks to remove an index.

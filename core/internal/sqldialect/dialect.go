@@ -52,6 +52,11 @@ type Dialect interface {
 	FormatLiteral(v engine.Value) string
 	// Lexer is the sqlsplit lexer for this family.
 	Lexer() sqlsplit.Dialect
+	// CreateIndex renders CREATE INDEX for spec, with cautions to show before
+	// running it. It fails when the family cannot express the spec.
+	CreateIndex(database, schema, table string, spec engine.IndexSpec) (sql string, warnings []string, err error)
+	// DropIndex renders DROP INDEX.
+	DropIndex(database, schema, table, name string) string
 }
 
 // Provider is implemented by a Conn whose engine speaks SQL.

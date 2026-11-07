@@ -136,6 +136,36 @@ func smoke(t *testing.T, envVar string, v Variant) {
 	}
 	t.Logf("sample fields: %d fields, sampled %d, fallback=%v", len(fs.Fields), fs.Sampled, fs.UsedFallback)
 
+	// 5. Indexes and stats. Listing and creating must work; usage and
+	// collStats may be rejected, which must surface as an unsupported error.
+	if _, _, err := c.CreateIndex(ctx, db, "", coll, engine.IndexSpec{Name: "smoke_name", Keys: []engine.IndexKey{{Name: "name"}}}, false); err != nil {
+		t.Fatalf("create index: %v", err)
+	}
+	indexes, err := c.ListIndexes(ctx, db, "", coll)
+	if err != nil {
+		t.Fatalf("list indexes: %v", err)
+	}
+	var created *engine.IndexInfo
+	for i := range indexes {
+		if indexes[i].Spec.Name == "smoke_name" {
+			created = &indexes[i]
+		}
+	}
+	if created == nil {
+		t.Fatalf("smoke_name missing from %d listed indexes", len(indexes))
+	}
+	t.Logf("index usage available=%v, size reported=%v", created.Usage.Available, created.SizeBytes != nil)
+	if _, err := c.TableStats(ctx, db, "", coll); err != nil {
+		var se *engine.Error
+		if !errors.As(err, &se) || se.Kind != engine.KindUnsupported {
+			t.Fatalf("collStats = %v, want success or an unsupported error", err)
+		}
+		t.Logf("collStats unsupported: %v", err)
+	}
+	if _, err := c.DropIndex(ctx, db, "", coll, "smoke_name", false); err != nil {
+		t.Fatalf("drop index: %v", err)
+	}
+
 	if n, err := c.Delete(ctx, db, coll, ids, engine.WriteOptions{}); err != nil || n != 2 {
 		t.Fatalf("delete = %d, %v", n, err)
 	}

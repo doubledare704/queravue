@@ -61,7 +61,7 @@ func New() *Engine {
 			{Key: ParamEncrypt, Label: "Encryption", Kind: engine.FieldSelect, Default: "required", Options: EncryptModes},
 			{Key: ParamTrust, Label: "Trust server certificate", Kind: engine.FieldBoolean, Default: "false"},
 		},
-		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector},
+		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats},
 	}}
 }
 
