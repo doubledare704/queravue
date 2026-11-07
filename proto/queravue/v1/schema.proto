@@ -81,6 +81,10 @@ message ColumnDetails {
   bool is_primary_key = 6;
   // 1-based order within a composite primary key; 0 if not a primary key.
   uint32 primary_key_order = 7;
+  // True for an auto-generated value (identity, serial, auto_increment).
+  bool identity = 8;
+  // Collation name, when the column has one that differs from the table default.
+  optional string collation = 9;
 }
 
 // IndexDetails describes an index on a table.
@@ -107,6 +111,26 @@ message ForeignKeyDetails {
   string referenced_table = 4;
   // Referenced column names in the target table.
   repeated string referenced_columns = 5;
+  // Action when a referenced row is deleted.
+  ReferentialAction on_delete = 6;
+  // Action when a referenced key is updated.
+  ReferentialAction on_update = 7;
+}
+
+// ReferentialAction is what a foreign key does when the referenced row changes.
+enum ReferentialAction {
+  // Unknown or the engine default.
+  REFERENTIAL_ACTION_UNSPECIFIED = 0;
+  // Reject the change at the end of the statement.
+  REFERENTIAL_ACTION_NO_ACTION = 1;
+  // Reject the change immediately.
+  REFERENTIAL_ACTION_RESTRICT = 2;
+  // Apply the same change to the referencing rows.
+  REFERENTIAL_ACTION_CASCADE = 3;
+  // Set the referencing columns to NULL.
+  REFERENTIAL_ACTION_SET_NULL = 4;
+  // Set the referencing columns to their defaults.
+  REFERENTIAL_ACTION_SET_DEFAULT = 5;
 }
 
 // ListDatabasesRequest selects the session to inspect.

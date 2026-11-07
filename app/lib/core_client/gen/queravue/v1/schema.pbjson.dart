@@ -36,6 +36,27 @@ final $typed_data.Uint8List schemaObjectTypeDescriptor = $convert.base64Decode(
     '9CSkVDVF9UWVBFX0NPTExFQ1RJT04QBBIiCh5TQ0hFTUFfT0JKRUNUX1RZUEVfVElNRV9TRVJJ'
     'RVMQBQ==');
 
+@$core.Deprecated('Use referentialActionDescriptor instead')
+const ReferentialAction$json = {
+  '1': 'ReferentialAction',
+  '2': [
+    {'1': 'REFERENTIAL_ACTION_UNSPECIFIED', '2': 0},
+    {'1': 'REFERENTIAL_ACTION_NO_ACTION', '2': 1},
+    {'1': 'REFERENTIAL_ACTION_RESTRICT', '2': 2},
+    {'1': 'REFERENTIAL_ACTION_CASCADE', '2': 3},
+    {'1': 'REFERENTIAL_ACTION_SET_NULL', '2': 4},
+    {'1': 'REFERENTIAL_ACTION_SET_DEFAULT', '2': 5},
+  ],
+};
+
+/// Descriptor for `ReferentialAction`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List referentialActionDescriptor = $convert.base64Decode(
+    'ChFSZWZlcmVudGlhbEFjdGlvbhIiCh5SRUZFUkVOVElBTF9BQ1RJT05fVU5TUEVDSUZJRUQQAB'
+    'IgChxSRUZFUkVOVElBTF9BQ1RJT05fTk9fQUNUSU9OEAESHwobUkVGRVJFTlRJQUxfQUNUSU9O'
+    'X1JFU1RSSUNUEAISHgoaUkVGRVJFTlRJQUxfQUNUSU9OX0NBU0NBREUQAxIfChtSRUZFUkVOVE'
+    'lBTF9BQ1RJT05fU0VUX05VTEwQBBIiCh5SRUZFUkVOVElBTF9BQ1RJT05fU0VUX0RFRkFVTFQQ'
+    'BQ==');
+
 @$core.Deprecated('Use tableRefDescriptor instead')
 const TableRef$json = {
   '1': 'TableRef',
@@ -115,9 +136,20 @@ const ColumnDetails$json = {
       '5': 13,
       '10': 'primaryKeyOrder'
     },
+    {'1': 'identity', '3': 8, '4': 1, '5': 8, '10': 'identity'},
+    {
+      '1': 'collation',
+      '3': 9,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'collation',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_default_value'},
+    {'1': '_collation'},
   ],
 };
 
@@ -127,8 +159,9 @@ final $typed_data.Uint8List columnDetailsDescriptor = $convert.base64Decode(
     'h0eXBlTmFtZRIqCgRraW5kGAMgASgOMhYucXVlcmF2dWUudjEuVmFsdWVLaW5kUgRraW5kEhoK'
     'CG51bGxhYmxlGAQgASgIUghudWxsYWJsZRIoCg1kZWZhdWx0X3ZhbHVlGAUgASgJSABSDGRlZm'
     'F1bHRWYWx1ZYgBARIkCg5pc19wcmltYXJ5X2tleRgGIAEoCFIMaXNQcmltYXJ5S2V5EioKEXBy'
-    'aW1hcnlfa2V5X29yZGVyGAcgASgNUg9wcmltYXJ5S2V5T3JkZXJCEAoOX2RlZmF1bHRfdmFsdW'
-    'U=');
+    'aW1hcnlfa2V5X29yZGVyGAcgASgNUg9wcmltYXJ5S2V5T3JkZXISGgoIaWRlbnRpdHkYCCABKA'
+    'hSCGlkZW50aXR5EiEKCWNvbGxhdGlvbhgJIAEoCUgBUgljb2xsYXRpb26IAQFCEAoOX2RlZmF1'
+    'bHRfdmFsdWVCDAoKX2NvbGxhdGlvbg==');
 
 @$core.Deprecated('Use indexDetailsDescriptor instead')
 const IndexDetails$json = {
@@ -168,6 +201,22 @@ const ForeignKeyDetails$json = {
       '5': 9,
       '10': 'referencedColumns'
     },
+    {
+      '1': 'on_delete',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.ReferentialAction',
+      '10': 'onDelete'
+    },
+    {
+      '1': 'on_update',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.ReferentialAction',
+      '10': 'onUpdate'
+    },
   ],
 };
 
@@ -176,7 +225,9 @@ final $typed_data.Uint8List foreignKeyDetailsDescriptor = $convert.base64Decode(
     'ChFGb3JlaWduS2V5RGV0YWlscxISCgRuYW1lGAEgASgJUgRuYW1lEhgKB2NvbHVtbnMYAiADKA'
     'lSB2NvbHVtbnMSKwoRcmVmZXJlbmNlZF9zY2hlbWEYAyABKAlSEHJlZmVyZW5jZWRTY2hlbWES'
     'KQoQcmVmZXJlbmNlZF90YWJsZRgEIAEoCVIPcmVmZXJlbmNlZFRhYmxlEi0KEnJlZmVyZW5jZW'
-    'RfY29sdW1ucxgFIAMoCVIRcmVmZXJlbmNlZENvbHVtbnM=');
+    'RfY29sdW1ucxgFIAMoCVIRcmVmZXJlbmNlZENvbHVtbnMSOwoJb25fZGVsZXRlGAYgASgOMh4u'
+    'cXVlcmF2dWUudjEuUmVmZXJlbnRpYWxBY3Rpb25SCG9uRGVsZXRlEjsKCW9uX3VwZGF0ZRgHIA'
+    'EoDjIeLnF1ZXJhdnVlLnYxLlJlZmVyZW50aWFsQWN0aW9uUghvblVwZGF0ZQ==');
 
 @$core.Deprecated('Use listDatabasesRequestDescriptor instead')
 const ListDatabasesRequest$json = {

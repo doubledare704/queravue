@@ -1,0 +1,253 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/index.proto";
+import "queravue/v1/schema.proto";
+
+// SchemaDesignService turns structured table changes into dialect-specific DDL
+// and runs it. The UI always previews first. It is offered only on connections
+// that can execute SQL and report the schema_inspector capability.
+service SchemaDesignService {
+  // PreviewDDL builds the statements for the changes without running anything.
+  rpc PreviewDDL(PreviewDDLRequest) returns (PreviewDDLResponse);
+
+  // ApplyDDL builds and runs the statements, in one transaction where the
+  // engine's DDL is transactional, and refreshes the schema cache.
+  rpc ApplyDDL(ApplyDDLRequest) returns (ApplyDDLResponse);
+}
+
+// ColumnSpec defines a column.
+message ColumnSpec {
+  // Column name.
+  string name = 1;
+  // Native type including length or precision, for example "varchar(255)" or "numeric(10,2)".
+  string type_name = 2;
+  // True if the column allows NULL.
+  bool nullable = 3;
+  // Default expression as SQL text; unset for none.
+  optional string default_expression = 4;
+  // True for an auto-generated value (identity, serial, auto_increment).
+  bool identity = 5;
+  // Collation name; unset for the server default.
+  optional string collation = 6;
+}
+
+// ForeignKeySpec defines a foreign key.
+message ForeignKeySpec {
+  // Constraint name; empty lets the server choose.
+  string name = 1;
+  // Columns in this table.
+  repeated string columns = 2;
+  // Referenced table.
+  TableRef referenced_table = 3;
+  // Columns in the referenced table.
+  repeated string referenced_columns = 4;
+  // Action when a referenced row is deleted.
+  ReferentialAction on_delete = 5;
+  // Action when a referenced key is updated.
+  ReferentialAction on_update = 6;
+}
+
+// UniqueSpec defines a unique constraint.
+message UniqueSpec {
+  // Constraint name; empty lets the server choose.
+  string name = 1;
+  // Columns in order.
+  repeated string columns = 2;
+}
+
+// CheckSpec defines a check constraint.
+message CheckSpec {
+  // Constraint name; empty lets the server choose.
+  string name = 1;
+  // Boolean SQL expression.
+  string expression = 2;
+}
+
+// TableDesign is the full definition of a new table. Its name comes from the request's table_ref.
+message TableDesign {
+  // Columns in order.
+  repeated ColumnSpec columns = 1;
+  // Primary key constraint name; empty lets the server choose.
+  string primary_key_name = 2;
+  // Primary key columns in order; empty for none.
+  repeated string primary_key_columns = 3;
+  // Unique constraints.
+  repeated UniqueSpec uniques = 4;
+  // Check constraints.
+  repeated CheckSpec checks = 5;
+  // Foreign keys.
+  repeated ForeignKeySpec foreign_keys = 6;
+  // Secondary indexes, created after the table.
+  repeated IndexSpec indexes = 7;
+}
+
+// CreateTable creates the table named by the request's table_ref.
+message CreateTable {
+  // Definition.
+  TableDesign design = 1;
+}
+
+// DropTable drops the table named by the request's table_ref.
+message DropTable {}
+
+// RenameTable renames the table.
+message RenameTable {
+  // New table name, in the same schema.
+  string new_name = 1;
+}
+
+// AddColumn adds a column.
+message AddColumn {
+  // Column definition.
+  ColumnSpec column = 1;
+}
+
+// DropColumn drops a column.
+message DropColumn {
+  // Column name.
+  string name = 1;
+}
+
+// RenameColumn renames a column.
+message RenameColumn {
+  // Current name.
+  string from = 1;
+  // New name.
+  string to = 2;
+}
+
+// AlterColumn changes a column's type, nullability, default or collation.
+message AlterColumn {
+  // Definition as it is now.
+  ColumnSpec before = 1;
+  // Definition wanted; the builder emits only what differs.
+  ColumnSpec after = 2;
+}
+
+// AddForeignKey adds a foreign key.
+message AddForeignKey {
+  // Definition.
+  ForeignKeySpec foreign_key = 1;
+}
+
+// AddUnique adds a unique constraint.
+message AddUnique {
+  // Definition.
+  UniqueSpec unique = 1;
+}
+
+// AddCheck adds a check constraint.
+message AddCheck {
+  // Definition.
+  CheckSpec check = 1;
+}
+
+// DropConstraint drops a foreign key, unique or check constraint by name.
+message DropConstraint {
+  // Constraint name.
+  string name = 1;
+}
+
+// AddIndex adds a secondary index.
+message AddIndex {
+  // Definition.
+  IndexSpec index = 1;
+}
+
+// DropIndexChange drops a secondary index.
+message DropIndexChange {
+  // Index name.
+  string name = 1;
+}
+
+// SchemaChange is one step of a design, applied in the order sent.
+message SchemaChange {
+  // The step.
+  oneof change {
+    // Create the table.
+    CreateTable create_table = 1;
+    // Drop the table.
+    DropTable drop_table = 2;
+    // Rename the table.
+    RenameTable rename_table = 3;
+    // Add a column.
+    AddColumn add_column = 4;
+    // Drop a column.
+    DropColumn drop_column = 5;
+    // Rename a column.
+    RenameColumn rename_column = 6;
+    // Alter a column.
+    AlterColumn alter_column = 7;
+    // Add a foreign key.
+    AddForeignKey add_foreign_key = 8;
+    // Add a unique constraint.
+    AddUnique add_unique = 9;
+    // Add a check constraint.
+    AddCheck add_check = 10;
+    // Drop a constraint by name.
+    DropConstraint drop_constraint = 11;
+    // Add an index.
+    AddIndex add_index = 12;
+    // Drop an index.
+    DropIndexChange drop_index = 13;
+  }
+}
+
+// DdlStatement is one statement of the generated script.
+message DdlStatement {
+  // SQL text, ending with a semicolon.
+  string sql = 1;
+  // True if the statement can lose data or structure (drop, type narrowing); needs confirmed=true.
+  bool destructive = 2;
+  // Short description for the preview list, for example "Add column email".
+  string summary = 3;
+}
+
+// PreviewDDLRequest asks what DDL the changes produce.
+message PreviewDDLRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Target table (the new table's name for CreateTable).
+  TableRef table_ref = 2;
+  // Steps in order.
+  repeated SchemaChange changes = 3;
+}
+
+// PreviewDDLResponse lists the statements and warnings.
+message PreviewDDLResponse {
+  // Statements in execution order.
+  repeated DdlStatement statements = 1;
+  // Cautions, for example that the engine commits DDL implicitly or that an alter needs a table rebuild.
+  repeated string warnings = 2;
+  // True if the engine runs these statements in one rollback-able transaction.
+  bool transactional = 3;
+  // Set when the changes cannot be turned into DDL for this engine.
+  AdminError error = 4;
+}
+
+// ApplyDDLRequest asks to run the DDL for the changes.
+message ApplyDDLRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Target table.
+  TableRef table_ref = 2;
+  // Steps in order.
+  repeated SchemaChange changes = 3;
+  // Required when any statement is destructive, and always on connections flagged production.
+  bool confirmed = 4;
+}
+
+// ApplyDDLResponse reports what ran.
+message ApplyDDLResponse {
+  // The statements that were run, in order.
+  repeated DdlStatement statements = 1;
+  // How many statements completed. Less than the list length means the run stopped on error; on engines that commit DDL implicitly those statements stay applied.
+  uint32 executed_statements = 2;
+  // True if the run was one rollback-able transaction.
+  bool transactional = 3;
+  // Set when the call failed or was refused.
+  AdminError error = 4;
+}

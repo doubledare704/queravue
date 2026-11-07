@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/schema.proto";
+
+// ValidationService reads and changes the Mongo collection validator
+// ($jsonSchema). The UI offers it only when the connection reports the
+// validation capability.
+service ValidationService {
+  // GetValidation returns the collection's current validator, level and action.
+  rpc GetValidation(GetValidationRequest) returns (GetValidationResponse);
+
+  // SetValidation replaces the validator (collMod). An empty validator removes
+  // it. With dry_run it only returns the command.
+  rpc SetValidation(SetValidationRequest) returns (SetValidationResponse);
+}
+
+// ValidationLevel says which writes the validator applies to.
+enum ValidationLevel {
+  // Unspecified. On set, keeps the server default (strict).
+  VALIDATION_LEVEL_UNSPECIFIED = 0;
+  // Validation is off.
+  VALIDATION_LEVEL_OFF = 1;
+  // Applies to inserts and to updates of documents that already satisfy the validator.
+  VALIDATION_LEVEL_MODERATE = 2;
+  // Applies to all inserts and updates.
+  VALIDATION_LEVEL_STRICT = 3;
+}
+
+// ValidationAction says what happens to a document that fails validation.
+enum ValidationAction {
+  // Unspecified. On set, keeps the server default (error).
+  VALIDATION_ACTION_UNSPECIFIED = 0;
+  // Reject the write.
+  VALIDATION_ACTION_ERROR = 1;
+  // Accept the write and log a warning on the server.
+  VALIDATION_ACTION_WARN = 2;
+}
+
+// ValidationRule is a collection's validation settings.
+message ValidationRule {
+  // Validator document as canonical Extended JSON, for example {"$jsonSchema": {...}}. Empty means none.
+  string validator = 1;
+  // Which writes are validated.
+  ValidationLevel level = 2;
+  // What happens on failure.
+  ValidationAction action = 3;
+}
+
+// GetValidationRequest selects the collection.
+message GetValidationRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Collection (database + table as collection, schema empty).
+  TableRef table_ref = 2;
+}
+
+// GetValidationResponse carries the rule or an error.
+message GetValidationResponse {
+  // Current rule; validator is empty when none is set.
+  ValidationRule rule = 1;
+  // Set when the call failed, for example UNSUPPORTED on a server without validators.
+  AdminError error = 2;
+}
+
+// SetValidationRequest replaces the validation rule.
+message SetValidationRequest {
+  // Session id from SessionService.
+  string session_id = 1;
+  // Collection.
+  TableRef table_ref = 2;
+  // New rule. An empty validator removes the current one.
+  ValidationRule rule = 3;
+  // If true, validates the rule and returns the command without running it.
+  bool dry_run = 4;
+  // Required on connections flagged production.
+  bool confirmed = 5;
+}
+
+// SetValidationResponse reports the command and outcome.
+message SetValidationResponse {
+  // The collMod command as shell text that ran (or would run on dry_run).
+  string command = 1;
+  // True if nothing was executed.
+  bool dry_run = 2;
+  // Set when the call failed or was refused; INVALID errors carry a position into rule.validator.
+  AdminError error = 3;
+}

@@ -62,5 +62,54 @@ class SchemaObjectType extends $pb.ProtobufEnum {
   const SchemaObjectType._(super.value, super.name);
 }
 
+/// ReferentialAction is what a foreign key does when the referenced row changes.
+class ReferentialAction extends $pb.ProtobufEnum {
+  /// Unknown or the engine default.
+  static const ReferentialAction REFERENTIAL_ACTION_UNSPECIFIED =
+      ReferentialAction._(
+          0, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_UNSPECIFIED');
+
+  /// Reject the change at the end of the statement.
+  static const ReferentialAction REFERENTIAL_ACTION_NO_ACTION =
+      ReferentialAction._(
+          1, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_NO_ACTION');
+
+  /// Reject the change immediately.
+  static const ReferentialAction REFERENTIAL_ACTION_RESTRICT =
+      ReferentialAction._(
+          2, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_RESTRICT');
+
+  /// Apply the same change to the referencing rows.
+  static const ReferentialAction REFERENTIAL_ACTION_CASCADE =
+      ReferentialAction._(
+          3, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_CASCADE');
+
+  /// Set the referencing columns to NULL.
+  static const ReferentialAction REFERENTIAL_ACTION_SET_NULL =
+      ReferentialAction._(
+          4, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_SET_NULL');
+
+  /// Set the referencing columns to their defaults.
+  static const ReferentialAction REFERENTIAL_ACTION_SET_DEFAULT =
+      ReferentialAction._(
+          5, _omitEnumNames ? '' : 'REFERENTIAL_ACTION_SET_DEFAULT');
+
+  static const $core.List<ReferentialAction> values = <ReferentialAction>[
+    REFERENTIAL_ACTION_UNSPECIFIED,
+    REFERENTIAL_ACTION_NO_ACTION,
+    REFERENTIAL_ACTION_RESTRICT,
+    REFERENTIAL_ACTION_CASCADE,
+    REFERENTIAL_ACTION_SET_NULL,
+    REFERENTIAL_ACTION_SET_DEFAULT,
+  ];
+
+  static final $core.List<ReferentialAction?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static ReferentialAction? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ReferentialAction._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');
