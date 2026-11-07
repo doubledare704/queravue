@@ -23,7 +23,7 @@ The UI sends `SchemaChange` steps (`create_table`, `drop_table`, `rename_table`,
 `AlterColumn` carries `before` and `after`, and the builder emits only what differs, so the preview shows the real change.
 
 ### 3. Operations an engine cannot do
-SQLite cannot alter most column properties or drop constraints in place. The builder emits the documented rebuild recipe (create new table, copy rows, drop old, rename, recreate indexes) only for column changes, in one transaction, with a warning that rows are copied. For anything else it returns `UNSUPPORTED` with the reason. Engines never get a silent, partial translation.
+The builder returns `UNSUPPORTED` with the reason instead of a partial translation. On SQLite that covers altering a column, adding a foreign key, unique or check constraint to an existing table, and dropping a constraint. The documented rebuild recipe (create new table, copy rows, drop old, rename) is deferred: SQLite does not expose inline `CHECK` and `UNIQUE` constraints, so a rebuild could silently lose them. Other engines reject what they cannot do themselves: SQL Server default changes need the default's constraint name (`UNSUPPORTED`), MySQL has no `SET DEFAULT` for foreign keys, SQL Server has no `RESTRICT`, and PostgreSQL and SQL Server cannot toggle identity in place.
 
 ### 4. Preview, apply, transactions
 - `PreviewDDL` returns the exact statements and warnings, and runs nothing.
@@ -31,11 +31,11 @@ SQLite cannot alter most column properties or drop constraints in place. The bui
 - DDL transactionality differs, and the response says which applies (`transactional`):
   - PostgreSQL, SQL Server and SQLite: one transaction; an error rolls everything back.
   - MySQL, MariaDB and TiDB: DDL commits implicitly. A warning is shown in the preview and `executed_statements` tells the UI how far a failed run got.
-  - CockroachDB: schema changes in one explicit transaction are limited; statements run one at a time with the same partial-run reporting.
+  - CockroachDB: schema changes in one explicit transaction are limited; statements run one at a time with the same partial-run reporting. A `Conn` whose DDL transactionality differs from its dialect's says so through `TransactionalDDL()` (`api.DDLTransactionality`).
 - After a successful apply the schema cache is invalidated for the table (`schema.Cache.Invalidate`), and each statement is recorded in the history.
 
 ### 5. Safety
-- `confirmed=true` is required on connections flagged production for every apply, and on any connection when a statement is `destructive` (drop table, drop column, drop constraint or index, and a type change that can narrow data). The preview lists destructive statements first.
+- `confirmed=true` is required on connections flagged production for every apply, and on any connection when a statement is `destructive` (drop table, drop column, drop constraint or index, and a type change that can narrow data). Statements keep the order of the changes; each carries its `destructive` flag so the preview can mark them.
 - Without confirmation the core refuses with `CONFIRMATION_REQUIRED` and changes nothing.
 - The table designer is offered only on connections that can execute SQL and inspect schema.
 
@@ -56,5 +56,5 @@ Additive only, no renumbering: `ColumnDetails.identity`, `ColumnDetails.collatio
 ## Consequences
 - One golden test suite per dialect pins the generated DDL; enginetest apply-and-describe checks that the server accepts it and reports the result back.
 - MySQL-family users can end up with a partly applied script after a failure; the UI states this up front in the preview and after a failed run.
-- SQLite alters are intentionally narrower than other engines.
+- SQLite alters are intentionally narrower than other engines; column changes beyond add, drop and rename are reported as unsupported.
 - The designer models columns, keys, unique and check constraints and indexes. Triggers, partitions, table options and engine-specific storage settings are not designed here; users run them in the SQL editor.

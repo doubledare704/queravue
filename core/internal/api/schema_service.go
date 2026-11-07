@@ -205,6 +205,8 @@ func toProtoTableDetails(td engine.TableDetails, ref *queravuev1.TableRef) *quer
 			DefaultValue:    c.DefaultValue,
 			IsPrimaryKey:    c.IsPrimaryKey,
 			PrimaryKeyOrder: uint32(c.PrimaryKeyOrder), //nolint:gosec // order is non-negative
+			Identity:        c.Identity,
+			Collation:       c.Collation,
 		}
 	}
 
@@ -226,6 +228,8 @@ func toProtoTableDetails(td engine.TableDetails, ref *queravuev1.TableRef) *quer
 			ReferencedSchema:  fk.ReferencedSchema,
 			ReferencedTable:   fk.ReferencedTable,
 			ReferencedColumns: fk.ReferencedColumns,
+			OnDelete:          referentialActionToProto(fk.OnDelete),
+			OnUpdate:          referentialActionToProto(fk.OnUpdate),
 		}
 	}
 
@@ -239,4 +243,40 @@ func toProtoTableDetails(td engine.TableDetails, ref *queravuev1.TableRef) *quer
 		CanEdit:            td.CanEdit,
 		EditDisabledReason: td.EditDisabledReason,
 	}
+}
+
+func referentialActionToProto(a engine.ReferentialAction) queravuev1.ReferentialAction {
+	switch a {
+	case engine.ReferentialNoAction:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_NO_ACTION
+	case engine.ReferentialRestrict:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_RESTRICT
+	case engine.ReferentialCascade:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_CASCADE
+	case engine.ReferentialSetNull:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_SET_NULL
+	case engine.ReferentialSetDefault:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_SET_DEFAULT
+	case engine.ReferentialDefault:
+		return queravuev1.ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED
+	}
+	return queravuev1.ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED
+}
+
+func referentialActionFromProto(a queravuev1.ReferentialAction) engine.ReferentialAction {
+	switch a {
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_NO_ACTION:
+		return engine.ReferentialNoAction
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_RESTRICT:
+		return engine.ReferentialRestrict
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_CASCADE:
+		return engine.ReferentialCascade
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_SET_NULL:
+		return engine.ReferentialSetNull
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_SET_DEFAULT:
+		return engine.ReferentialSetDefault
+	case queravuev1.ReferentialAction_REFERENTIAL_ACTION_UNSPECIFIED:
+		return engine.ReferentialDefault
+	}
+	return engine.ReferentialDefault
 }

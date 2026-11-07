@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"strings"
 )
 
 // ObjectType classifies a database object.
@@ -38,7 +39,22 @@ type ColumnDef struct {
 	DefaultValue    *string
 	IsPrimaryKey    bool
 	PrimaryKeyOrder int // 1-based position in composite primary key; 0 if not PK
+	Identity        bool
+	Collation       *string
 }
+
+// ReferentialAction is what a foreign key does when the referenced row changes.
+type ReferentialAction int
+
+// Referential actions; ReferentialDefault means unknown or the engine default.
+const (
+	ReferentialDefault ReferentialAction = iota
+	ReferentialNoAction
+	ReferentialRestrict
+	ReferentialCascade
+	ReferentialSetNull
+	ReferentialSetDefault
+)
 
 // IndexDef describes an index on a table.
 type IndexDef struct {
@@ -55,6 +71,8 @@ type ForeignKeyDef struct {
 	ReferencedSchema  string
 	ReferencedTable   string
 	ReferencedColumns []string
+	OnDelete          ReferentialAction
+	OnUpdate          ReferentialAction
 }
 
 // TableDetails contains comprehensive schema metadata for a single table.
@@ -82,4 +100,21 @@ type SchemaInspector interface {
 	ListObjects(ctx context.Context, database, schema string) ([]SchemaObject, error)
 	// DescribeTable returns full column, index, and foreign key definitions for a table.
 	DescribeTable(ctx context.Context, database, schema, table string) (TableDetails, error)
+}
+
+// ParseReferentialAction reads the action text servers report, such as "SET NULL" or "SET_NULL".
+func ParseReferentialAction(text string) ReferentialAction {
+	switch strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(text), "_", " ")) {
+	case "NO ACTION":
+		return ReferentialNoAction
+	case "RESTRICT":
+		return ReferentialRestrict
+	case "CASCADE":
+		return ReferentialCascade
+	case "SET NULL":
+		return ReferentialSetNull
+	case "SET DEFAULT":
+		return ReferentialSetDefault
+	}
+	return ReferentialDefault
 }

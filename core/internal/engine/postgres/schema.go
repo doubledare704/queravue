@@ -198,7 +198,10 @@ WHERE n.nspname = $1 AND c.relname = $2;`
        NOT a.attnotnull AS is_nullable,
        pg_get_expr(ad.adbin, ad.adrelid) AS default_val,
        COALESCE(i.indisprimary AND (a.attnum = ANY(i.indkey)), false) AS is_pk,
-       COALESCE(array_position(i.indkey, a.attnum), 0) AS pk_pos
+       COALESCE(array_position(i.indkey, a.attnum), 0) AS pk_pos,
+       COALESCE(a.attidentity::text, '') <> '' AS is_identity,
+       CASE WHEN a.attcollation <> 0 AND a.attcollation <> t.typcollation
+            THEN (SELECT collname FROM pg_collation WHERE oid = a.attcollation) END AS collation
 FROM pg_attribute a
 JOIN pg_type t ON t.oid = a.atttypid
 LEFT JOIN pg_attrdef ad ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
@@ -234,8 +237,10 @@ ORDER BY a.attnum;`
 		var nullable, isPK bool
 		var defaultVal *string
 		var pkPos int
+		var identity bool
+		var collation *string
 
-		if err := colRows.Scan(&name, &fullType, &rawType, &typeOID, &nullable, &defaultVal, &isPK, &pkPos); err != nil {
+		if err := colRows.Scan(&name, &fullType, &rawType, &typeOID, &nullable, &defaultVal, &isPK, &pkPos, &identity, &collation); err != nil {
 			return details, c.execError(ctx, err)
 		}
 
@@ -254,6 +259,8 @@ ORDER BY a.attnum;`
 			DefaultValue:    defaultVal,
 			IsPrimaryKey:    isPK,
 			PrimaryKeyOrder: pkPos,
+			Identity:        identity,
+			Collation:       collation,
 		})
 	}
 	if err := colRows.Err(); err != nil {
@@ -310,7 +317,8 @@ ORDER BY c2.relname;`
          FROM unnest(con.confkey) WITH ORDINALITY AS u(attnum, ord)
          JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = u.attnum
          ORDER BY u.ord
-       ) AS ref_cols
+       ) AS ref_cols,
+       con.confdeltype::text, con.confupdtype::text
 FROM pg_constraint con
 JOIN pg_class ref_cl ON ref_cl.oid = con.confrelid
 JOIN pg_namespace ref_ns ON ref_ns.oid = ref_cl.relnamespace
@@ -323,13 +331,16 @@ ORDER BY con.conname;`
 		for fkRows.Next() {
 			var name, refSchema, refTable string
 			var srcCols, refCols []string
-			if err := fkRows.Scan(&name, &srcCols, &refSchema, &refTable, &refCols); err == nil {
+			var onDelete, onUpdate string
+			if err := fkRows.Scan(&name, &srcCols, &refSchema, &refTable, &refCols, &onDelete, &onUpdate); err == nil {
 				details.ForeignKeys = append(details.ForeignKeys, engine.ForeignKeyDef{
 					Name:              name,
 					Columns:           srcCols,
 					ReferencedSchema:  refSchema,
 					ReferencedTable:   refTable,
 					ReferencedColumns: refCols,
+					OnDelete:          pgReferentialAction(onDelete),
+					OnUpdate:          pgReferentialAction(onUpdate),
 				})
 			}
 		}
@@ -396,4 +407,20 @@ func allVisible(indexCols []string, cols []engine.ColumnDef) bool {
 		}
 	}
 	return true
+}
+
+func pgReferentialAction(code string) engine.ReferentialAction {
+	switch code {
+	case "a":
+		return engine.ReferentialNoAction
+	case "r":
+		return engine.ReferentialRestrict
+	case "c":
+		return engine.ReferentialCascade
+	case "n":
+		return engine.ReferentialSetNull
+	case "d":
+		return engine.ReferentialSetDefault
+	}
+	return engine.ReferentialDefault
 }
