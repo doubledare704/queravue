@@ -179,6 +179,7 @@ jobs:
         run: |
           brew tap mongodb/brew
           brew trust --formula mongodb/brew/mongodb-community@7.0
+          brew trust --formula mongodb/brew/mongodb-database-tools
           brew install mongodb-community@7.0 mongosh
           mkdir -p "$RUNNER_TEMP/mongo-data"
           "$(brew --prefix mongodb-community@7.0)/bin/mongod" --replSet rs0 --bind_ip 127.0.0.1 \
