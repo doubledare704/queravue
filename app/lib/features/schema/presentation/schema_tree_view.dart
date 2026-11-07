@@ -418,11 +418,18 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
         ),
         if (!docs)
           const PopupMenuItem(value: 'query', child: Text('New query here')),
+        if (!docs && node.type == SchemaObjectType.table)
+          const PopupMenuItem(value: 'design', child: Text('Design table')),
         const PopupMenuDivider(),
         const PopupMenuItem(value: 'copy', child: Text('Copy name')),
         const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
       ]);
     } else {
+      if (!docs && (node is SchemaNamespaceNode)) {
+        items.add(
+          const PopupMenuItem(value: 'new-table', child: Text('New table')),
+        );
+      }
       items.addAll([
         const PopupMenuItem(value: 'copy', child: Text('Copy name')),
         const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
@@ -453,6 +460,26 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           ref
               .read(editorTabsProvider.notifier)
               .openQueryWithSql(widget.connectionId, sql);
+        }
+      case 'design':
+        if (node is ObjectNode) {
+          ref
+              .read(editorTabsProvider.notifier)
+              .openDesigner(widget.connectionId, node.tableRef);
+        }
+      case 'new-table':
+        if (node is SchemaNamespaceNode) {
+          ref
+              .read(editorTabsProvider.notifier)
+              .openDesigner(
+                widget.connectionId,
+                TableRef(
+                  database: node.database,
+                  schema: node.label,
+                  table: '',
+                ),
+                newTable: true,
+              );
         }
       case 'copy':
         await Clipboard.setData(ClipboardData(text: node.label));

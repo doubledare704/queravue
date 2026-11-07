@@ -10,7 +10,7 @@ import '../../schema/domain/schema_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table, collection, shell }
+enum TabKind { query, table, collection, shell, designer }
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -20,6 +20,7 @@ class EditorTab {
     required this.title,
     this.kind = TabKind.query,
     this.tableRef,
+    this.newTable = false,
     CodeLineEditingController? controller,
   }) : controller = controller ?? CodeLineEditingController();
 
@@ -28,12 +29,16 @@ class EditorTab {
   final String title;
   final TabKind kind;
   final TableRef? tableRef;
+
+  /// For a designer tab: the table does not exist yet.
+  final bool newTable;
   final CodeLineEditingController controller;
 
   bool get isQuery => kind == TabKind.query;
   bool get isTable => kind == TabKind.table;
   bool get isCollection => kind == TabKind.collection;
   bool get isShell => kind == TabKind.shell;
+  bool get isDesigner => kind == TabKind.designer;
 
   /// The same tab, with its editor kept, under a new title.
   EditorTab withTitle(String newTitle) => EditorTab(
@@ -42,6 +47,7 @@ class EditorTab {
     title: newTitle,
     kind: kind,
     tableRef: tableRef,
+    newTable: newTable,
     controller: controller,
   );
 }
@@ -127,6 +133,44 @@ class EditorTabs extends Notifier<EditorTabsState> {
       title: tableRef.table,
       kind: TabKind.table,
       tableRef: tableRef,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  /// Opens the table designer on [tableRef]; with [newTable] the ref names
+  /// the schema and table to create. An existing table's designer is reused.
+  EditorTab openDesigner(
+    String connectionId,
+    TableRef tableRef, {
+    bool newTable = false,
+  }) {
+    if (!newTable) {
+      final existing = state.tabs
+          .where(
+            (t) =>
+                t.isDesigner &&
+                !t.newTable &&
+                t.connectionId == connectionId &&
+                t.tableRef == tableRef,
+          )
+          .firstOrNull;
+      if (existing != null) {
+        select(existing.id);
+        return existing;
+      }
+    }
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: newTable ? 'New table' : 'Design ${tableRef.table}',
+      kind: TabKind.designer,
+      tableRef: tableRef,
+      newTable: newTable,
     );
     _live.add(tab);
     state = EditorTabsState(

@@ -82,6 +82,7 @@ class ColumnDetails {
     this.defaultValue,
     required this.isPrimaryKey,
     this.primaryKeyOrder = 0,
+    this.identity = false,
   });
 
   final String name;
@@ -90,6 +91,7 @@ class ColumnDetails {
   final bool nullable;
   final String? defaultValue;
   final bool isPrimaryKey;
+  final bool identity;
   final int primaryKeyOrder;
 }
 

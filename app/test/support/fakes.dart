@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
 import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/design.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/index.pbgrpc.dart';
@@ -157,6 +158,10 @@ class FakeCoreConnection implements CoreConnection {
   @override
   ValidationServiceClient get validationService =>
       throw UnimplementedError('use a fake AdminRepository');
+
+  @override
+  SchemaDesignServiceClient get designService =>
+      throw UnimplementedError('use a fake DesignRepository');
 
   @override
   Future<void> close() async {

@@ -6,6 +6,7 @@ import 'package:grpc/grpc.dart';
 import 'core_launcher.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
+import 'gen/queravue/v1/design.pbgrpc.dart';
 import 'gen/queravue/v1/document.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/index.pbgrpc.dart';
@@ -78,6 +79,9 @@ abstract interface class CoreConnection {
   /// Client for Mongo collection validators.
   ValidationServiceClient get validationService;
 
+  /// Client for previewing and applying schema changes.
+  SchemaDesignServiceClient get designService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -102,6 +106,7 @@ class GrpcCoreConnection implements CoreConnection {
     indexService = IndexServiceClient(_channel, options: _auth);
     statsService = StatsServiceClient(_channel, options: _auth);
     validationService = ValidationServiceClient(_channel, options: _auth);
+    designService = SchemaDesignServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -161,6 +166,9 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final ValidationServiceClient validationService;
+
+  @override
+  late final SchemaDesignServiceClient designService;
 
   @override
   Future<CoreInfo> hello() async {
