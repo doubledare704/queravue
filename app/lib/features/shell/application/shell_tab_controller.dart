@@ -125,6 +125,7 @@ class ShellTabController extends Notifier<ShellTabState> {
   StreamSubscription<ShellEvent>? _sub;
   Timer? _cancelTimer;
   String? _connectionId;
+  String _database = '';
 
   // Not read from `state` in onDispose: provider state is off limits there.
   String? _shellId;
@@ -140,6 +141,7 @@ class ShellTabController extends Notifier<ShellTabState> {
         .where((t) => t.id == tabId)
         .firstOrNull;
     _connectionId = tab?.connectionId;
+    _database = tab?.shellDatabase ?? '';
     ref.listen(
       editorTabsProvider.select((s) => s.tabs.any((t) => t.id == tabId)),
       (was, open) {
@@ -235,7 +237,7 @@ class ShellTabController extends Notifier<ShellTabState> {
       return null;
     }
     try {
-      final shellId = await _repo.openShell(session.id, '');
+      final shellId = await _repo.openShell(session.id, _database);
       if (!ref.mounted) return null;
       _shellId = shellId;
       state = state.copyWith(shellId: shellId);

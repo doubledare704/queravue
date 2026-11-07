@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos
+.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -92,3 +92,6 @@ test-docdb: ## DocumentDB smoke tests against the documentdb compose service (st
 test-cosmos: ## Cosmos DB (Mongo API) smoke tests; needs QV_COSMOS_URI of a real account
 	@test -n "$$QV_COSMOS_URI" || { echo "set QV_COSMOS_URI (see docs/engines/cosmosdb.md)"; exit 2; }
 	cd core && go test -count=1 -tags=integration -run TestSmokeCosmosDB -v ./internal/engine/mongo/
+
+seed-sqlite: ## Create dev/demo.sqlite with fake data
+	rm -f dev/demo.sqlite && sqlite3 dev/demo.sqlite < dev/seed/sqlite/01_seed.sql

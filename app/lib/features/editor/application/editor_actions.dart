@@ -20,7 +20,11 @@ void openQueryTab(WidgetRef ref) {
 void openShellTab(WidgetRef ref) {
   final id = ref.read(selectedConnectionProvider);
   if (id != null && ref.read(connectionHasShellProvider(id))) {
-    ref.read(editorTabsProvider.notifier).openShell(id);
+    final active = ref.read(editorTabsProvider).activeFor(id);
+    final database = active != null && active.isCollection
+        ? active.tableRef?.database ?? ''
+        : '';
+    ref.read(editorTabsProvider.notifier).openShell(id, database: database);
   }
 }
 

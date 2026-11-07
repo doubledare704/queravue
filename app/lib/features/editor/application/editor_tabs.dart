@@ -21,6 +21,7 @@ class EditorTab {
     this.kind = TabKind.query,
     this.tableRef,
     this.newTable = false,
+    this.shellDatabase = '',
     CodeLineEditingController? controller,
   }) : controller = controller ?? CodeLineEditingController();
 
@@ -32,6 +33,7 @@ class EditorTab {
 
   /// For a designer tab: the table does not exist yet.
   final bool newTable;
+  final String shellDatabase;
   final CodeLineEditingController controller;
 
   bool get isQuery => kind == TabKind.query;
@@ -48,6 +50,7 @@ class EditorTab {
     kind: kind,
     tableRef: tableRef,
     newTable: newTable,
+    shellDatabase: shellDatabase,
     controller: controller,
   );
 }
@@ -211,13 +214,14 @@ class EditorTabs extends Notifier<EditorTabsState> {
   }
 
   /// Opens a Mongo shell tab for [connectionId] and makes it active.
-  EditorTab openShell(String connectionId) {
+  EditorTab openShell(String connectionId, {String database = ''}) {
     final n = state.tabsFor(connectionId).where((t) => t.isShell).length + 1;
     final tab = EditorTab(
       id: 'tab-${++_seq}',
       connectionId: connectionId,
       title: 'Shell $n',
       kind: TabKind.shell,
+      shellDatabase: database,
     );
     _live.add(tab);
     state = EditorTabsState(

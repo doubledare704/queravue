@@ -42,3 +42,4 @@ spikes/**/build/
 spikes/**/*.log
 
 !core/internal/shell/testdata/corpus/*.out
+dev/demo.sqlite

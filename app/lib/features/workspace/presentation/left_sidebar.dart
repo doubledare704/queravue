@@ -5,6 +5,8 @@ import '../../connections/presentation/connection_sidebar.dart';
 import '../application/sidebar_mode.dart';
 import 'workspace_panel.dart';
 
+const _tabLabel = TextStyle(fontSize: 12);
+
 /// The left pane: connections or the workspace, switched at the top.
 class LeftSidebar extends ConsumerWidget {
   const LeftSidebar({super.key});
@@ -23,17 +25,32 @@ class LeftSidebar extends ConsumerWidget {
             child: SegmentedButton<SidebarMode>(
               key: const Key('sidebar-switch'),
               showSelectedIcon: false,
-              style: const ButtonStyle(visualDensity: VisualDensity.compact),
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 6),
+                ),
+              ),
               segments: const [
                 ButtonSegment(
                   value: SidebarMode.connections,
                   icon: Icon(Icons.storage_outlined, size: 16),
-                  label: Text('Connections'),
+                  label: Text(
+                    'Connections',
+                    style: _tabLabel,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
                 ),
                 ButtonSegment(
                   value: SidebarMode.workspace,
                   icon: Icon(Icons.folder_copy_outlined, size: 16),
-                  label: Text('Workspace'),
+                  label: Text(
+                    'Workspace',
+                    style: _tabLabel,
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
                 ),
               ],
               selected: {mode},
