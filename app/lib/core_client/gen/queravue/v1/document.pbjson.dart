@@ -515,3 +515,80 @@ final $typed_data.Uint8List sampleFieldsResponseDescriptor = $convert.base64Deco
     'VsZFN0YXRSBmZpZWxkcxIYCgdzYW1wbGVkGAIgASgNUgdzYW1wbGVkEiMKDXVzZWRfZmFsbGJh'
     'Y2sYAyABKAhSDHVzZWRGYWxsYmFjaxIwCgVlcnJvchgEIAEoCzIaLnF1ZXJhdnVlLnYxLkRvY3'
     'VtZW50RXJyb3JSBWVycm9y');
+
+@$core.Deprecated('Use sampleFieldPathsRequestDescriptor instead')
+const SampleFieldPathsRequest$json = {
+  '1': 'SampleFieldPathsRequest',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'database', '3': 2, '4': 1, '5': 9, '10': 'database'},
+    {'1': 'collection', '3': 3, '4': 1, '5': 9, '10': 'collection'},
+    {'1': 'sample_size', '3': 4, '4': 1, '5': 13, '10': 'sampleSize'},
+    {'1': 'max_depth', '3': 5, '4': 1, '5': 13, '10': 'maxDepth'},
+    {'1': 'refresh', '3': 6, '4': 1, '5': 8, '10': 'refresh'},
+  ],
+};
+
+/// Descriptor for `SampleFieldPathsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sampleFieldPathsRequestDescriptor = $convert.base64Decode(
+    'ChdTYW1wbGVGaWVsZFBhdGhzUmVxdWVzdBIdCgpzZXNzaW9uX2lkGAEgASgJUglzZXNzaW9uSW'
+    'QSGgoIZGF0YWJhc2UYAiABKAlSCGRhdGFiYXNlEh4KCmNvbGxlY3Rpb24YAyABKAlSCmNvbGxl'
+    'Y3Rpb24SHwoLc2FtcGxlX3NpemUYBCABKA1SCnNhbXBsZVNpemUSGwoJbWF4X2RlcHRoGAUgAS'
+    'gNUghtYXhEZXB0aBIYCgdyZWZyZXNoGAYgASgIUgdyZWZyZXNo');
+
+@$core.Deprecated('Use fieldPathStatDescriptor instead')
+const FieldPathStat$json = {
+  '1': 'FieldPathStat',
+  '2': [
+    {'1': 'path', '3': 1, '4': 1, '5': 9, '10': 'path'},
+    {
+      '1': 'types',
+      '3': 2,
+      '4': 3,
+      '5': 11,
+      '6': '.queravue.v1.TypeCount',
+      '10': 'types'
+    },
+    {'1': 'frequency', '3': 3, '4': 1, '5': 1, '10': 'frequency'},
+    {'1': 'depth', '3': 4, '4': 1, '5': 13, '10': 'depth'},
+  ],
+};
+
+/// Descriptor for `FieldPathStat`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List fieldPathStatDescriptor = $convert.base64Decode(
+    'Cg1GaWVsZFBhdGhTdGF0EhIKBHBhdGgYASABKAlSBHBhdGgSLAoFdHlwZXMYAiADKAsyFi5xdW'
+    'VyYXZ1ZS52MS5UeXBlQ291bnRSBXR5cGVzEhwKCWZyZXF1ZW5jeRgDIAEoAVIJZnJlcXVlbmN5'
+    'EhQKBWRlcHRoGAQgASgNUgVkZXB0aA==');
+
+@$core.Deprecated('Use sampleFieldPathsResponseDescriptor instead')
+const SampleFieldPathsResponse$json = {
+  '1': 'SampleFieldPathsResponse',
+  '2': [
+    {
+      '1': 'paths',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.queravue.v1.FieldPathStat',
+      '10': 'paths'
+    },
+    {'1': 'sampled', '3': 2, '4': 1, '5': 13, '10': 'sampled'},
+    {'1': 'used_fallback', '3': 3, '4': 1, '5': 8, '10': 'usedFallback'},
+    {'1': 'truncated', '3': 4, '4': 1, '5': 8, '10': 'truncated'},
+    {
+      '1': 'error',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.DocumentError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `SampleFieldPathsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sampleFieldPathsResponseDescriptor = $convert.base64Decode(
+    'ChhTYW1wbGVGaWVsZFBhdGhzUmVzcG9uc2USMAoFcGF0aHMYASADKAsyGi5xdWVyYXZ1ZS52MS'
+    '5GaWVsZFBhdGhTdGF0UgVwYXRocxIYCgdzYW1wbGVkGAIgASgNUgdzYW1wbGVkEiMKDXVzZWRf'
+    'ZmFsbGJhY2sYAyABKAhSDHVzZWRGYWxsYmFjaxIcCgl0cnVuY2F0ZWQYBCABKAhSCXRydW5jYX'
+    'RlZBIwCgVlcnJvchgFIAEoCzIaLnF1ZXJhdnVlLnYxLkRvY3VtZW50RXJyb3JSBWVycm9y');

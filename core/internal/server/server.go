@@ -117,6 +117,7 @@ func Serve(ctx context.Context, cfg Config) error {
 		queravuev1.RegisterSchemaDesignServiceServer(srv, api.NewSchemaDesignService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log))
 		queravuev1.RegisterValidationServiceServer(srv, api.NewValidationService(cfg.Sessions, cfg.Connections, cfg.History))
 		queravuev1.RegisterStatsServiceServer(srv, api.NewStatsService(cfg.Sessions))
+		queravuev1.RegisterCompletionServiceServer(srv, api.NewCompletionService(cfg.Sessions))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

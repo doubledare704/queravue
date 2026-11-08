@@ -112,6 +112,16 @@ class DocumentServiceClient extends $grpc.Client {
     return $createUnaryCall(_$sampleFields, request, options: options);
   }
 
+  /// SampleFieldPaths samples a collection and reports nested field paths
+  /// (address.city, tags.[], items.[].sku) with types and frequency. Editor
+  /// completion uses it. Results are cached per collection for a short time.
+  $grpc.ResponseFuture<$0.SampleFieldPathsResponse> sampleFieldPaths(
+    $0.SampleFieldPathsRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$sampleFieldPaths, request, options: options);
+  }
+
   // method descriptors
 
   static final _$find = $grpc.ClientMethod<$0.FindRequest, $0.FindResponse>(
@@ -147,6 +157,11 @@ class DocumentServiceClient extends $grpc.Client {
           '/queravue.v1.DocumentService/SampleFields',
           ($0.SampleFieldsRequest value) => value.writeToBuffer(),
           $0.SampleFieldsResponse.fromBuffer);
+  static final _$sampleFieldPaths = $grpc.ClientMethod<
+          $0.SampleFieldPathsRequest, $0.SampleFieldPathsResponse>(
+      '/queravue.v1.DocumentService/SampleFieldPaths',
+      ($0.SampleFieldPathsRequest value) => value.writeToBuffer(),
+      $0.SampleFieldPathsResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('queravue.v1.DocumentService')
@@ -213,6 +228,15 @@ abstract class DocumentServiceBase extends $grpc.Service {
             ($core.List<$core.int> value) =>
                 $0.SampleFieldsRequest.fromBuffer(value),
             ($0.SampleFieldsResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.SampleFieldPathsRequest,
+            $0.SampleFieldPathsResponse>(
+        'SampleFieldPaths',
+        sampleFieldPaths_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.SampleFieldPathsRequest.fromBuffer(value),
+        ($0.SampleFieldPathsResponse value) => value.writeToBuffer()));
   }
 
   $async.Stream<$0.FindResponse> find_Pre(
@@ -275,4 +299,13 @@ abstract class DocumentServiceBase extends $grpc.Service {
 
   $async.Future<$0.SampleFieldsResponse> sampleFields(
       $grpc.ServiceCall call, $0.SampleFieldsRequest request);
+
+  $async.Future<$0.SampleFieldPathsResponse> sampleFieldPaths_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.SampleFieldPathsRequest> $request) async {
+    return sampleFieldPaths($call, await $request);
+  }
+
+  $async.Future<$0.SampleFieldPathsResponse> sampleFieldPaths(
+      $grpc.ServiceCall call, $0.SampleFieldPathsRequest request);
 }

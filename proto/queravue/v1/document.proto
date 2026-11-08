@@ -46,6 +46,11 @@ service DocumentService {
   // types seen and how often they occur. The UI uses it to build table-view
   // columns.
   rpc SampleFields(SampleFieldsRequest) returns (SampleFieldsResponse);
+
+  // SampleFieldPaths samples a collection and reports nested field paths
+  // (address.city, tags.[], items.[].sku) with types and frequency. Editor
+  // completion uses it. Results are cached per collection for a short time.
+  rpc SampleFieldPaths(SampleFieldPathsRequest) returns (SampleFieldPathsResponse);
 }
 
 // DocumentErrorKind classifies a document operation failure.
@@ -319,4 +324,46 @@ message SampleFieldsResponse {
   bool used_fallback = 3;
   // Set when sampling failed.
   DocumentError error = 4;
+}
+
+// SampleFieldPathsRequest is the input of SampleFieldPaths.
+message SampleFieldPathsRequest {
+  // Session id.
+  string session_id = 1;
+  // Database name.
+  string database = 2;
+  // Collection or view name.
+  string collection = 3;
+  // Documents to sample. 0 means 100; the core clamps it to [1, 1000].
+  uint32 sample_size = 4;
+  // Deepest path to report. 0 means 6; the core clamps it to [1, 12].
+  uint32 max_depth = 5;
+  // Skip the cache and sample again.
+  bool refresh = 6;
+}
+
+// FieldPathStat describes one field path in the sample.
+message FieldPathStat {
+  // Dotted path; array elements use the segment [].
+  string path = 1;
+  // Types seen, most frequent first.
+  repeated TypeCount types = 2;
+  // Share of sampled documents that have the path, in [0, 1].
+  double frequency = 3;
+  // Number of segments in the path.
+  uint32 depth = 4;
+}
+
+// SampleFieldPathsResponse holds the sampled paths or the failure.
+message SampleFieldPathsResponse {
+  // Paths ordered by frequency, then path. _id comes first.
+  repeated FieldPathStat paths = 1;
+  // Number of documents actually sampled.
+  uint32 sampled = 2;
+  // True if $sample was unavailable and the first documents were read instead.
+  bool used_fallback = 3;
+  // True if the path limit cut the list.
+  bool truncated = 4;
+  // Set when sampling failed.
+  DocumentError error = 5;
 }
