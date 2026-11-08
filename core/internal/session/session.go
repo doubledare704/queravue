@@ -116,6 +116,7 @@ type Manager struct {
 	log     *slog.Logger
 	now     func() time.Time
 	onClose func(sessionID string)
+	onOpen  func(*Session)
 
 	mu       sync.Mutex
 	sessions map[string]*Session
@@ -144,6 +145,10 @@ func WithLogger(l *slog.Logger) Option { return func(m *Manager) { m.log = l } }
 // WithOnClose registers a hook called after a session closes, for example to
 // drop its spooled results.
 func WithOnClose(f func(sessionID string)) Option { return func(m *Manager) { m.onClose = f } }
+
+// WithOnOpen registers a hook called after a session opens, for example to
+// warm its schema catalog in the background. It must not block.
+func WithOnOpen(f func(*Session)) Option { return func(m *Manager) { m.onOpen = f } }
 
 // NewManager returns a Manager and starts its idle sweeper. Call Shutdown to
 // stop it and close all sessions.
@@ -175,6 +180,9 @@ func (m *Manager) Open(ctx context.Context, connectionID string) (*Session, erro
 	}
 	m.sessions[s.ID] = s
 	m.mu.Unlock()
+	if m.onOpen != nil {
+		m.onOpen(s)
+	}
 	return s, nil
 }
 

@@ -41,8 +41,10 @@ type CompletionServiceClient interface {
 	Complete(ctx context.Context, in *CompleteRequest, opts ...grpc.CallOption) (*CompleteResponse, error)
 	// WarmCatalog loads all columns of a database in the background with one
 	// query per schema and streams progress. The last message has done=true.
-	// Cancelling the call stops the load. A second call for the same database
-	// joins the running load.
+	// Calls for the same database share one load. Cancelling the last call
+	// stops a load that no automatic warm-up started; the core also starts one
+	// when a session opens, and that one only stops when the session closes or
+	// its schema changes.
 	WarmCatalog(ctx context.Context, in *WarmCatalogRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WarmCatalogResponse], error)
 	// FormatSQL formats SQL text or a range of it. Unknown syntax is returned
 	// unchanged.
@@ -113,8 +115,10 @@ type CompletionServiceServer interface {
 	Complete(context.Context, *CompleteRequest) (*CompleteResponse, error)
 	// WarmCatalog loads all columns of a database in the background with one
 	// query per schema and streams progress. The last message has done=true.
-	// Cancelling the call stops the load. A second call for the same database
-	// joins the running load.
+	// Calls for the same database share one load. Cancelling the last call
+	// stops a load that no automatic warm-up started; the core also starts one
+	// when a session opens, and that one only stops when the session closes or
+	// its schema changes.
 	WarmCatalog(*WarmCatalogRequest, grpc.ServerStreamingServer[WarmCatalogResponse]) error
 	// FormatSQL formats SQL text or a range of it. Unknown syntax is returned
 	// unchanged.

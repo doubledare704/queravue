@@ -25,8 +25,27 @@ func newSessionCache() *sessionCache {
 
 // Cache provides thread-safe, session-scoped schema metadata caching with explicit invalidation.
 type Cache struct {
-	mu       sync.RWMutex
-	sessions map[string]*sessionCache
+	mu        sync.RWMutex
+	sessions  map[string]*sessionCache
+	listeners []func(sessionID string)
+}
+
+// OnInvalidate registers f to run after any invalidation of a session's
+// entries or its closing, for example to drop caches built from them. f runs
+// outside the cache lock.
+func (c *Cache) OnInvalidate(f func(sessionID string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.listeners = append(c.listeners, f)
+}
+
+func (c *Cache) notify(sessionID string) {
+	c.mu.RLock()
+	fs := append([]func(string){}, c.listeners...)
+	c.mu.RUnlock()
+	for _, f := range fs {
+		f(sessionID)
+	}
 }
 
 // NewCache initializes an empty schema cache.
@@ -134,6 +153,7 @@ func (c *Cache) SetTableDetails(sessionID, database, schema, table string, detai
 
 // Invalidate clears all or targeted schema cache entries for a session.
 func (c *Cache) Invalidate(sessionID string, ref *queravuev1.TableRef) {
+	defer c.notify(sessionID)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	sc, ok := c.sessions[sessionID]
@@ -162,6 +182,7 @@ func (c *Cache) Invalidate(sessionID string, ref *queravuev1.TableRef) {
 
 // CloseSession discards all cache data for sessionID.
 func (c *Cache) CloseSession(sessionID string) {
+	defer c.notify(sessionID)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.sessions, sessionID)

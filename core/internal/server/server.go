@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/doubledare704/queravue/core/internal/api"
+	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/history"
@@ -48,6 +49,8 @@ type Config struct {
 	Results     *results.Manager
 	History     *history.Store
 	SchemaCache *schema.Cache
+	// Completion holds the schema catalogs behind CompletionService. If nil, one is created.
+	Completion *completion.Manager
 }
 
 // Serve listens on cfg.SocketPath and serves until ctx is cancelled, then
@@ -97,6 +100,13 @@ func Serve(ctx context.Context, cfg Config) error {
 		if schemaCache == nil {
 			schemaCache = schema.NewCache()
 		}
+		catalogs := cfg.Completion
+		if catalogs == nil {
+			catalogs = completion.NewManager()
+			defer catalogs.Shutdown()
+			schemaCache.OnInvalidate(catalogs.Invalidate)
+		}
+		querySvc.SetSchemaChangeHook(func(sessionID string) { schemaCache.Invalidate(sessionID, nil) })
 		queravuev1.RegisterSchemaServiceServer(srv, api.NewSchemaService(cfg.Sessions, schemaCache))
 		docSvc := api.NewDocumentService(cfg.Sessions, cfg.Connections, log)
 		if cfg.History != nil {
@@ -117,7 +127,7 @@ func Serve(ctx context.Context, cfg Config) error {
 		queravuev1.RegisterSchemaDesignServiceServer(srv, api.NewSchemaDesignService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log))
 		queravuev1.RegisterValidationServiceServer(srv, api.NewValidationService(cfg.Sessions, cfg.Connections, cfg.History))
 		queravuev1.RegisterStatsServiceServer(srv, api.NewStatsService(cfg.Sessions))
-		queravuev1.RegisterCompletionServiceServer(srv, api.NewCompletionService(cfg.Sessions))
+		queravuev1.RegisterCompletionServiceServer(srv, api.NewCompletionService(cfg.Sessions, catalogs))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

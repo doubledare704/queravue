@@ -50,8 +50,10 @@ class CompletionServiceClient extends $grpc.Client {
 
   /// WarmCatalog loads all columns of a database in the background with one
   /// query per schema and streams progress. The last message has done=true.
-  /// Cancelling the call stops the load. A second call for the same database
-  /// joins the running load.
+  /// Calls for the same database share one load. Cancelling the last call
+  /// stops a load that no automatic warm-up started; the core also starts one
+  /// when a session opens, and that one only stops when the session closes or
+  /// its schema changes.
   $grpc.ResponseStream<$0.WarmCatalogResponse> warmCatalog(
     $0.WarmCatalogRequest request, {
     $grpc.CallOptions? options,
