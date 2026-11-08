@@ -1,0 +1,122 @@
+=== simple select
+select a,b,c from t
+=== select star where
+SELECT * FROM users WHERE id=1
+=== lower case keywords
+select id from users where active = true order by id desc limit 5
+=== mixed case keywords
+Select Id From Users Where Id = 1
+=== qualified columns and aliases
+select u.id, u.name as user_name, o.total from users u join orders o on o.user_id = u.id
+=== inner join on and
+select * from a inner join b on a.id=b.a_id and b.kind='x' where a.n>3
+=== left join using
+select * from a left join b using (id) where b.id is null
+=== multiple joins
+select o.id, c.name, p.title from orders o join customers c on c.id=o.customer_id left join products p on p.id=o.product_id cross join regions r where r.code='eu'
+=== long select list breaks
+select customers.id, customers.first_name, customers.last_name, customers.email_address, customers.created_at, customers.updated_at from customers
+=== long where breaks at and or
+select id from events where created_at >= '2024-01-01' and created_at < '2025-01-01' and (kind = 'click' or kind = 'view' or kind = 'scroll') and user_id is not null
+=== group having order
+select region, count(*) as n, sum(total) from sales group by region having count(*) > 10 order by n desc, region
+=== aggregate functions
+select count(*), count(distinct user_id), avg(price), min(created_at), max(created_at) from orders
+=== distinct
+select distinct country, city from addresses order by country, city
+=== between
+select * from t where a between 1 and 10 and b between 'x' and 'y'
+=== in list
+select * from t where status in ('new','open','pending') and kind not in (1,2,3)
+=== like and is null
+select * from t where name like 'a%' and deleted_at is null and note is not null
+=== case expression
+select id, case when n > 10 then 'big' when n > 5 then 'mid' else 'small' end as size from t
+=== subquery in where
+select * from t where id in (select t_id from u where u.flag = 1)
+=== exists subquery
+select * from t where exists (select 1 from u where u.t_id = t.id and u.kind = 'a')
+=== derived table
+select x.id from (select id, n from t where n > 1) x where x.n < 9
+=== long derived table breaks
+select d.region, d.total from (select region, sum(amount) as total from transactions where booked_at >= '2024-01-01' group by region having sum(amount) > 1000) d order by d.total desc
+=== union all
+select id from a union all select id from b union select id from c
+=== intersect except
+select id from a intersect select id from b except select id from c
+=== cte single
+with recent as (select * from orders where created_at > '2024-01-01') select * from recent
+=== cte multiple
+with a as (select id from t), b as (select id from u) select a.id from a join b on a.id=b.id
+=== insert values
+insert into t (a, b) values (1, 'x')
+=== insert multiple rows
+insert into t (a, b) values (1, 'x'), (2, 'y'), (3, 'z')
+=== insert select
+insert into archive (id, name) select id, name from users where deleted_at is not null
+=== update simple
+update t set a=1 where id=2
+=== update multiple assignments
+update accounts set balance = balance - 10, updated_at = now(), version = version + 1 where id = 7 and balance >= 10
+=== delete simple
+delete from t where id = 1
+=== delete with subquery
+delete from t where id in (select id from u)
+=== comment trailing line
+select a, -- first
+b from t
+=== comment own line
+select a
+-- the table
+from t
+=== block comment inline
+select /* all */ * from t
+=== string with keywords
+select 'select from where' as s, 'it''s' as q from t
+=== numbers and arithmetic
+select 1+2*3, -4, a-b, 1.5e-3, 0.5 from t
+=== unary minus after operator
+select * from t where a=-1 and b>-2.5
+=== comparison operators
+select * from t where a<>1 and b<=2 and c>=3 and d!=4
+=== concat and modulo
+select a||b, a%3 from t
+=== order by expressions
+select * from t order by lower(name) asc, id desc
+=== limit offset
+select * from t order by id limit 10 offset 20
+=== window function
+select id, row_number() over (partition by region order by created_at desc) as rn from t
+=== multi statement
+select 1;select 2;
+=== multi statement with blank lines
+select a from t;
+
+update t set a=1
+
+;delete from t where a=2
+=== not formatted: create table
+create table  t (a int,   b text)
+=== not formatted: drop
+drop table   t
+=== tabs and newlines input
+select
+	a,
+	b
+from
+	t
+where
+	a = 1
+=== already formatted
+SELECT a, b
+FROM t
+WHERE a = 1
+ORDER BY b
+=== parenthesised select
+(select 1) union (select 2)
+=== nested subqueries
+select * from t where a in (select a from u where b in (select b from v where c = 1))
+=== function call spacing
+select coalesce(a,0), upper( name ), substring(name from 1 for 3) from t
+=== boolean literals
+select * from t where flag = true or other = false

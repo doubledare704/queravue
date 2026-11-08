@@ -1,0 +1,32 @@
+=== sq double quoted identifier
+select "order"."id" from "order" where "name"='x'
+=== sq bracket identifier
+select [a b], [c] from [t]
+=== sq backtick identifier
+select `a b` from `t`
+=== sq insert or replace
+insert or replace into t (a, b) values (1, 2)
+=== sq insert or ignore
+insert or ignore into t (a) values (1)
+=== sq update or replace
+update or replace t set a=1 where id=2
+=== sq upsert
+insert into t (a, b) values (1, 2) on conflict (a) do update set b = excluded.b
+=== sq returning
+delete from t where a=1 returning a, b
+=== sq limit offset
+select * from t limit 5 offset 10
+=== sq glob
+select * from t where name glob 'a*' and b like 'x%'
+=== sq json arrow
+select data->'$.a', data->>'$.b' from t
+=== sq named parameters
+select * from t where a=:a and b=@b and c=?
+=== sq positional parameters
+select * from t where a=?1 and b=?2
+=== sq string concat
+select a||'-'||b from t
+=== sq typeof and total
+select typeof(a), total(b), group_concat(c, ',') from t group by d
+=== sq replace into
+replace into t (a) values (1)

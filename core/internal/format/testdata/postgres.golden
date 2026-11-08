@@ -1,0 +1,467 @@
+=== simple select
+select a,b,c from t
+---
+SELECT a, b, c
+FROM t
+=== select star where
+SELECT * FROM users WHERE id=1
+---
+SELECT *
+FROM users
+WHERE id = 1
+=== lower case keywords
+select id from users where active = true order by id desc limit 5
+---
+SELECT id
+FROM users
+WHERE active = TRUE
+ORDER BY id DESC
+LIMIT 5
+=== mixed case keywords
+Select Id From Users Where Id = 1
+---
+SELECT Id
+FROM Users
+WHERE Id = 1
+=== qualified columns and aliases
+select u.id, u.name as user_name, o.total from users u join orders o on o.user_id = u.id
+---
+SELECT u.id, u.name AS user_name, o.total
+FROM users u
+JOIN orders o ON o.user_id = u.id
+=== inner join on and
+select * from a inner join b on a.id=b.a_id and b.kind='x' where a.n>3
+---
+SELECT *
+FROM a
+INNER JOIN b ON a.id = b.a_id AND b.kind = 'x'
+WHERE a.n > 3
+=== left join using
+select * from a left join b using (id) where b.id is null
+---
+SELECT *
+FROM a
+LEFT JOIN b USING (id)
+WHERE b.id IS NULL
+=== multiple joins
+select o.id, c.name, p.title from orders o join customers c on c.id=o.customer_id left join products p on p.id=o.product_id cross join regions r where r.code='eu'
+---
+SELECT o.id, c.name, p.title
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+LEFT JOIN products p ON p.id = o.product_id
+CROSS JOIN regions r
+WHERE r.code = 'eu'
+=== long select list breaks
+select customers.id, customers.first_name, customers.last_name, customers.email_address, customers.created_at, customers.updated_at from customers
+---
+SELECT
+  customers.id,
+  customers.first_name,
+  customers.last_name,
+  customers.email_address,
+  customers.created_at,
+  customers.updated_at
+FROM customers
+=== long where breaks at and or
+select id from events where created_at >= '2024-01-01' and created_at < '2025-01-01' and (kind = 'click' or kind = 'view' or kind = 'scroll') and user_id is not null
+---
+SELECT id
+FROM events
+WHERE created_at >= '2024-01-01'
+  AND created_at < '2025-01-01'
+  AND (kind = 'click' OR kind = 'view' OR kind = 'scroll')
+  AND user_id IS NOT NULL
+=== group having order
+select region, count(*) as n, sum(total) from sales group by region having count(*) > 10 order by n desc, region
+---
+SELECT region, count(*) AS n, sum(total)
+FROM sales
+GROUP BY region
+HAVING count(*) > 10
+ORDER BY n DESC, region
+=== aggregate functions
+select count(*), count(distinct user_id), avg(price), min(created_at), max(created_at) from orders
+---
+SELECT count(*), count(DISTINCT user_id), avg(price), min(created_at), max(created_at)
+FROM orders
+=== distinct
+select distinct country, city from addresses order by country, city
+---
+SELECT DISTINCT country, city
+FROM addresses
+ORDER BY country, city
+=== between
+select * from t where a between 1 and 10 and b between 'x' and 'y'
+---
+SELECT *
+FROM t
+WHERE a BETWEEN 1 AND 10 AND b BETWEEN 'x' AND 'y'
+=== in list
+select * from t where status in ('new','open','pending') and kind not in (1,2,3)
+---
+SELECT *
+FROM t
+WHERE status IN ('new', 'open', 'pending') AND kind NOT IN (1, 2, 3)
+=== like and is null
+select * from t where name like 'a%' and deleted_at is null and note is not null
+---
+SELECT *
+FROM t
+WHERE name LIKE 'a%' AND deleted_at IS NULL AND note IS NOT NULL
+=== case expression
+select id, case when n > 10 then 'big' when n > 5 then 'mid' else 'small' end as size from t
+---
+SELECT id, CASE WHEN n > 10 THEN 'big' WHEN n > 5 THEN 'mid' ELSE 'small' END AS size
+FROM t
+=== subquery in where
+select * from t where id in (select t_id from u where u.flag = 1)
+---
+SELECT *
+FROM t
+WHERE id IN (SELECT t_id FROM u WHERE u.flag = 1)
+=== exists subquery
+select * from t where exists (select 1 from u where u.t_id = t.id and u.kind = 'a')
+---
+SELECT *
+FROM t
+WHERE EXISTS (SELECT 1 FROM u WHERE u.t_id = t.id AND u.kind = 'a')
+=== derived table
+select x.id from (select id, n from t where n > 1) x where x.n < 9
+---
+SELECT x.id
+FROM (SELECT id, n FROM t WHERE n > 1) x
+WHERE x.n < 9
+=== long derived table breaks
+select d.region, d.total from (select region, sum(amount) as total from transactions where booked_at >= '2024-01-01' group by region having sum(amount) > 1000) d order by d.total desc
+---
+SELECT d.region, d.total
+FROM (
+  SELECT region, sum(amount) AS total
+  FROM transactions
+  WHERE booked_at >= '2024-01-01'
+  GROUP BY region
+  HAVING sum(amount) > 1000
+) d
+ORDER BY d.total DESC
+=== union all
+select id from a union all select id from b union select id from c
+---
+SELECT id
+FROM a
+UNION ALL
+SELECT id
+FROM b
+UNION
+SELECT id
+FROM c
+=== intersect except
+select id from a intersect select id from b except select id from c
+---
+SELECT id
+FROM a
+INTERSECT
+SELECT id
+FROM b
+EXCEPT
+SELECT id
+FROM c
+=== cte single
+with recent as (select * from orders where created_at > '2024-01-01') select * from recent
+---
+WITH recent AS (SELECT * FROM orders WHERE created_at > '2024-01-01')
+SELECT *
+FROM recent
+=== cte multiple
+with a as (select id from t), b as (select id from u) select a.id from a join b on a.id=b.id
+---
+WITH a AS (SELECT id FROM t), b AS (SELECT id FROM u)
+SELECT a.id
+FROM a
+JOIN b ON a.id = b.id
+=== insert values
+insert into t (a, b) values (1, 'x')
+---
+INSERT INTO t (a, b)
+VALUES (1, 'x')
+=== insert multiple rows
+insert into t (a, b) values (1, 'x'), (2, 'y'), (3, 'z')
+---
+INSERT INTO t (a, b)
+VALUES (1, 'x'), (2, 'y'), (3, 'z')
+=== insert select
+insert into archive (id, name) select id, name from users where deleted_at is not null
+---
+INSERT INTO archive (id, name)
+SELECT id, name
+FROM users
+WHERE deleted_at IS NOT NULL
+=== update simple
+update t set a=1 where id=2
+---
+UPDATE t
+SET a = 1
+WHERE id = 2
+=== update multiple assignments
+update accounts set balance = balance - 10, updated_at = now(), version = version + 1 where id = 7 and balance >= 10
+---
+UPDATE accounts
+SET balance = balance - 10, updated_at = now(), version = version + 1
+WHERE id = 7 AND balance >= 10
+=== delete simple
+delete from t where id = 1
+---
+DELETE FROM t
+WHERE id = 1
+=== delete with subquery
+delete from t where id in (select id from u)
+---
+DELETE FROM t
+WHERE id IN (SELECT id FROM u)
+=== comment trailing line
+select a, -- first
+b from t
+---
+SELECT
+  a, -- first
+  b
+FROM t
+=== comment own line
+select a
+-- the table
+from t
+---
+SELECT a
+-- the table
+FROM t
+=== block comment inline
+select /* all */ * from t
+---
+SELECT /* all */ *
+FROM t
+=== string with keywords
+select 'select from where' as s, 'it''s' as q from t
+---
+SELECT 'select from where' AS s, 'it''s' AS q
+FROM t
+=== numbers and arithmetic
+select 1+2*3, -4, a-b, 1.5e-3, 0.5 from t
+---
+SELECT 1 + 2 * 3, -4, a - b, 1.5e-3, 0.5
+FROM t
+=== unary minus after operator
+select * from t where a=-1 and b>-2.5
+---
+SELECT *
+FROM t
+WHERE a = -1 AND b > -2.5
+=== comparison operators
+select * from t where a<>1 and b<=2 and c>=3 and d!=4
+---
+SELECT *
+FROM t
+WHERE a <> 1 AND b <= 2 AND c >= 3 AND d != 4
+=== concat and modulo
+select a||b, a%3 from t
+---
+SELECT a || b, a % 3
+FROM t
+=== order by expressions
+select * from t order by lower(name) asc, id desc
+---
+SELECT *
+FROM t
+ORDER BY lower(name) ASC, id DESC
+=== limit offset
+select * from t order by id limit 10 offset 20
+---
+SELECT *
+FROM t
+ORDER BY id
+LIMIT 10
+OFFSET 20
+=== window function
+select id, row_number() over (partition by region order by created_at desc) as rn from t
+---
+SELECT id, row_number() OVER (PARTITION BY region ORDER BY created_at DESC) AS rn
+FROM t
+=== multi statement
+select 1;select 2;
+---
+SELECT 1;SELECT 2;
+=== multi statement with blank lines
+select a from t;
+
+update t set a=1
+
+;delete from t where a=2
+---
+SELECT a
+FROM t;
+
+UPDATE t
+SET a = 1
+
+;DELETE FROM t
+WHERE a = 2
+=== not formatted: create table
+create table  t (a int,   b text)
+---
+create table  t (a int,   b text)
+=== not formatted: drop
+drop table   t
+---
+drop table   t
+=== tabs and newlines input
+select
+	a,
+	b
+from
+	t
+where
+	a = 1
+---
+SELECT a, b
+FROM t
+WHERE a = 1
+=== already formatted
+SELECT a, b
+FROM t
+WHERE a = 1
+ORDER BY b
+---
+SELECT a, b
+FROM t
+WHERE a = 1
+ORDER BY b
+=== parenthesised select
+(select 1) union (select 2)
+---
+(SELECT 1)
+UNION
+(SELECT 2)
+=== nested subqueries
+select * from t where a in (select a from u where b in (select b from v where c = 1))
+---
+SELECT *
+FROM t
+WHERE a IN (SELECT a FROM u WHERE b IN (SELECT b FROM v WHERE c = 1))
+=== function call spacing
+select coalesce(a,0), upper( name ), substring(name from 1 for 3) from t
+---
+SELECT coalesce(a, 0), upper(name), substring(name FROM 1 FOR 3)
+FROM t
+=== boolean literals
+select * from t where flag = true or other = false
+---
+SELECT *
+FROM t
+WHERE flag = TRUE OR other = FALSE
+=== pg cast operator
+select id::text, '1'::int, (a+b)::numeric(10,2) from t
+---
+SELECT id::text, '1'::int, (a + b)::numeric(10, 2)
+FROM t
+=== pg json operators
+select data->'a'->>'b', data#>>'{a,b}', data @> '{"k":1}'::jsonb from t
+---
+SELECT data -> 'a' ->> 'b', data #>> '{a,b}', data @> '{"k":1}'::jsonb
+FROM t
+=== pg positional parameters
+select * from t where a=$1 and b=$2
+---
+SELECT *
+FROM t
+WHERE a = $1 AND b = $2
+=== pg returning
+insert into t (a) values (1) returning id, a
+---
+INSERT INTO t (a)
+VALUES (1)
+RETURNING id, a
+=== pg on conflict do nothing
+insert into t (a) values (1) on conflict (a) do nothing
+---
+INSERT INTO t (a)
+VALUES (1)
+ON CONFLICT (a)
+DO NOTHING
+=== pg on conflict do update
+insert into t (a, b) values (1, 2) on conflict (a) do update set b = excluded.b where t.b <> excluded.b returning *
+---
+INSERT INTO t (a, b)
+VALUES (1, 2)
+ON CONFLICT (a)
+DO UPDATE
+SET b = excluded.b
+WHERE t.b <> excluded.b
+RETURNING *
+=== pg distinct on
+select distinct on (user_id) user_id, created_at from events order by user_id, created_at desc
+---
+SELECT DISTINCT ON (user_id) user_id, created_at
+FROM events
+ORDER BY user_id, created_at DESC
+=== pg ilike
+select * from t where name ilike '%abc%' and tags && array['a','b']
+---
+SELECT *
+FROM t
+WHERE name ILIKE '%abc%' AND tags && array['a', 'b']
+=== pg dollar quoted string
+select $$a;b$$ as body, $tag$x$tag$ as other
+---
+SELECT $$a;b$$ AS body, $tag$x$tag$ AS other
+=== pg array subscript
+select arr[1], arr[2:3], matrix[1][2] from t
+---
+SELECT arr[1], arr[2:3], matrix[1][2]
+FROM t
+=== pg lateral join
+select * from a, lateral (select * from b where b.a_id = a.id limit 1) x
+---
+SELECT *
+FROM a, LATERAL (SELECT * FROM b WHERE b.a_id = a.id LIMIT 1) x
+=== pg for update
+select * from jobs where state = 'new' order by id limit 1 for update skip locked
+---
+SELECT *
+FROM jobs
+WHERE state = 'new'
+ORDER BY id
+LIMIT 1
+FOR UPDATE SKIP LOCKED
+=== pg generate series
+select * from generate_series(1,10) as g(n)
+---
+SELECT *
+FROM generate_series(1, 10) AS g(n)
+=== pg quoted identifiers
+select "Order"."Id", "user name" from "Order" where "user name" = 'x'
+---
+SELECT "Order"."Id", "user name"
+FROM "Order"
+WHERE "user name" = 'x'
+=== pg filter clause
+select count(*) filter (where a > 1) as n from t
+---
+SELECT count(*) filter (WHERE a > 1) AS n
+FROM t
+=== pg fetch first
+select * from t order by id fetch first 5 rows only
+---
+SELECT *
+FROM t
+ORDER BY id
+FETCH FIRST 5 ROWS ONLY
+=== pg interval
+select now() - interval '1 day', now() + interval '2 hours' from t
+---
+SELECT now() - interval '1 day', now() + interval '2 hours'
+FROM t
+=== pg regex operators
+select * from t where a ~ '^a' and b !~* 'x'
+---
+SELECT *
+FROM t
+WHERE a ~ '^a' AND b !~* 'x'

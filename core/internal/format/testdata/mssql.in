@@ -1,0 +1,30 @@
+=== ms bracket identifiers
+select [order].[id], [user name] from [dbo].[order] where [user name]='x'
+=== ms top
+select top 10 * from t order by id
+=== ms top percent
+select top 5 percent a, b from t
+=== ms top with ties
+select top (5) with ties a from t order by a
+=== ms variables
+select * from t where id=@id and name=@name
+=== ms n string
+select N'abc' as s, 'x' as t from t
+=== ms cross apply
+select * from a cross apply (select top 1 * from b where b.a_id=a.id order by b.id desc) x
+=== ms outer apply
+select * from a outer apply fn(a.id) x
+=== ms offset fetch
+select * from t order by id offset 10 rows fetch next 5 rows only
+=== ms nolock hint
+select * from t with (nolock) where a=1
+=== ms output
+insert into t (a) output inserted.id values (1)
+=== ms isnull convert
+select isnull(a,0), convert(varchar(10), b, 120), getdate() from t
+=== ms temp table
+select * from #tmp where a=1
+=== ms schema qualified
+select * from dbo.t join other.u on t.id=u.id
+=== ms block comment nested
+select /* a /* b */ c */ 1 from t

@@ -1,0 +1,36 @@
+=== pg cast operator
+select id::text, '1'::int, (a+b)::numeric(10,2) from t
+=== pg json operators
+select data->'a'->>'b', data#>>'{a,b}', data @> '{"k":1}'::jsonb from t
+=== pg positional parameters
+select * from t where a=$1 and b=$2
+=== pg returning
+insert into t (a) values (1) returning id, a
+=== pg on conflict do nothing
+insert into t (a) values (1) on conflict (a) do nothing
+=== pg on conflict do update
+insert into t (a, b) values (1, 2) on conflict (a) do update set b = excluded.b where t.b <> excluded.b returning *
+=== pg distinct on
+select distinct on (user_id) user_id, created_at from events order by user_id, created_at desc
+=== pg ilike
+select * from t where name ilike '%abc%' and tags && array['a','b']
+=== pg dollar quoted string
+select $$a;b$$ as body, $tag$x$tag$ as other
+=== pg array subscript
+select arr[1], arr[2:3], matrix[1][2] from t
+=== pg lateral join
+select * from a, lateral (select * from b where b.a_id = a.id limit 1) x
+=== pg for update
+select * from jobs where state = 'new' order by id limit 1 for update skip locked
+=== pg generate series
+select * from generate_series(1,10) as g(n)
+=== pg quoted identifiers
+select "Order"."Id", "user name" from "Order" where "user name" = 'x'
+=== pg filter clause
+select count(*) filter (where a > 1) as n from t
+=== pg fetch first
+select * from t order by id fetch first 5 rows only
+=== pg interval
+select now() - interval '1 day', now() + interval '2 hours' from t
+=== pg regex operators
+select * from t where a ~ '^a' and b !~* 'x'

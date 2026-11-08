@@ -115,10 +115,64 @@ func TestCompleteOnNonSQLConnectionIsUnsupported(t *testing.T) {
 	}
 }
 
-func TestFormatSQLIsUnsupportedUntilTheFormatterLands(t *testing.T) {
+func TestFormatSQLFormatsWithTheSessionDialect(t *testing.T) {
 	svc, sess, _ := completionEnv(t)
-	resp, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{SessionId: sess.ID, Text: "select 1"})
-	if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED {
-		t.Errorf("FormatSQL = %v, %v", resp, err)
+	resp, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{SessionId: sess.ID, Text: "select a,b from t"})
+	if err != nil || resp.GetError() != nil {
+		t.Fatalf("FormatSQL = %v, %v", resp, err)
+	}
+	if resp.GetFormattedText() != "SELECT a, b\nFROM t" || resp.GetReplacedRange().GetStart() != 0 || resp.GetReplacedRange().GetEnd() != 17 {
+		t.Errorf("FormatSQL = %v", resp)
+	}
+}
+
+func TestFormatSQLFormatsOnlyTheRequestedRangeInUTF16Units(t *testing.T) {
+	svc, _, _ := completionEnv(t)
+	text := "-- é😀\nselect a,b from t;\nselect 1"
+	resp, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{
+		Dialect: "postgres", Text: text, Range: &queravuev1.TextRange{Start: 7, End: 24},
+	})
+	if err != nil || resp.GetError() != nil {
+		t.Fatalf("FormatSQL = %v, %v", resp, err)
+	}
+	if resp.GetFormattedText() != "SELECT a, b\nFROM t" {
+		t.Errorf("formatted = %q", resp.GetFormattedText())
+	}
+	if r := resp.GetReplacedRange(); r.GetStart() != 7 || r.GetEnd() != 24 {
+		t.Errorf("replaced = %v", r)
+	}
+}
+
+func TestFormatSQLReportsUnterminatedInputWithAUTF16Position(t *testing.T) {
+	svc, _, _ := completionEnv(t)
+	resp, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{Dialect: "mysql", Text: "select '😀', 'abc"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := resp.GetError()
+	if e.GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID || e.GetPosition() != 13 {
+		t.Errorf("error = %v", e)
+	}
+}
+
+func TestFormatSQLRejectsUnknownDialectAndBadRange(t *testing.T) {
+	svc, _, _ := completionEnv(t)
+	for _, req := range []*queravuev1.FormatSQLRequest{
+		{Dialect: "cobol", Text: "select 1"},
+		{Dialect: "postgres", Text: "select 1", Range: &queravuev1.TextRange{Start: 5, End: 99}},
+		{Dialect: "postgres", Text: "select 1", Range: &queravuev1.TextRange{Start: 5, End: 2}},
+	} {
+		resp, err := svc.FormatSQL(context.Background(), req)
+		if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID {
+			t.Errorf("FormatSQL(%v) = %v, %v", req, resp, err)
+		}
+	}
+}
+
+func TestFormatSQLUnknownSessionIsNotFound(t *testing.T) {
+	svc, _, _ := completionEnv(t)
+	_, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{SessionId: "nope", Text: "select 1"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code = %v", status.Code(err))
 	}
 }

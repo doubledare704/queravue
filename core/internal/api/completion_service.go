@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/doubledare704/queravue/core/internal/completion"
+	"github.com/doubledare704/queravue/core/internal/format"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/session"
+	"github.com/doubledare704/queravue/core/internal/sqlsplit"
 )
 
 // CompletionService implements queravuev1.CompletionServiceServer.
@@ -151,10 +154,82 @@ func itemKind(k completion.Kind) queravuev1.CompletionItemKind {
 
 // FormatSQL implements the RPC.
 func (c *CompletionService) FormatSQL(_ context.Context, req *queravuev1.FormatSQLRequest) (*queravuev1.FormatSQLResponse, error) {
-	if id := req.GetSessionId(); id != "" {
-		if _, err := c.sessions.Get(id); err != nil {
-			return nil, status.Error(codes.NotFound, "session not found")
-		}
+	lexer, errResp, err := c.formatDialect(req)
+	if err != nil || errResp != nil {
+		return errResp, err
 	}
-	return &queravuev1.FormatSQLResponse{Error: unsupported("formatting is not available yet")}, nil
+	text := req.GetText()
+	offsets := sqlsplit.NewOffsetMap(text)
+	whole := &queravuev1.TextRange{End: utf16Offset(offsets, len(text))}
+	replaced := whole
+	start, end := 0, len(text)
+	if r := req.GetRange(); r != nil {
+		if r.GetStart() > r.GetEnd() || r.GetEnd() > whole.GetEnd() {
+			return &queravuev1.FormatSQLResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, "range is outside the text")}, nil
+		}
+		replaced = r
+		start, end = offsets.ToByte(int(r.GetStart())), offsets.ToByte(int(r.GetEnd()))
+	}
+	formatted, err := format.Format(lexer, text[start:end], formatOptions(req.GetOptions()))
+	var syntaxErr *format.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		pos := utf16Offset(offsets, start+syntaxErr.Offset)
+		return &queravuev1.FormatSQLResponse{Error: &queravuev1.AdminError{
+			Kind: queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, Message: syntaxErr.Message, Position: &pos,
+		}}, nil
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, "formatting failed")
+	}
+	return &queravuev1.FormatSQLResponse{FormattedText: formatted, ReplacedRange: replaced}, nil
+}
+
+func (c *CompletionService) formatDialect(req *queravuev1.FormatSQLRequest) (sqlsplit.Dialect, *queravuev1.FormatSQLResponse, error) {
+	if id := req.GetSessionId(); id != "" {
+		sess, err := c.sessions.Get(id)
+		if err != nil {
+			return 0, nil, status.Error(codes.NotFound, "session not found")
+		}
+		if sess.Dialect == nil {
+			return 0, &queravuev1.FormatSQLResponse{Error: unsupported("this connection does not speak SQL")}, nil
+		}
+		return sess.Dialect.Lexer(), nil, nil
+	}
+	lexer, ok := lexerByName(req.GetDialect())
+	if !ok {
+		return 0, &queravuev1.FormatSQLResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, fmt.Sprintf("unknown dialect %q", req.GetDialect()))}, nil
+	}
+	return lexer, nil, nil
+}
+
+func lexerByName(name string) (sqlsplit.Dialect, bool) {
+	switch strings.ToLower(name) {
+	case "postgres", "postgresql", "cockroachdb", "cockroach":
+		return sqlsplit.Postgres, true
+	case "mysql", "mariadb", "tidb":
+		return sqlsplit.MySQL, true
+	case "mssql", "sqlserver":
+		return sqlsplit.MSSQL, true
+	case "sqlite":
+		return sqlsplit.SQLite, true
+	}
+	return 0, false
+}
+
+func utf16Offset(m sqlsplit.OffsetMap, byteOffset int) uint32 {
+	return uint32(m.ToUTF16(byteOffset)) //nolint:gosec // offsets are non-negative and bounded by the request size
+}
+
+func formatOptions(o *queravuev1.FormatOptions) format.Options {
+	opts := format.Options{IndentWidth: int(o.GetIndentWidth()), MaxLineWidth: int(o.GetMaxLineWidth())}
+	switch o.GetKeywordCase() {
+	case queravuev1.KeywordCase_KEYWORD_CASE_LOWER:
+		opts.KeywordCase = format.CaseLower
+	case queravuev1.KeywordCase_KEYWORD_CASE_PRESERVE:
+		opts.KeywordCase = format.CasePreserve
+	}
+	if o.GetCommaStyle() == queravuev1.CommaStyle_COMMA_STYLE_LEADING {
+		opts.CommaStyle = format.CommaLeading
+	}
+	return opts
 }

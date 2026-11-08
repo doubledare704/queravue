@@ -101,7 +101,7 @@ func TestBuiltinRegistry(t *testing.T) {
 			if c == engine.CapConnect {
 				continue
 			}
-			if _, ok := engine.CapabilityInterfaces[c]; !ok {
+			if _, ok := engine.CapabilityInterfaces[c]; !ok && !engine.CapabilitiesWithoutInterface[c] {
 				t.Errorf("%s declares %q with no interface mapping", d.ID, c)
 			}
 		}
