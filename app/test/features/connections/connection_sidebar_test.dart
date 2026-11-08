@@ -2,7 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:queravue/features/command_palette/command_palette.dart';
+import 'package:queravue/features/command_palette/presentation/command_palette.dart';
 import 'package:queravue/features/connections/domain/models.dart';
 import 'package:queravue/features/connections/presentation/connection_sidebar.dart';
 

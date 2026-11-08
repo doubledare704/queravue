@@ -4,6 +4,9 @@ import 'package:queravue/features/completion/data/completion_repository.dart';
 import 'package:queravue/features/completion/domain/snippets.dart';
 
 import 'fake_completion.dart';
+import 'fake_keybindings.dart';
+
+import 'package:queravue/features/keybindings/application/keybindings_controller.dart';
 
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +24,7 @@ List<Override> fakeCoreOverrides(
   coreReadyProvider.overrideWithValue(ready),
   completionRepositoryProvider.overrideWithValue(FakeCompletionRepository()),
   userSnippetsProvider.overrideWith((ref) async => const <Snippet>[]),
+  keybindingsProvider.overrideWith(FakeKeybindings.new),
 ];
 
 /// A container backed by [repo], disposed after the test.
