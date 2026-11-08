@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core_client/core_providers.dart';
 import 'features/command_palette/command_palette.dart';
+import 'features/completion/application/format_action.dart';
 import 'features/connections/presentation/connection_actions.dart';
 import 'features/editor/application/editor_actions.dart';
 import 'features/editor/domain/query_models.dart';
@@ -95,6 +96,12 @@ class HomeScreen extends ConsumerWidget {
             searchWorkspaceFlow(ref),
         primaryShortcut(LogicalKeyboardKey.keyT, shift: true): () =>
             openShellTab(ref),
+        const SingleActivator(
+          LogicalKeyboardKey.keyF,
+          shift: true,
+          alt: true,
+        ): () =>
+            formatActiveTab(context, ref),
       },
       child: Focus(
         autofocus: true,

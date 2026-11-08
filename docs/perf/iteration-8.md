@@ -48,7 +48,20 @@ Go benchmark (`BenchmarkCompleteOn500Tables`, generated 500-table catalog, 200 i
 
 Go benchmark (`BenchmarkCompleteMongoFilterKeys`, a sample with about 2,000 distinct nested paths, filter key position, Apple M4 Pro): 0.69 ms/op, 1.2 MB/op, 21,263 allocs/op. Budget ≤ 10 ms. Sampling cost on a real server is paid once per collection and 5 minutes; `Complete` never waits more than 150 ms for it.
 
+## Keystroke to popup (app, profile build)
+
+`make test-perf-completion` (`app/integration_test/completion_perf_test.dart`): the real app and core, the seeded Postgres 17 schema `large` (500 tables, about 7,500 columns), Apple M4 Pro, macOS profile build. Typing is injected as IME deltas into the SQL editor, one character at a time with 90 ms between characters; the clock runs from the insertion until the frame that shows the popup, vsync included. 6 rounds of 4 scenarios (`FROM large.` + `account_a`, alias columns after `x.`, `SELECT ` + `co`, a second table after `JOIN large.`).
+
+| Measurement | Samples | p50 | p95 | Budget |
+|---|---|---|---|---|
+| First character of a word (popup opens) | 24 | 13.4 ms | 19.4 ms | 50 ms |
+| Next characters (list narrows) | 72 | | 25.1 ms | 50 ms |
+| `Complete` round trip over the socket, no UI | 60 | | 2.8 ms | |
+
+The test asserts both p95 values in profile mode. The first character is fast because the previous keystroke (the dot, the space) already asked the core; a keystroke that opens a context nobody asked about yet (a paste) shows its popup one keystroke later, not measured here. re_editor's own 50 ms delay is removed by the vendored patch (`docs/editor.md`).
+
+Along the way the run found a core bug that the unit tests could not: the first warm-up of a session raced with the schema browser on the same driver connection (`conn busy`), failed silently and never retried, so completion stayed cold. Warm-up queries now retry while the connection is busy, a failed warm-up is logged and retried after 5 seconds.
+
 ## Not measured yet
-- Keystroke → popup frame (50 ms budget): needs the UI, PR 4.
 - Bulk introspection timings on MySQL, MariaDB, SQL Server, CockroachDB and TiDB. The queries are covered by the shared `BulkColumns` integration suite; only PostgreSQL, MySQL and MariaDB were run locally.
 - Cold start and idle memory with the warm-up running at session open: the catalog is small, but the whole-process numbers need the perf-check run with the UI.

@@ -52,3 +52,5 @@ Use **`re_editor`** (with `re_highlight` for SQL grammars) for the SQL editor in
 ## Alternatives considered
 - **flutter_code_editor:** rejected. Every keystroke re-highlights and re-lays out the whole document on the UI thread (4.2 s per keystroke on 5k lines). It also has no replace and its completion popup can't be customised.
 - **Wrapping a web editor (Monaco/CodeMirror) in a webview:** out of scope by ADR 0001 (no webview).
+
+- **Vendored for the completion popup (Iteration 8, PR 4).** re_editor opened its autocomplete popup 50 ms after a keystroke, which is the entire PRD budget (≤ 50 ms from keystroke to popup), and its prompts hook is synchronous. The app now vendors re_editor 0.10.0 in `app/third_party/re_editor/` with two patches (the popup opens after the frame that laid the typed text out; the cursor blink timer ignores a disposed controller), listed in `QUERAVUE.md` there. The completion engine feeds the synchronous hook from a cache (ADR 0015). Moving back to the pub.dev package needs the first patch upstream.
