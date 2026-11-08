@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/query.proto";
+
+// CompletionService answers editor completion and formatting requests (ADR 0015).
+// The UI enables it from the "completion" and "format" capabilities and never
+// from engine ids.
+//
+// Failures are returned in-band as AdminError so streams and transport stay
+// healthy. Unknown sessions are NOT_FOUND.
+service CompletionService {
+  // Complete returns ranked candidates for the cursor position. It answers
+  // from the cached catalog and never waits for WarmCatalog. Cancel the call
+  // when the user types again.
+  rpc Complete(CompleteRequest) returns (CompleteResponse);
+
+  // WarmCatalog loads all columns of a database in the background with one
+  // query per schema and streams progress. The last message has done=true.
+  // Cancelling the call stops the load. A second call for the same database
+  // joins the running load.
+  rpc WarmCatalog(WarmCatalogRequest) returns (stream WarmCatalogResponse);
+
+  // FormatSQL formats SQL text or a range of it. Unknown syntax is returned
+  // unchanged.
+  rpc FormatSQL(FormatSQLRequest) returns (FormatSQLResponse);
+}
+
+// CompletionContextKind says what kind of text is being completed.
+enum CompletionContextKind {
+  // Unspecified. Rejected as INVALID.
+  COMPLETION_CONTEXT_KIND_UNSPECIFIED = 0;
+  // A SQL statement in the SQL editor.
+  COMPLETION_CONTEXT_KIND_SQL = 1;
+  // JavaScript in the Mongo shell.
+  COMPLETION_CONTEXT_KIND_SHELL = 2;
+  // EJSON in the Mongo filter, sort or projection inputs.
+  COMPLETION_CONTEXT_KIND_MONGO_QUERY = 3;
+}
+
+// CompletionItemKind selects the icon and tells the UI what the item is.
+enum CompletionItemKind {
+  // Unspecified.
+  COMPLETION_ITEM_KIND_UNSPECIFIED = 0;
+  // A SQL or shell keyword.
+  COMPLETION_ITEM_KIND_KEYWORD = 1;
+  // A function.
+  COMPLETION_ITEM_KIND_FUNCTION = 2;
+  // A table.
+  COMPLETION_ITEM_KIND_TABLE = 3;
+  // A view or materialized view.
+  COMPLETION_ITEM_KIND_VIEW = 4;
+  // A column.
+  COMPLETION_ITEM_KIND_COLUMN = 5;
+  // A schema.
+  COMPLETION_ITEM_KIND_SCHEMA = 6;
+  // A database.
+  COMPLETION_ITEM_KIND_DATABASE = 7;
+  // A table alias or CTE name defined in the statement.
+  COMPLETION_ITEM_KIND_ALIAS = 8;
+  // A Mongo collection.
+  COMPLETION_ITEM_KIND_COLLECTION = 9;
+  // A Mongo field path.
+  COMPLETION_ITEM_KIND_FIELD = 10;
+  // A Mongo query or update operator such as $in.
+  COMPLETION_ITEM_KIND_OPERATOR = 11;
+  // A collection or cursor method in the shell.
+  COMPLETION_ITEM_KIND_METHOD = 12;
+}
+
+// CatalogState tells how much of the schema catalog is loaded.
+enum CatalogState {
+  // Unspecified, for example Mongo contexts without a catalog.
+  CATALOG_STATE_UNSPECIFIED = 0;
+  // Nothing loaded yet; only the object list may be available.
+  CATALOG_STATE_COLD = 1;
+  // Columns are still arriving; the UI shows a loading hint.
+  CATALOG_STATE_WARMING = 2;
+  // All columns are cached.
+  CATALOG_STATE_READY = 3;
+}
+
+// CompleteRequest is the input of Complete.
+message CompleteRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // What is being completed.
+  CompletionContextKind kind = 2;
+  // Text window around the cursor: the current statement for SQL, the current
+  // chunk for the shell, the whole input for the query bar. Never the whole file.
+  string text = 3;
+  // Cursor position inside text, in UTF-16 code units.
+  uint32 cursor_offset = 4;
+  // Upper limit on returned items. 0 means 200; the core clamps it to [1, 1000].
+  uint32 max_items = 5;
+  // Database in scope; empty means the session default.
+  string database = 6;
+  // Schema in scope for unqualified SQL names; empty means the engine default.
+  string schema = 7;
+  // Collection in scope for SHELL (when known) and MONGO_QUERY.
+  string collection = 8;
+}
+
+// CompletionItem is one candidate.
+message CompletionItem {
+  // Text shown in the list.
+  string label = 1;
+  // What the item is.
+  CompletionItemKind kind = 2;
+  // Secondary text, such as a column type and its table.
+  string detail = 3;
+  // Text to insert, already quoted for the dialect when needed.
+  string insert_text = 4;
+  // Range of the request text that insert_text replaces.
+  TextRange replace = 5;
+  // Fixed-width key; sorting items by it ascending gives the ranked order.
+  string sort_key = 6;
+}
+
+// CompleteResponse holds ranked candidates or the failure.
+message CompleteResponse {
+  // Candidates in ranked order.
+  repeated CompletionItem items = 1;
+  // True if max_items cut the list, so the UI must not filter it locally.
+  bool is_incomplete = 2;
+  // How much of the catalog was available for this answer.
+  CatalogState catalog_state = 3;
+  // Set when the call failed.
+  AdminError error = 4;
+}
+
+// WarmCatalogRequest selects what to load.
+message WarmCatalogRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Database to warm; empty means the session default.
+  string database = 2;
+}
+
+// WarmCatalogResponse reports loading counters.
+message WarmCatalogResponse {
+  // Schemas to load, once known.
+  uint32 schemas_total = 1;
+  // Schemas loaded so far.
+  uint32 schemas_done = 2;
+  // Tables and views known so far.
+  uint32 tables_loaded = 3;
+  // Columns cached so far.
+  uint32 columns_loaded = 4;
+  // True on the last message.
+  bool done = 5;
+  // Set on the last message if loading failed or was unsupported.
+  AdminError error = 6;
+}
+
+// KeywordCase selects how keywords are written.
+enum KeywordCase {
+  // Use the default, upper case.
+  KEYWORD_CASE_UNSPECIFIED = 0;
+  // SELECT
+  KEYWORD_CASE_UPPER = 1;
+  // select
+  KEYWORD_CASE_LOWER = 2;
+  // Leave keywords as written.
+  KEYWORD_CASE_PRESERVE = 3;
+}
+
+// CommaStyle selects where commas go in lists that span lines.
+enum CommaStyle {
+  // Use the default, trailing.
+  COMMA_STYLE_UNSPECIFIED = 0;
+  // a,
+  // b
+  COMMA_STYLE_TRAILING = 1;
+  // a
+  // , b
+  COMMA_STYLE_LEADING = 2;
+}
+
+// FormatOptions control the formatter.
+message FormatOptions {
+  // Keyword case.
+  KeywordCase keyword_case = 1;
+  // Spaces per indent level. 0 means 2; the core clamps it to [1, 8].
+  uint32 indent_width = 2;
+  // Comma placement.
+  CommaStyle comma_style = 3;
+  // Preferred maximum line width. 0 means 100; the core clamps it to [40, 400].
+  uint32 max_line_width = 4;
+}
+
+// FormatSQLRequest is the input of FormatSQL.
+message FormatSQLRequest {
+  // Session id; its dialect is used when set.
+  string session_id = 1;
+  // Dialect id such as "postgres", "mysql", "mssql" or "sqlite", used when
+  // session_id is empty.
+  string dialect = 2;
+  // Text to format.
+  string text = 3;
+  // Formatter options.
+  FormatOptions options = 4;
+  // Range of text to format in UTF-16 code units. Unset means all of text.
+  optional TextRange range = 5;
+}
+
+// FormatSQLResponse holds the formatted text or the failure.
+message FormatSQLResponse {
+  // Replacement for the formatted range.
+  string formatted_text = 1;
+  // Range of the request text that formatted_text replaces.
+  TextRange replaced_range = 2;
+  // Set when formatting failed; AdminError.position points at the offending
+  // character for INVALID. The text is then unchanged.
+  AdminError error = 3;
+}

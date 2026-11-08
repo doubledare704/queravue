@@ -69,11 +69,13 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 
 ## Phase C — Productivity (it. 8–12)
 
-### It. 8 — Editor intelligence & layout
+### It. 8 — Editor intelligence & layout 🚧 in progress
 - Schema-aware autocomplete (tables, columns, aliases, Mongo fields from sampled schema).
 - Formatter, snippets, command palette, shortcuts.
 - Split panels / detachable panes.
 - **Done when:** autocomplete is useful on a 500-table schema and stays under 50 ms.
+
+**Status:** PR 1 of 6 (ADR 0015, `CompletionService` contract, protocol version 8) in review. Core completion, formatter, UI, action registry and layout follow in PRs 2–6.
 
 ### It. 9 — ER diagrams + materialize
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).

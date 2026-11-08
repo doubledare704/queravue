@@ -341,3 +341,11 @@ func documentInput(in engine.Input) queravuev1.DocumentInput {
 		return queravuev1.DocumentInput_DOCUMENT_INPUT_UNSPECIFIED
 	}
 }
+
+// SampleFieldPaths implements the RPC.
+func (d *DocumentService) SampleFieldPaths(_ context.Context, _ *queravuev1.SampleFieldPathsRequest) (*queravuev1.SampleFieldPathsResponse, error) {
+	return &queravuev1.SampleFieldPathsResponse{Error: &queravuev1.DocumentError{
+		Kind:    queravuev1.DocumentErrorKind_DOCUMENT_ERROR_KIND_UNSUPPORTED,
+		Message: "field path sampling is not available yet",
+	}}, nil
+}

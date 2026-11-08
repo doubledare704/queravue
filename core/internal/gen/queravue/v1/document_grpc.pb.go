@@ -19,13 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DocumentService_Find_FullMethodName            = "/queravue.v1.DocumentService/Find"
-	DocumentService_Count_FullMethodName           = "/queravue.v1.DocumentService/Count"
-	DocumentService_InsertDocuments_FullMethodName = "/queravue.v1.DocumentService/InsertDocuments"
-	DocumentService_ReplaceDocument_FullMethodName = "/queravue.v1.DocumentService/ReplaceDocument"
-	DocumentService_UpdateFields_FullMethodName    = "/queravue.v1.DocumentService/UpdateFields"
-	DocumentService_DeleteDocuments_FullMethodName = "/queravue.v1.DocumentService/DeleteDocuments"
-	DocumentService_SampleFields_FullMethodName    = "/queravue.v1.DocumentService/SampleFields"
+	DocumentService_Find_FullMethodName             = "/queravue.v1.DocumentService/Find"
+	DocumentService_Count_FullMethodName            = "/queravue.v1.DocumentService/Count"
+	DocumentService_InsertDocuments_FullMethodName  = "/queravue.v1.DocumentService/InsertDocuments"
+	DocumentService_ReplaceDocument_FullMethodName  = "/queravue.v1.DocumentService/ReplaceDocument"
+	DocumentService_UpdateFields_FullMethodName     = "/queravue.v1.DocumentService/UpdateFields"
+	DocumentService_DeleteDocuments_FullMethodName  = "/queravue.v1.DocumentService/DeleteDocuments"
+	DocumentService_SampleFields_FullMethodName     = "/queravue.v1.DocumentService/SampleFields"
+	DocumentService_SampleFieldPaths_FullMethodName = "/queravue.v1.DocumentService/SampleFieldPaths"
 )
 
 // DocumentServiceClient is the client API for DocumentService service.
@@ -70,6 +71,10 @@ type DocumentServiceClient interface {
 	// types seen and how often they occur. The UI uses it to build table-view
 	// columns.
 	SampleFields(ctx context.Context, in *SampleFieldsRequest, opts ...grpc.CallOption) (*SampleFieldsResponse, error)
+	// SampleFieldPaths samples a collection and reports nested field paths
+	// (address.city, tags.[], items.[].sku) with types and frequency. Editor
+	// completion uses it. Results are cached per collection for a short time.
+	SampleFieldPaths(ctx context.Context, in *SampleFieldPathsRequest, opts ...grpc.CallOption) (*SampleFieldPathsResponse, error)
 }
 
 type documentServiceClient struct {
@@ -159,6 +164,16 @@ func (c *documentServiceClient) SampleFields(ctx context.Context, in *SampleFiel
 	return out, nil
 }
 
+func (c *documentServiceClient) SampleFieldPaths(ctx context.Context, in *SampleFieldPathsRequest, opts ...grpc.CallOption) (*SampleFieldPathsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SampleFieldPathsResponse)
+	err := c.cc.Invoke(ctx, DocumentService_SampleFieldPaths_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DocumentServiceServer is the server API for DocumentService service.
 // All implementations must embed UnimplementedDocumentServiceServer
 // for forward compatibility.
@@ -201,6 +216,10 @@ type DocumentServiceServer interface {
 	// types seen and how often they occur. The UI uses it to build table-view
 	// columns.
 	SampleFields(context.Context, *SampleFieldsRequest) (*SampleFieldsResponse, error)
+	// SampleFieldPaths samples a collection and reports nested field paths
+	// (address.city, tags.[], items.[].sku) with types and frequency. Editor
+	// completion uses it. Results are cached per collection for a short time.
+	SampleFieldPaths(context.Context, *SampleFieldPathsRequest) (*SampleFieldPathsResponse, error)
 	mustEmbedUnimplementedDocumentServiceServer()
 }
 
@@ -231,6 +250,9 @@ func (UnimplementedDocumentServiceServer) DeleteDocuments(context.Context, *Dele
 }
 func (UnimplementedDocumentServiceServer) SampleFields(context.Context, *SampleFieldsRequest) (*SampleFieldsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SampleFields not implemented")
+}
+func (UnimplementedDocumentServiceServer) SampleFieldPaths(context.Context, *SampleFieldPathsRequest) (*SampleFieldPathsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SampleFieldPaths not implemented")
 }
 func (UnimplementedDocumentServiceServer) mustEmbedUnimplementedDocumentServiceServer() {}
 func (UnimplementedDocumentServiceServer) testEmbeddedByValue()                         {}
@@ -372,6 +394,24 @@ func _DocumentService_SampleFields_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DocumentService_SampleFieldPaths_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SampleFieldPathsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DocumentServiceServer).SampleFieldPaths(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DocumentService_SampleFieldPaths_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DocumentServiceServer).SampleFieldPaths(ctx, req.(*SampleFieldPathsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DocumentService_ServiceDesc is the grpc.ServiceDesc for DocumentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +442,10 @@ var DocumentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SampleFields",
 			Handler:    _DocumentService_SampleFields_Handler,
+		},
+		{
+			MethodName: "SampleFieldPaths",
+			Handler:    _DocumentService_SampleFieldPaths_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

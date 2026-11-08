@@ -1787,6 +1787,325 @@ class SampleFieldsResponse extends $pb.GeneratedMessage {
   DocumentError ensureError() => $_ensure(3);
 }
 
+/// SampleFieldPathsRequest is the input of SampleFieldPaths.
+class SampleFieldPathsRequest extends $pb.GeneratedMessage {
+  factory SampleFieldPathsRequest({
+    $core.String? sessionId,
+    $core.String? database,
+    $core.String? collection,
+    $core.int? sampleSize,
+    $core.int? maxDepth,
+    $core.bool? refresh,
+  }) {
+    final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (database != null) result.database = database;
+    if (collection != null) result.collection = collection;
+    if (sampleSize != null) result.sampleSize = sampleSize;
+    if (maxDepth != null) result.maxDepth = maxDepth;
+    if (refresh != null) result.refresh = refresh;
+    return result;
+  }
+
+  SampleFieldPathsRequest._();
+
+  factory SampleFieldPathsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SampleFieldPathsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SampleFieldPathsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(2, _omitFieldNames ? '' : 'database')
+    ..aOS(3, _omitFieldNames ? '' : 'collection')
+    ..aI(4, _omitFieldNames ? '' : 'sampleSize', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'maxDepth', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(6, _omitFieldNames ? '' : 'refresh')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SampleFieldPathsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SampleFieldPathsRequest copyWith(
+          void Function(SampleFieldPathsRequest) updates) =>
+      super.copyWith((message) => updates(message as SampleFieldPathsRequest))
+          as SampleFieldPathsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SampleFieldPathsRequest create() => SampleFieldPathsRequest._();
+  @$core.override
+  SampleFieldPathsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SampleFieldPathsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SampleFieldPathsRequest>(create);
+  static SampleFieldPathsRequest? _defaultInstance;
+
+  /// Session id.
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  /// Database name.
+  @$pb.TagNumber(2)
+  $core.String get database => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set database($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDatabase() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDatabase() => $_clearField(2);
+
+  /// Collection or view name.
+  @$pb.TagNumber(3)
+  $core.String get collection => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set collection($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCollection() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCollection() => $_clearField(3);
+
+  /// Documents to sample. 0 means 100; the core clamps it to [1, 1000].
+  @$pb.TagNumber(4)
+  $core.int get sampleSize => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sampleSize($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSampleSize() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSampleSize() => $_clearField(4);
+
+  /// Deepest path to report. 0 means 6; the core clamps it to [1, 12].
+  @$pb.TagNumber(5)
+  $core.int get maxDepth => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set maxDepth($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMaxDepth() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMaxDepth() => $_clearField(5);
+
+  /// Skip the cache and sample again.
+  @$pb.TagNumber(6)
+  $core.bool get refresh => $_getBF(5);
+  @$pb.TagNumber(6)
+  set refresh($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasRefresh() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRefresh() => $_clearField(6);
+}
+
+/// FieldPathStat describes one field path in the sample.
+class FieldPathStat extends $pb.GeneratedMessage {
+  factory FieldPathStat({
+    $core.String? path,
+    $core.Iterable<TypeCount>? types,
+    $core.double? frequency,
+    $core.int? depth,
+  }) {
+    final result = create();
+    if (path != null) result.path = path;
+    if (types != null) result.types.addAll(types);
+    if (frequency != null) result.frequency = frequency;
+    if (depth != null) result.depth = depth;
+    return result;
+  }
+
+  FieldPathStat._();
+
+  factory FieldPathStat.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FieldPathStat.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FieldPathStat',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'path')
+    ..pPM<TypeCount>(2, _omitFieldNames ? '' : 'types',
+        subBuilder: TypeCount.create)
+    ..aD(3, _omitFieldNames ? '' : 'frequency')
+    ..aI(4, _omitFieldNames ? '' : 'depth', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FieldPathStat clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FieldPathStat copyWith(void Function(FieldPathStat) updates) =>
+      super.copyWith((message) => updates(message as FieldPathStat))
+          as FieldPathStat;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FieldPathStat create() => FieldPathStat._();
+  @$core.override
+  FieldPathStat createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FieldPathStat getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FieldPathStat>(create);
+  static FieldPathStat? _defaultInstance;
+
+  /// Dotted path; array elements use the segment [].
+  @$pb.TagNumber(1)
+  $core.String get path => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set path($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPath() => $_clearField(1);
+
+  /// Types seen, most frequent first.
+  @$pb.TagNumber(2)
+  $pb.PbList<TypeCount> get types => $_getList(1);
+
+  /// Share of sampled documents that have the path, in [0, 1].
+  @$pb.TagNumber(3)
+  $core.double get frequency => $_getN(2);
+  @$pb.TagNumber(3)
+  set frequency($core.double value) => $_setDouble(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFrequency() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFrequency() => $_clearField(3);
+
+  /// Number of segments in the path.
+  @$pb.TagNumber(4)
+  $core.int get depth => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set depth($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDepth() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDepth() => $_clearField(4);
+}
+
+/// SampleFieldPathsResponse holds the sampled paths or the failure.
+class SampleFieldPathsResponse extends $pb.GeneratedMessage {
+  factory SampleFieldPathsResponse({
+    $core.Iterable<FieldPathStat>? paths,
+    $core.int? sampled,
+    $core.bool? usedFallback,
+    $core.bool? truncated,
+    DocumentError? error,
+  }) {
+    final result = create();
+    if (paths != null) result.paths.addAll(paths);
+    if (sampled != null) result.sampled = sampled;
+    if (usedFallback != null) result.usedFallback = usedFallback;
+    if (truncated != null) result.truncated = truncated;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  SampleFieldPathsResponse._();
+
+  factory SampleFieldPathsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SampleFieldPathsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SampleFieldPathsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..pPM<FieldPathStat>(1, _omitFieldNames ? '' : 'paths',
+        subBuilder: FieldPathStat.create)
+    ..aI(2, _omitFieldNames ? '' : 'sampled', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(3, _omitFieldNames ? '' : 'usedFallback')
+    ..aOB(4, _omitFieldNames ? '' : 'truncated')
+    ..aOM<DocumentError>(5, _omitFieldNames ? '' : 'error',
+        subBuilder: DocumentError.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SampleFieldPathsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SampleFieldPathsResponse copyWith(
+          void Function(SampleFieldPathsResponse) updates) =>
+      super.copyWith((message) => updates(message as SampleFieldPathsResponse))
+          as SampleFieldPathsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SampleFieldPathsResponse create() => SampleFieldPathsResponse._();
+  @$core.override
+  SampleFieldPathsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SampleFieldPathsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SampleFieldPathsResponse>(create);
+  static SampleFieldPathsResponse? _defaultInstance;
+
+  /// Paths ordered by frequency, then path. _id comes first.
+  @$pb.TagNumber(1)
+  $pb.PbList<FieldPathStat> get paths => $_getList(0);
+
+  /// Number of documents actually sampled.
+  @$pb.TagNumber(2)
+  $core.int get sampled => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set sampled($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSampled() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSampled() => $_clearField(2);
+
+  /// True if $sample was unavailable and the first documents were read instead.
+  @$pb.TagNumber(3)
+  $core.bool get usedFallback => $_getBF(2);
+  @$pb.TagNumber(3)
+  set usedFallback($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUsedFallback() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUsedFallback() => $_clearField(3);
+
+  /// True if the path limit cut the list.
+  @$pb.TagNumber(4)
+  $core.bool get truncated => $_getBF(3);
+  @$pb.TagNumber(4)
+  set truncated($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTruncated() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTruncated() => $_clearField(4);
+
+  /// Set when sampling failed.
+  @$pb.TagNumber(5)
+  DocumentError get error => $_getN(4);
+  @$pb.TagNumber(5)
+  set error(DocumentError value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => $_clearField(5);
+  @$pb.TagNumber(5)
+  DocumentError ensureError() => $_ensure(4);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =

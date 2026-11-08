@@ -30,6 +30,11 @@ const (
 	CapStats Capability = "stats"
 	// CapValidation: ValidationManager (Iteration 7).
 	CapValidation Capability = "validation"
+	// CapCompletion: schema-aware completion (Iteration 8, ADR 0015). Engines
+	// declare it, and get a CapabilityInterfaces entry, when they implement it.
+	CapCompletion Capability = "completion"
+	// CapFormat: SQL formatting (Iteration 8, ADR 0015), declared like CapCompletion.
+	CapFormat Capability = "format"
 )
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides

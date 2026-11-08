@@ -1548,6 +1548,252 @@ func (x *SampleFieldsResponse) GetError() *DocumentError {
 	return nil
 }
 
+// SampleFieldPathsRequest is the input of SampleFieldPaths.
+type SampleFieldPathsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Session id.
+	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	// Database name.
+	Database string `protobuf:"bytes,2,opt,name=database,proto3" json:"database,omitempty"`
+	// Collection or view name.
+	Collection string `protobuf:"bytes,3,opt,name=collection,proto3" json:"collection,omitempty"`
+	// Documents to sample. 0 means 100; the core clamps it to [1, 1000].
+	SampleSize uint32 `protobuf:"varint,4,opt,name=sample_size,json=sampleSize,proto3" json:"sample_size,omitempty"`
+	// Deepest path to report. 0 means 6; the core clamps it to [1, 12].
+	MaxDepth uint32 `protobuf:"varint,5,opt,name=max_depth,json=maxDepth,proto3" json:"max_depth,omitempty"`
+	// Skip the cache and sample again.
+	Refresh       bool `protobuf:"varint,6,opt,name=refresh,proto3" json:"refresh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SampleFieldPathsRequest) Reset() {
+	*x = SampleFieldPathsRequest{}
+	mi := &file_queravue_v1_document_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SampleFieldPathsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SampleFieldPathsRequest) ProtoMessage() {}
+
+func (x *SampleFieldPathsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_document_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SampleFieldPathsRequest.ProtoReflect.Descriptor instead.
+func (*SampleFieldPathsRequest) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_document_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SampleFieldPathsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *SampleFieldPathsRequest) GetDatabase() string {
+	if x != nil {
+		return x.Database
+	}
+	return ""
+}
+
+func (x *SampleFieldPathsRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *SampleFieldPathsRequest) GetSampleSize() uint32 {
+	if x != nil {
+		return x.SampleSize
+	}
+	return 0
+}
+
+func (x *SampleFieldPathsRequest) GetMaxDepth() uint32 {
+	if x != nil {
+		return x.MaxDepth
+	}
+	return 0
+}
+
+func (x *SampleFieldPathsRequest) GetRefresh() bool {
+	if x != nil {
+		return x.Refresh
+	}
+	return false
+}
+
+// FieldPathStat describes one field path in the sample.
+type FieldPathStat struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Dotted path; array elements use the segment [].
+	Path string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	// Types seen, most frequent first.
+	Types []*TypeCount `protobuf:"bytes,2,rep,name=types,proto3" json:"types,omitempty"`
+	// Share of sampled documents that have the path, in [0, 1].
+	Frequency float64 `protobuf:"fixed64,3,opt,name=frequency,proto3" json:"frequency,omitempty"`
+	// Number of segments in the path.
+	Depth         uint32 `protobuf:"varint,4,opt,name=depth,proto3" json:"depth,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FieldPathStat) Reset() {
+	*x = FieldPathStat{}
+	mi := &file_queravue_v1_document_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FieldPathStat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FieldPathStat) ProtoMessage() {}
+
+func (x *FieldPathStat) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_document_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FieldPathStat.ProtoReflect.Descriptor instead.
+func (*FieldPathStat) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_document_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *FieldPathStat) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FieldPathStat) GetTypes() []*TypeCount {
+	if x != nil {
+		return x.Types
+	}
+	return nil
+}
+
+func (x *FieldPathStat) GetFrequency() float64 {
+	if x != nil {
+		return x.Frequency
+	}
+	return 0
+}
+
+func (x *FieldPathStat) GetDepth() uint32 {
+	if x != nil {
+		return x.Depth
+	}
+	return 0
+}
+
+// SampleFieldPathsResponse holds the sampled paths or the failure.
+type SampleFieldPathsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Paths ordered by frequency, then path. _id comes first.
+	Paths []*FieldPathStat `protobuf:"bytes,1,rep,name=paths,proto3" json:"paths,omitempty"`
+	// Number of documents actually sampled.
+	Sampled uint32 `protobuf:"varint,2,opt,name=sampled,proto3" json:"sampled,omitempty"`
+	// True if $sample was unavailable and the first documents were read instead.
+	UsedFallback bool `protobuf:"varint,3,opt,name=used_fallback,json=usedFallback,proto3" json:"used_fallback,omitempty"`
+	// True if the path limit cut the list.
+	Truncated bool `protobuf:"varint,4,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	// Set when sampling failed.
+	Error         *DocumentError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SampleFieldPathsResponse) Reset() {
+	*x = SampleFieldPathsResponse{}
+	mi := &file_queravue_v1_document_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SampleFieldPathsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SampleFieldPathsResponse) ProtoMessage() {}
+
+func (x *SampleFieldPathsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_document_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SampleFieldPathsResponse.ProtoReflect.Descriptor instead.
+func (*SampleFieldPathsResponse) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_document_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SampleFieldPathsResponse) GetPaths() []*FieldPathStat {
+	if x != nil {
+		return x.Paths
+	}
+	return nil
+}
+
+func (x *SampleFieldPathsResponse) GetSampled() uint32 {
+	if x != nil {
+		return x.Sampled
+	}
+	return 0
+}
+
+func (x *SampleFieldPathsResponse) GetUsedFallback() bool {
+	if x != nil {
+		return x.UsedFallback
+	}
+	return false
+}
+
+func (x *SampleFieldPathsResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+func (x *SampleFieldPathsResponse) GetError() *DocumentError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 var File_queravue_v1_document_proto protoreflect.FileDescriptor
 
 const file_queravue_v1_document_proto_rawDesc = "" +
@@ -1677,7 +1923,29 @@ const file_queravue_v1_document_proto_rawDesc = "" +
 	"\x06fields\x18\x01 \x03(\v2\x16.queravue.v1.FieldStatR\x06fields\x12\x18\n" +
 	"\asampled\x18\x02 \x01(\rR\asampled\x12#\n" +
 	"\rused_fallback\x18\x03 \x01(\bR\fusedFallback\x120\n" +
-	"\x05error\x18\x04 \x01(\v2\x1a.queravue.v1.DocumentErrorR\x05error*\x92\x03\n" +
+	"\x05error\x18\x04 \x01(\v2\x1a.queravue.v1.DocumentErrorR\x05error\"\xcc\x01\n" +
+	"\x17SampleFieldPathsRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1a\n" +
+	"\bdatabase\x18\x02 \x01(\tR\bdatabase\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x03 \x01(\tR\n" +
+	"collection\x12\x1f\n" +
+	"\vsample_size\x18\x04 \x01(\rR\n" +
+	"sampleSize\x12\x1b\n" +
+	"\tmax_depth\x18\x05 \x01(\rR\bmaxDepth\x12\x18\n" +
+	"\arefresh\x18\x06 \x01(\bR\arefresh\"\x85\x01\n" +
+	"\rFieldPathStat\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12,\n" +
+	"\x05types\x18\x02 \x03(\v2\x16.queravue.v1.TypeCountR\x05types\x12\x1c\n" +
+	"\tfrequency\x18\x03 \x01(\x01R\tfrequency\x12\x14\n" +
+	"\x05depth\x18\x04 \x01(\rR\x05depth\"\xdb\x01\n" +
+	"\x18SampleFieldPathsResponse\x120\n" +
+	"\x05paths\x18\x01 \x03(\v2\x1a.queravue.v1.FieldPathStatR\x05paths\x12\x18\n" +
+	"\asampled\x18\x02 \x01(\rR\asampled\x12#\n" +
+	"\rused_fallback\x18\x03 \x01(\bR\fusedFallback\x12\x1c\n" +
+	"\ttruncated\x18\x04 \x01(\bR\ttruncated\x120\n" +
+	"\x05error\x18\x05 \x01(\v2\x1a.queravue.v1.DocumentErrorR\x05error*\x92\x03\n" +
 	"\x11DocumentErrorKind\x12#\n" +
 	"\x1fDOCUMENT_ERROR_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19DOCUMENT_ERROR_KIND_PARSE\x10\x01\x12 \n" +
@@ -1696,7 +1964,7 @@ const file_queravue_v1_document_proto_rawDesc = "" +
 	"\x15DOCUMENT_INPUT_FILTER\x10\x01\x12\x17\n" +
 	"\x13DOCUMENT_INPUT_SORT\x10\x02\x12\x1d\n" +
 	"\x19DOCUMENT_INPUT_PROJECTION\x10\x03\x12\x1b\n" +
-	"\x17DOCUMENT_INPUT_DOCUMENT\x10\x042\xd4\x04\n" +
+	"\x17DOCUMENT_INPUT_DOCUMENT\x10\x042\xb5\x05\n" +
 	"\x0fDocumentService\x12=\n" +
 	"\x04Find\x12\x18.queravue.v1.FindRequest\x1a\x19.queravue.v1.FindResponse0\x01\x12>\n" +
 	"\x05Count\x12\x19.queravue.v1.CountRequest\x1a\x1a.queravue.v1.CountResponse\x12\\\n" +
@@ -1704,7 +1972,8 @@ const file_queravue_v1_document_proto_rawDesc = "" +
 	"\x0fReplaceDocument\x12#.queravue.v1.ReplaceDocumentRequest\x1a$.queravue.v1.ReplaceDocumentResponse\x12S\n" +
 	"\fUpdateFields\x12 .queravue.v1.UpdateFieldsRequest\x1a!.queravue.v1.UpdateFieldsResponse\x12\\\n" +
 	"\x0fDeleteDocuments\x12#.queravue.v1.DeleteDocumentsRequest\x1a$.queravue.v1.DeleteDocumentsResponse\x12S\n" +
-	"\fSampleFields\x12 .queravue.v1.SampleFieldsRequest\x1a!.queravue.v1.SampleFieldsResponseB\xb9\x01\n" +
+	"\fSampleFields\x12 .queravue.v1.SampleFieldsRequest\x1a!.queravue.v1.SampleFieldsResponse\x12_\n" +
+	"\x10SampleFieldPaths\x12$.queravue.v1.SampleFieldPathsRequest\x1a%.queravue.v1.SampleFieldPathsResponseB\xb9\x01\n" +
 	"\x0fcom.queravue.v1B\rDocumentProtoP\x01ZJgithub.com/doubledare704/queravue/core/internal/gen/queravue/v1;queravuev1\xa2\x02\x03QXX\xaa\x02\vQueravue.V1\xca\x02\vQueravue\\V1\xe2\x02\x17Queravue\\V1\\GPBMetadata\xea\x02\fQueravue::V1b\x06proto3"
 
 var (
@@ -1720,28 +1989,31 @@ func file_queravue_v1_document_proto_rawDescGZIP() []byte {
 }
 
 var file_queravue_v1_document_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_queravue_v1_document_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_queravue_v1_document_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_queravue_v1_document_proto_goTypes = []any{
-	(DocumentErrorKind)(0),          // 0: queravue.v1.DocumentErrorKind
-	(DocumentInput)(0),              // 1: queravue.v1.DocumentInput
-	(*DocumentError)(nil),           // 2: queravue.v1.DocumentError
-	(*FindRequest)(nil),             // 3: queravue.v1.FindRequest
-	(*DocumentBatch)(nil),           // 4: queravue.v1.DocumentBatch
-	(*FindResponse)(nil),            // 5: queravue.v1.FindResponse
-	(*CountRequest)(nil),            // 6: queravue.v1.CountRequest
-	(*CountResponse)(nil),           // 7: queravue.v1.CountResponse
-	(*InsertDocumentsRequest)(nil),  // 8: queravue.v1.InsertDocumentsRequest
-	(*InsertDocumentsResponse)(nil), // 9: queravue.v1.InsertDocumentsResponse
-	(*ReplaceDocumentRequest)(nil),  // 10: queravue.v1.ReplaceDocumentRequest
-	(*ReplaceDocumentResponse)(nil), // 11: queravue.v1.ReplaceDocumentResponse
-	(*UpdateFieldsRequest)(nil),     // 12: queravue.v1.UpdateFieldsRequest
-	(*UpdateFieldsResponse)(nil),    // 13: queravue.v1.UpdateFieldsResponse
-	(*DeleteDocumentsRequest)(nil),  // 14: queravue.v1.DeleteDocumentsRequest
-	(*DeleteDocumentsResponse)(nil), // 15: queravue.v1.DeleteDocumentsResponse
-	(*SampleFieldsRequest)(nil),     // 16: queravue.v1.SampleFieldsRequest
-	(*TypeCount)(nil),               // 17: queravue.v1.TypeCount
-	(*FieldStat)(nil),               // 18: queravue.v1.FieldStat
-	(*SampleFieldsResponse)(nil),    // 19: queravue.v1.SampleFieldsResponse
+	(DocumentErrorKind)(0),           // 0: queravue.v1.DocumentErrorKind
+	(DocumentInput)(0),               // 1: queravue.v1.DocumentInput
+	(*DocumentError)(nil),            // 2: queravue.v1.DocumentError
+	(*FindRequest)(nil),              // 3: queravue.v1.FindRequest
+	(*DocumentBatch)(nil),            // 4: queravue.v1.DocumentBatch
+	(*FindResponse)(nil),             // 5: queravue.v1.FindResponse
+	(*CountRequest)(nil),             // 6: queravue.v1.CountRequest
+	(*CountResponse)(nil),            // 7: queravue.v1.CountResponse
+	(*InsertDocumentsRequest)(nil),   // 8: queravue.v1.InsertDocumentsRequest
+	(*InsertDocumentsResponse)(nil),  // 9: queravue.v1.InsertDocumentsResponse
+	(*ReplaceDocumentRequest)(nil),   // 10: queravue.v1.ReplaceDocumentRequest
+	(*ReplaceDocumentResponse)(nil),  // 11: queravue.v1.ReplaceDocumentResponse
+	(*UpdateFieldsRequest)(nil),      // 12: queravue.v1.UpdateFieldsRequest
+	(*UpdateFieldsResponse)(nil),     // 13: queravue.v1.UpdateFieldsResponse
+	(*DeleteDocumentsRequest)(nil),   // 14: queravue.v1.DeleteDocumentsRequest
+	(*DeleteDocumentsResponse)(nil),  // 15: queravue.v1.DeleteDocumentsResponse
+	(*SampleFieldsRequest)(nil),      // 16: queravue.v1.SampleFieldsRequest
+	(*TypeCount)(nil),                // 17: queravue.v1.TypeCount
+	(*FieldStat)(nil),                // 18: queravue.v1.FieldStat
+	(*SampleFieldsResponse)(nil),     // 19: queravue.v1.SampleFieldsResponse
+	(*SampleFieldPathsRequest)(nil),  // 20: queravue.v1.SampleFieldPathsRequest
+	(*FieldPathStat)(nil),            // 21: queravue.v1.FieldPathStat
+	(*SampleFieldPathsResponse)(nil), // 22: queravue.v1.SampleFieldPathsResponse
 }
 var file_queravue_v1_document_proto_depIdxs = []int32{
 	0,  // 0: queravue.v1.DocumentError.kind:type_name -> queravue.v1.DocumentErrorKind
@@ -1756,25 +2028,30 @@ var file_queravue_v1_document_proto_depIdxs = []int32{
 	17, // 9: queravue.v1.FieldStat.types:type_name -> queravue.v1.TypeCount
 	18, // 10: queravue.v1.SampleFieldsResponse.fields:type_name -> queravue.v1.FieldStat
 	2,  // 11: queravue.v1.SampleFieldsResponse.error:type_name -> queravue.v1.DocumentError
-	3,  // 12: queravue.v1.DocumentService.Find:input_type -> queravue.v1.FindRequest
-	6,  // 13: queravue.v1.DocumentService.Count:input_type -> queravue.v1.CountRequest
-	8,  // 14: queravue.v1.DocumentService.InsertDocuments:input_type -> queravue.v1.InsertDocumentsRequest
-	10, // 15: queravue.v1.DocumentService.ReplaceDocument:input_type -> queravue.v1.ReplaceDocumentRequest
-	12, // 16: queravue.v1.DocumentService.UpdateFields:input_type -> queravue.v1.UpdateFieldsRequest
-	14, // 17: queravue.v1.DocumentService.DeleteDocuments:input_type -> queravue.v1.DeleteDocumentsRequest
-	16, // 18: queravue.v1.DocumentService.SampleFields:input_type -> queravue.v1.SampleFieldsRequest
-	5,  // 19: queravue.v1.DocumentService.Find:output_type -> queravue.v1.FindResponse
-	7,  // 20: queravue.v1.DocumentService.Count:output_type -> queravue.v1.CountResponse
-	9,  // 21: queravue.v1.DocumentService.InsertDocuments:output_type -> queravue.v1.InsertDocumentsResponse
-	11, // 22: queravue.v1.DocumentService.ReplaceDocument:output_type -> queravue.v1.ReplaceDocumentResponse
-	13, // 23: queravue.v1.DocumentService.UpdateFields:output_type -> queravue.v1.UpdateFieldsResponse
-	15, // 24: queravue.v1.DocumentService.DeleteDocuments:output_type -> queravue.v1.DeleteDocumentsResponse
-	19, // 25: queravue.v1.DocumentService.SampleFields:output_type -> queravue.v1.SampleFieldsResponse
-	19, // [19:26] is the sub-list for method output_type
-	12, // [12:19] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	17, // 12: queravue.v1.FieldPathStat.types:type_name -> queravue.v1.TypeCount
+	21, // 13: queravue.v1.SampleFieldPathsResponse.paths:type_name -> queravue.v1.FieldPathStat
+	2,  // 14: queravue.v1.SampleFieldPathsResponse.error:type_name -> queravue.v1.DocumentError
+	3,  // 15: queravue.v1.DocumentService.Find:input_type -> queravue.v1.FindRequest
+	6,  // 16: queravue.v1.DocumentService.Count:input_type -> queravue.v1.CountRequest
+	8,  // 17: queravue.v1.DocumentService.InsertDocuments:input_type -> queravue.v1.InsertDocumentsRequest
+	10, // 18: queravue.v1.DocumentService.ReplaceDocument:input_type -> queravue.v1.ReplaceDocumentRequest
+	12, // 19: queravue.v1.DocumentService.UpdateFields:input_type -> queravue.v1.UpdateFieldsRequest
+	14, // 20: queravue.v1.DocumentService.DeleteDocuments:input_type -> queravue.v1.DeleteDocumentsRequest
+	16, // 21: queravue.v1.DocumentService.SampleFields:input_type -> queravue.v1.SampleFieldsRequest
+	20, // 22: queravue.v1.DocumentService.SampleFieldPaths:input_type -> queravue.v1.SampleFieldPathsRequest
+	5,  // 23: queravue.v1.DocumentService.Find:output_type -> queravue.v1.FindResponse
+	7,  // 24: queravue.v1.DocumentService.Count:output_type -> queravue.v1.CountResponse
+	9,  // 25: queravue.v1.DocumentService.InsertDocuments:output_type -> queravue.v1.InsertDocumentsResponse
+	11, // 26: queravue.v1.DocumentService.ReplaceDocument:output_type -> queravue.v1.ReplaceDocumentResponse
+	13, // 27: queravue.v1.DocumentService.UpdateFields:output_type -> queravue.v1.UpdateFieldsResponse
+	15, // 28: queravue.v1.DocumentService.DeleteDocuments:output_type -> queravue.v1.DeleteDocumentsResponse
+	19, // 29: queravue.v1.DocumentService.SampleFields:output_type -> queravue.v1.SampleFieldsResponse
+	22, // 30: queravue.v1.DocumentService.SampleFieldPaths:output_type -> queravue.v1.SampleFieldPathsResponse
+	23, // [23:31] is the sub-list for method output_type
+	15, // [15:23] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_queravue_v1_document_proto_init() }
@@ -1795,7 +2072,7 @@ func file_queravue_v1_document_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queravue_v1_document_proto_rawDesc), len(file_queravue_v1_document_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
