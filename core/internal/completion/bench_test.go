@@ -102,7 +102,7 @@ func TestCompleteP95StaysUnderTenMillisecondsOn500Tables(t *testing.T) {
 		slices.Sort(durations)
 		p95 := durations[runs*95/100]
 		t.Logf("%-26s p50 %-10v p95 %v", sc.name, durations[runs/2], p95)
-		if p95 > 10*time.Millisecond {
+		if p95 > 10*time.Millisecond && !raceDetectorOn {
 			t.Errorf("%s: p95 = %v, budget 10ms", sc.name, p95)
 		}
 	}
