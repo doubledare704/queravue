@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/doubledare704/queravue/core/internal/completion"
+	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/format"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/session"
+	"github.com/doubledare704/queravue/core/internal/sqlsplit"
 )
 
 // CompletionService implements queravuev1.CompletionServiceServer.
@@ -44,7 +49,7 @@ func (c *CompletionService) Complete(ctx context.Context, req *queravuev1.Comple
 	case queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SQL:
 	case queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL,
 		queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_MONGO_QUERY:
-		return &queravuev1.CompleteResponse{Error: unsupported("completion for this context is not available yet")}, nil
+		return c.completeMongo(ctx, sess, req)
 	default:
 		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, "completion context kind is required")}, nil
 	}
@@ -69,14 +74,66 @@ func (c *CompletionService) Complete(ctx context.Context, req *queravuev1.Comple
 		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_CANCELED, "completion was cancelled")}, nil
 	}
 	out := &queravuev1.CompleteResponse{IsIncomplete: res.Incomplete, CatalogState: catalogState(res.State)}
-	out.Items = make([]*queravuev1.CompletionItem, len(res.Items))
-	for i, it := range res.Items {
-		out.Items[i] = &queravuev1.CompletionItem{
+	out.Items = wireItems(res.Items)
+	return out, nil
+}
+
+func wireItems(items []completion.Item) []*queravuev1.CompletionItem {
+	out := make([]*queravuev1.CompletionItem, len(items))
+	for i, it := range items {
+		out[i] = &queravuev1.CompletionItem{
 			Label: it.Label, Kind: itemKind(it.Kind), Detail: it.Detail, InsertText: it.InsertText, SortKey: it.SortKey,
 			Replace: &queravuev1.TextRange{Start: uint32(it.ReplaceStart), End: uint32(it.ReplaceEnd)}, //nolint:gosec // offsets are non-negative
 		}
 	}
-	return out, nil
+	return out
+}
+
+const mongoSampleWait = 150 * time.Millisecond
+
+func (c *CompletionService) completeMongo(ctx context.Context, sess *session.Session, req *queravuev1.CompleteRequest) (*queravuev1.CompleteResponse, error) {
+	if _, ok := engine.As[engine.DocumentStore](sess.Conn); !ok {
+		return &queravuev1.CompleteResponse{Error: unsupported("this connection has no documents")}, nil
+	}
+	res, err := completion.CompleteMongo(ctx, completion.MongoRequest{
+		Shell:      req.GetKind() == queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL,
+		Text:       req.GetText(),
+		Cursor:     int(req.GetCursorOffset()),
+		MaxItems:   int(req.GetMaxItems()),
+		Database:   req.GetDatabase(),
+		Collection: req.GetCollection(),
+		Source:     mongoSource{sess: sess, catalog: c.catalogs.Mongo()},
+	})
+	if err != nil {
+		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_CANCELED, "completion was cancelled")}, nil
+	}
+	return &queravuev1.CompleteResponse{Items: wireItems(res.Items), IsIncomplete: res.Incomplete}, nil
+}
+
+type mongoSource struct {
+	sess    *session.Session
+	catalog *completion.MongoCatalog
+}
+
+func (m mongoSource) Collections(ctx context.Context, database string) ([]string, error) {
+	names, err := m.catalog.Collections(ctx, m.sess, database)
+	if err != nil {
+		return nil, fmt.Errorf("completion: collections: %w", err)
+	}
+	return names, nil
+}
+
+func (m mongoSource) FieldPaths(ctx context.Context, database, collection string) (engine.FieldPathSample, bool, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, mongoSampleWait)
+	defer cancel()
+	sample, err := m.catalog.FieldPaths(waitCtx, m.sess, completion.PathsRequest{Database: database, Collection: collection})
+	switch {
+	case err == nil:
+		return sample, true, nil
+	case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
+		return engine.FieldPathSample{}, false, nil
+	}
+	return engine.FieldPathSample{}, false, fmt.Errorf("completion: field paths: %w", err)
 }
 
 // WarmCatalog implements the RPC.
@@ -145,16 +202,96 @@ func itemKind(k completion.Kind) queravuev1.CompletionItemKind {
 		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_SCHEMA
 	case completion.KindAlias:
 		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_ALIAS
+	case completion.KindCollection:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_COLLECTION
+	case completion.KindField:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_FIELD
+	case completion.KindOperator:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_OPERATOR
+	case completion.KindMethod:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_METHOD
 	}
 	return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_UNSPECIFIED
 }
 
 // FormatSQL implements the RPC.
 func (c *CompletionService) FormatSQL(_ context.Context, req *queravuev1.FormatSQLRequest) (*queravuev1.FormatSQLResponse, error) {
-	if id := req.GetSessionId(); id != "" {
-		if _, err := c.sessions.Get(id); err != nil {
-			return nil, status.Error(codes.NotFound, "session not found")
-		}
+	lexer, errResp, err := c.formatDialect(req)
+	if err != nil || errResp != nil {
+		return errResp, err
 	}
-	return &queravuev1.FormatSQLResponse{Error: unsupported("formatting is not available yet")}, nil
+	text := req.GetText()
+	offsets := sqlsplit.NewOffsetMap(text)
+	whole := &queravuev1.TextRange{End: utf16Offset(offsets, len(text))}
+	replaced := whole
+	start, end := 0, len(text)
+	if r := req.GetRange(); r != nil {
+		if r.GetStart() > r.GetEnd() || r.GetEnd() > whole.GetEnd() {
+			return &queravuev1.FormatSQLResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, "range is outside the text")}, nil
+		}
+		replaced = r
+		start, end = offsets.ToByte(int(r.GetStart())), offsets.ToByte(int(r.GetEnd()))
+	}
+	formatted, err := format.Format(lexer, text[start:end], formatOptions(req.GetOptions()))
+	var syntaxErr *format.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		pos := utf16Offset(offsets, start+syntaxErr.Offset)
+		return &queravuev1.FormatSQLResponse{Error: &queravuev1.AdminError{
+			Kind: queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, Message: syntaxErr.Message, Position: &pos,
+		}}, nil
+	}
+	if err != nil {
+		return nil, status.Error(codes.Internal, "formatting failed")
+	}
+	return &queravuev1.FormatSQLResponse{FormattedText: formatted, ReplacedRange: replaced}, nil
+}
+
+func (c *CompletionService) formatDialect(req *queravuev1.FormatSQLRequest) (sqlsplit.Dialect, *queravuev1.FormatSQLResponse, error) {
+	if id := req.GetSessionId(); id != "" {
+		sess, err := c.sessions.Get(id)
+		if err != nil {
+			return 0, nil, status.Error(codes.NotFound, "session not found")
+		}
+		if sess.Dialect == nil {
+			return 0, &queravuev1.FormatSQLResponse{Error: unsupported("this connection does not speak SQL")}, nil
+		}
+		return sess.Dialect.Lexer(), nil, nil
+	}
+	lexer, ok := lexerByName(req.GetDialect())
+	if !ok {
+		return 0, &queravuev1.FormatSQLResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, fmt.Sprintf("unknown dialect %q", req.GetDialect()))}, nil
+	}
+	return lexer, nil, nil
+}
+
+func lexerByName(name string) (sqlsplit.Dialect, bool) {
+	switch strings.ToLower(name) {
+	case "postgres", "postgresql", "cockroachdb", "cockroach":
+		return sqlsplit.Postgres, true
+	case "mysql", "mariadb", "tidb":
+		return sqlsplit.MySQL, true
+	case "mssql", "sqlserver":
+		return sqlsplit.MSSQL, true
+	case "sqlite":
+		return sqlsplit.SQLite, true
+	}
+	return 0, false
+}
+
+func utf16Offset(m sqlsplit.OffsetMap, byteOffset int) uint32 {
+	return uint32(m.ToUTF16(byteOffset)) //nolint:gosec // offsets are non-negative and bounded by the request size
+}
+
+func formatOptions(o *queravuev1.FormatOptions) format.Options {
+	opts := format.Options{IndentWidth: int(o.GetIndentWidth()), MaxLineWidth: int(o.GetMaxLineWidth())}
+	switch o.GetKeywordCase() {
+	case queravuev1.KeywordCase_KEYWORD_CASE_LOWER:
+		opts.KeywordCase = format.CaseLower
+	case queravuev1.KeywordCase_KEYWORD_CASE_PRESERVE:
+		opts.KeywordCase = format.CasePreserve
+	}
+	if o.GetCommaStyle() == queravuev1.CommaStyle_COMMA_STYLE_LEADING {
+		opts.CommaStyle = format.CommaLeading
+	}
+	return opts
 }

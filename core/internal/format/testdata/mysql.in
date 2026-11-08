@@ -1,0 +1,33 @@
+=== my backtick identifiers
+select `order`.`id`, `user name` from `order` where `user name`='x'
+=== my limit comma
+select * from t order by id limit 10, 20
+=== my on duplicate key update
+insert into t (a, b) values (1, 2) on duplicate key update b = values(b), c = c + 1
+=== my insert ignore
+insert ignore into t (a) values (1)
+=== my replace into
+replace into t (a, b) values (1, 2)
+=== my hash comment
+select a # first column
+, b from t
+=== my double quoted string
+select "a b" as s, 'c' as d from t
+=== my straight join
+select * from a straight_join b on a.id=b.id
+=== my group concat
+select group_concat(name order by name separator ',') from t group by kind
+=== my user variable
+select @a:=1, @b from t where x=@a
+=== my string escape
+select 'it\'s' as s from t where a = 'b\\c'
+=== my update join
+update a join b on a.id=b.a_id set a.n=b.n where b.flag=1
+=== my delete limit
+delete from t where a=1 order by id limit 5
+=== my json arrow
+select data->'$.a', data->>'$.b' from t
+=== my for update
+select * from t where id=1 for update
+=== my if function
+select if(a>1,'y','n'), ifnull(b,0) from t

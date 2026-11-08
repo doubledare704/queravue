@@ -2,6 +2,7 @@ package api_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -20,6 +21,7 @@ type fakeDocConn struct {
 	findErr  error
 	replace  func(id, doc string, w engine.WriteOptions) (string, error)
 	findOpts engine.FindOptions
+	pathRuns atomic.Int32
 }
 
 func (*fakeDocConn) Ping(context.Context) error { return nil }
@@ -57,6 +59,11 @@ func (*fakeDocConn) Delete(context.Context, string, string, []engine.Document, e
 }
 func (*fakeDocConn) SampleFields(context.Context, string, string, uint32) (engine.FieldSample, error) {
 	return engine.FieldSample{Sampled: 3, Fields: []engine.FieldStat{{Name: "_id", Frequency: 1, Types: []engine.FieldType{{Type: "objectId", Count: 3}}}}}, nil
+}
+
+func (f *fakeDocConn) SampleFieldPaths(context.Context, string, string, engine.PathSampleOptions) (engine.FieldPathSample, error) {
+	f.pathRuns.Add(1)
+	return engine.FieldPathSample{Sampled: 3, Paths: []engine.FieldPathStat{{Path: "address.city", Depth: 2, Frequency: 1, Types: []engine.FieldType{{Type: "string", Count: 3}}}}}, nil
 }
 
 type fakeDocOpener struct{ conn engine.Conn }
@@ -153,5 +160,39 @@ func TestDocumentServiceSessionErrors(t *testing.T) {
 	_, err := svc.Count(context.Background(), &queravuev1.CountRequest{SessionId: "nope"})
 	if status.Code(err) != codes.NotFound {
 		t.Errorf("unknown session: %v", err)
+	}
+}
+
+func TestDocumentServiceSampleFieldPathsMapsAndCaches(t *testing.T) {
+	conn := &fakeDocConn{}
+	svc, sid := newDocService(t, conn)
+	req := &queravuev1.SampleFieldPathsRequest{SessionId: sid, Database: "d", Collection: "c"}
+	for range 2 {
+		resp, err := svc.SampleFieldPaths(context.Background(), req)
+		if err != nil || resp.GetError() != nil {
+			t.Fatalf("SampleFieldPaths = %v, %v", resp, err)
+		}
+		p := resp.GetPaths()[0]
+		if resp.GetSampled() != 3 || p.GetPath() != "address.city" || p.GetDepth() != 2 || p.GetFrequency() != 1 || p.GetTypes()[0].GetType() != "string" {
+			t.Errorf("response = %v", resp)
+		}
+	}
+	if n := conn.pathRuns.Load(); n != 1 {
+		t.Errorf("sampled %d times, want 1 (second call cached)", n)
+	}
+	req.Refresh = true
+	if _, err := svc.SampleFieldPaths(context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	if n := conn.pathRuns.Load(); n != 2 {
+		t.Errorf("sampled %d times after refresh, want 2", n)
+	}
+}
+
+func TestDocumentServiceSampleFieldPathsUnknownSessionIsNotFound(t *testing.T) {
+	svc, _ := newDocService(t, &fakeDocConn{})
+	_, err := svc.SampleFieldPaths(context.Background(), &queravuev1.SampleFieldPathsRequest{SessionId: "nope"})
+	if status.Code(err) != codes.NotFound {
+		t.Errorf("code = %v", status.Code(err))
 	}
 }

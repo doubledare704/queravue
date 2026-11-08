@@ -33,10 +33,13 @@ const (
 	// CapCompletion: ColumnLister (Iteration 8, ADR 0015).
 	CapCompletion Capability = "completion"
 	// CapFormat: SQL formatting (Iteration 8, ADR 0015). It needs no Conn
-	// interface, so it has no CapabilityInterfaces entry; engines declare it
-	// once the formatter supports their dialect.
+	// interface; see CapabilitiesWithoutInterface.
 	CapFormat Capability = "format"
 )
+
+// CapabilitiesWithoutInterface lists capabilities that core implements on its
+// own, so no Conn interface backs them.
+var CapabilitiesWithoutInterface = map[Capability]bool{CapFormat: true}
 
 // CapabilityInterfaces maps capabilities to the Conn interface that provides
 // them. Registry tests use it to check that declared capabilities match what a

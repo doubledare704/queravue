@@ -66,6 +66,30 @@ type FieldStat struct {
 	Frequency float64 // 0..1
 }
 
+// FieldPathStat describes one sampled field path. Array elements use the
+// segment "[]", so "items.[].sku" is the sku of every element of items.
+type FieldPathStat struct {
+	Path      string
+	Types     []FieldType
+	Frequency float64 // share of sampled documents that have the path, 0..1
+	Depth     int
+}
+
+// PathSampleOptions bound SampleFieldPaths. Zero values pick the defaults.
+type PathSampleOptions struct {
+	SampleSize uint32
+	MaxDepth   int
+	MaxPaths   int
+}
+
+// FieldPathSample is the result of SampleFieldPaths.
+type FieldPathSample struct {
+	Paths        []FieldPathStat
+	Sampled      uint32
+	UsedFallback bool
+	Truncated    bool
+}
+
 // FieldSample is the result of SampleFields.
 type FieldSample struct {
 	Fields       []FieldStat
@@ -92,4 +116,6 @@ type DocumentStore interface {
 	Delete(ctx context.Context, database, collection string, ids []Document, w WriteOptions) (uint64, error)
 	// SampleFields reports top-level field names, types and frequencies.
 	SampleFields(ctx context.Context, database, collection string, n uint32) (FieldSample, error)
+	// SampleFieldPaths reports nested field paths with types and frequencies.
+	SampleFieldPaths(ctx context.Context, database, collection string, opts PathSampleOptions) (FieldPathSample, error)
 }
