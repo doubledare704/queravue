@@ -25,6 +25,20 @@ services:
       timeout: 5s
       retries: 20
 
+  postgres-large-seed:
+    # One-shot: loads dev/seed/postgres/large (schema "large": 500 tables, about
+    # 7,500 columns) into the running postgres service.
+    #   docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
+    profiles: ["large-schema"]
+    image: postgres:17.11
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      PGPASSWORD: ${PG_PASSWORD:-queravue}
+    volumes: ["./seed/postgres/large:/seed:ro"]
+    entrypoint: ["psql", "-q", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "${PG_USER:-queravue}", "-d", "${PG_DB:-queravue}", "-f", "/seed/01_500_tables.sql"]
+    restart: "no"
+
   mysql:
     image: mysql:8.4.13
     environment:

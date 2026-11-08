@@ -18,10 +18,12 @@ import (
 	"time"
 
 	"github.com/doubledare704/queravue/core/internal/api"
+	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine/engines"
 	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/results"
+	"github.com/doubledare704/queravue/core/internal/schema"
 	"github.com/doubledare704/queravue/core/internal/secrets"
 	"github.com/doubledare704/queravue/core/internal/server"
 	"github.com/doubledare704/queravue/core/internal/session"
@@ -100,9 +102,20 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 	defer spools.Shutdown()
 	// The shell service needs the session manager, which needs this hook.
 	var closeShells atomic.Pointer[func(string)]
+	schemaCache := schema.NewCache()
+	catalogs := completion.NewManager()
+	defer catalogs.Shutdown()
+	schemaCache.OnInvalidate(catalogs.Invalidate)
 	sessions := session.NewManager(connSvc, session.WithIdleTimeout(*sessionIdle), session.WithLogger(log),
+		session.WithOnOpen(func(s *session.Session) {
+			if s.Dialect != nil {
+				catalogs.Start(s, "")
+			}
+		}),
 		session.WithOnClose(func(id string) {
 			spools.CloseSession(id)
+			schemaCache.CloseSession(id)
+			catalogs.CloseSession(id)
 			if f := closeShells.Load(); f != nil {
 				(*f)(id)
 			}
@@ -131,6 +144,8 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stderr io.W
 		Results:         spools,
 		History:         histStore,
 		Shells:          shells,
+		SchemaCache:     schemaCache,
+		Completion:      catalogs,
 		Workspace:       workspaceSvc,
 	})
 	if err != nil {

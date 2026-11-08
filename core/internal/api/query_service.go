@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/history"
@@ -37,6 +38,8 @@ type QueryService struct {
 	results  *results.Manager
 	history  *history.Store
 	log      *slog.Logger
+
+	schemaChanged func(sessionID string)
 }
 
 // NewQueryService returns a handler.
@@ -50,6 +53,13 @@ func NewQueryService(s *session.Manager, r *results.Manager, log *slog.Logger) *
 // SetHistory configures query history recording.
 func (h *QueryService) SetHistory(store *history.Store) {
 	h.history = store
+}
+
+// SetSchemaChangeHook registers f to run after a statement that changes the
+// schema (CREATE, ALTER, DROP, RENAME) succeeds, so caches built from the
+// schema can be dropped.
+func (h *QueryService) SetSchemaChangeHook(f func(sessionID string)) {
+	h.schemaChanged = f
 }
 
 // Execute implements the RPC.
@@ -175,6 +185,9 @@ func (h *QueryService) runStatement(ctx context.Context, stream queravuev1.Query
 			h.log.Error("execute", "err", execErr)
 		}
 		return false, send(errEvent(idx, kind, msg, pos, sum.Duration))
+	}
+	if h.schemaChanged != nil && sess.Dialect != nil && completion.IsSchemaChange(sess.Dialect.Lexer(), r.Text(text)) {
+		h.schemaChanged(sess.ID)
 	}
 	if err := send(&queravuev1.ExecuteResponse{Event: &queravuev1.ExecuteResponse_Progress{
 		Progress: &queravuev1.Progress{StatementIndex: idx, RowsSpooled: rows, Done: true},

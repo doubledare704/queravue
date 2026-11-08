@@ -2,35 +2,123 @@ package api_test
 
 import (
 	"context"
+	"database/sql"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	_ "modernc.org/sqlite"
 
 	"github.com/doubledare704/queravue/core/internal/api"
+	"github.com/doubledare704/queravue/core/internal/completion"
+	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/engine/sqlite"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/session"
 )
 
-func TestCompletionServiceReportsUnsupportedUntilImplemented(t *testing.T) {
+type sqliteFileOpener struct{ path string }
+
+func (o sqliteFileOpener) Open(ctx context.Context, _ string) (engine.Conn, engine.Descriptor, error) {
+	e := sqlite.New()
+	c, err := e.Connect(ctx, engine.Config{EngineID: sqlite.ID, Params: map[string]string{sqlite.ParamPath: o.path}}, engine.Secret{})
+	return c, e.Descriptor(), err
+}
+
+func completionEnv(t *testing.T) (*api.CompletionService, *session.Session, *completion.Manager) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "c.db")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, email TEXT)"); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	mgr := session.NewManager(sqliteFileOpener{path})
+	t.Cleanup(mgr.Shutdown)
+	catalogs := completion.NewManager()
+	t.Cleanup(catalogs.Shutdown)
+	sess, err := mgr.Open(context.Background(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return api.NewCompletionService(mgr, catalogs), sess, catalogs
+}
+
+func waitReady(t *testing.T, catalogs *completion.Manager, sess *session.Session) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := catalogs.Watch(ctx, sess, "", func(completion.Progress) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCompleteReturnsColumnsOnceTheCatalogIsWarm(t *testing.T) {
+	svc, sess, catalogs := completionEnv(t)
+	waitReady(t, catalogs, sess)
+	text := "SELECT c.na FROM customers c"
+	resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{
+		SessionId: sess.ID, Kind: queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SQL, Text: text, CursorOffset: 11,
+	})
+	if err != nil || resp.GetError() != nil {
+		t.Fatalf("Complete = %v, %v", resp, err)
+	}
+	first := resp.GetItems()[0]
+	if first.GetLabel() != "name" || first.GetKind() != queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_COLUMN ||
+		first.GetReplace().GetStart() != 9 || first.GetReplace().GetEnd() != 11 || first.GetDetail() != "TEXT · c" {
+		t.Errorf("first item = %v", first)
+	}
+	if resp.GetCatalogState() != queravuev1.CatalogState_CATALOG_STATE_READY {
+		t.Errorf("catalog state = %v", resp.GetCatalogState())
+	}
+}
+
+func TestCompleteRejectsUnavailableContexts(t *testing.T) {
+	svc, sess, _ := completionEnv(t)
+	tests := []struct {
+		kind queravuev1.CompletionContextKind
+		want queravuev1.AdminErrorKind
+	}{
+		{queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_UNSPECIFIED, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID},
+		{queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED},
+		{queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_MONGO_QUERY, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED},
+	}
+	for _, tc := range tests {
+		resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{SessionId: sess.ID, Kind: tc.kind})
+		if err != nil || resp.GetError().GetKind() != tc.want {
+			t.Errorf("kind %v: %v, %v; want in-band %v", tc.kind, resp, err, tc.want)
+		}
+	}
+}
+
+func TestCompleteOnNonSQLConnectionIsUnsupported(t *testing.T) {
 	mgr := session.NewManager(fakeOpener{conn: &fakeValidatingConn{}})
 	t.Cleanup(mgr.Shutdown)
 	sess, err := mgr.Open(context.Background(), "test-conn")
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := api.NewCompletionService(mgr)
-	want := queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED
-
-	complete, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{SessionId: sess.ID})
-	if err != nil || complete.GetError().GetKind() != want {
-		t.Errorf("Complete = %v, %v; want in-band UNSUPPORTED", complete, err)
-	}
-	format, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{SessionId: sess.ID})
-	if err != nil || format.GetError().GetKind() != want {
-		t.Errorf("FormatSQL = %v, %v; want in-band UNSUPPORTED", format, err)
+	svc := api.NewCompletionService(mgr, completion.NewManager())
+	resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{
+		SessionId: sess.ID, Kind: queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SQL,
+	})
+	if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED {
+		t.Errorf("Complete = %v, %v", resp, err)
 	}
 	if _, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{SessionId: "missing"}); status.Code(err) != codes.NotFound {
 		t.Errorf("unknown session code = %v, want NotFound", status.Code(err))
+	}
+}
+
+func TestFormatSQLIsUnsupportedUntilTheFormatterLands(t *testing.T) {
+	svc, sess, _ := completionEnv(t)
+	resp, err := svc.FormatSQL(context.Background(), &queravuev1.FormatSQLRequest{SessionId: sess.ID, Text: "select 1"})
+	if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED {
+		t.Errorf("FormatSQL = %v, %v", resp, err)
 	}
 }

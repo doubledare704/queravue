@@ -307,3 +307,19 @@ func TestSessionServiceOpenClose(t *testing.T) {
 		t.Errorf("Execute on closed session: %v", err)
 	}
 }
+
+func TestExecuteCallsTheSchemaChangeHookOnlyAfterSuccessfulDDL(t *testing.T) {
+	f := newFixture(t)
+	var calls []string
+	f.q.SetSchemaChangeHook(func(id string) { calls = append(calls, id) })
+
+	f.exec(t, &queravuev1.ExecuteRequest{Text: "SELECT 1", Mode: queravuev1.ExecuteMode_EXECUTE_MODE_ALL})
+	f.exec(t, &queravuev1.ExecuteRequest{Text: "CREATE TABLE broken (", Mode: queravuev1.ExecuteMode_EXECUTE_MODE_ALL})
+	if len(calls) != 0 {
+		t.Fatalf("hook ran for %v before any successful DDL", calls)
+	}
+	f.exec(t, &queravuev1.ExecuteRequest{Text: "CREATE TABLE t (id INTEGER); INSERT INTO t VALUES (1)", Mode: queravuev1.ExecuteMode_EXECUTE_MODE_ALL})
+	if len(calls) != 1 || calls[0] != f.sess.ID {
+		t.Errorf("hook calls = %v, want one for the session", calls)
+	}
+}
