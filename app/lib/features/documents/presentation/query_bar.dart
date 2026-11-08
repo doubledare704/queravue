@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/shortcuts.dart';
+import '../../completion/presentation/completion_field.dart';
 import '../application/document_tab_controller.dart';
 import '../domain/models.dart';
 
@@ -24,6 +25,8 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
   final _skip = TextEditingController();
   final _limit = TextEditingController();
   final _filterFocus = FocusNode();
+  final _sortFocus = FocusNode();
+  final _projectionFocus = FocusNode();
 
   DocumentTabController get _c =>
       ref.read(documentTabProvider(widget.tabId).notifier);
@@ -34,6 +37,8 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
       c.dispose();
     }
     _filterFocus.dispose();
+    _sortFocus.dispose();
+    _projectionFocus.dispose();
     super.dispose();
   }
 
@@ -72,6 +77,20 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
     return '${e.message}$at';
   }
 
+  Widget _completing(
+    TextEditingController controller,
+    FocusNode focus,
+    DocumentTabState state,
+    Widget field,
+  ) => CompletionField(
+    controller: controller,
+    focusNode: focus,
+    sessionId: () => ref.read(documentTabProvider(widget.tabId)).sessionId,
+    database: state.database,
+    collection: state.collection,
+    child: field,
+  );
+
   @override
   Widget build(BuildContext context) {
     ref.listen(documentTabProvider(widget.tabId).select((s) => s.queryError), (
@@ -105,43 +124,60 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
           children: [
             Expanded(
               flex: 5,
-              child: TextField(
-                key: const Key('doc-filter'),
-                controller: _filter,
-                focusNode: _filterFocus,
-                onChanged: (_) => _changed(),
-                decoration: deco(
-                  'Filter',
-                  '{ "status": "paid" }',
-                  DocInput.filter,
+              child: _completing(
+                _filter,
+                _filterFocus,
+                state,
+                TextField(
+                  key: const Key('doc-filter'),
+                  controller: _filter,
+                  focusNode: _filterFocus,
+                  onChanged: (_) => _changed(),
+                  decoration: deco(
+                    'Filter',
+                    '{ "status": "paid" }',
+                    DocInput.filter,
+                  ),
+                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
                 ),
-                style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               flex: 3,
-              child: TextField(
-                key: const Key('doc-sort'),
-                controller: _sort,
-                onChanged: (_) => _changed(),
-                decoration: deco('Sort', '{ "_id": -1 }', DocInput.sort),
-                style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+              child: _completing(
+                _sort,
+                _sortFocus,
+                state,
+                TextField(
+                  key: const Key('doc-sort'),
+                  controller: _sort,
+                  focusNode: _sortFocus,
+                  onChanged: (_) => _changed(),
+                  decoration: deco('Sort', '{ "_id": -1 }', DocInput.sort),
+                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+                ),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               flex: 3,
-              child: TextField(
-                key: const Key('doc-projection'),
-                controller: _projection,
-                onChanged: (_) => _changed(),
-                decoration: deco(
-                  'Projection',
-                  '{ "name": 1 }',
-                  DocInput.projection,
+              child: _completing(
+                _projection,
+                _projectionFocus,
+                state,
+                TextField(
+                  key: const Key('doc-projection'),
+                  controller: _projection,
+                  focusNode: _projectionFocus,
+                  onChanged: (_) => _changed(),
+                  decoration: deco(
+                    'Projection',
+                    '{ "name": 1 }',
+                    DocInput.projection,
+                  ),
+                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
                 ),
-                style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
               ),
             ),
             const SizedBox(width: 8),

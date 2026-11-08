@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:queravue/features/completion/application/user_snippets.dart';
 import 'package:queravue/features/completion/data/completion_repository.dart';
+import 'package:queravue/features/completion/domain/snippets.dart';
 import 'package:queravue/features/completion/domain/completion_models.dart';
 import 'package:queravue/features/completion/presentation/completion_host.dart';
 import 'package:queravue/features/connections/application/connection_session.dart';
@@ -59,6 +61,7 @@ Future<(FakeCompletionRepository, CodeLineEditingController)> pumpEditor(
     ProviderScope(
       overrides: [
         completionRepositoryProvider.overrideWithValue(repo),
+        userSnippetsProvider.overrideWith((ref) async => const <Snippet>[]),
         connectionSessionProvider('c')
             .overrideWith(() => _Connected('c', capabilities)),
       ],

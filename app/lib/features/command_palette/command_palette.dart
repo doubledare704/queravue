@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../completion/application/format_action.dart';
 import '../connections/application/connections_controller.dart';
 import '../connections/presentation/connection_actions.dart';
 import '../documents/application/document_actions.dart';
@@ -61,6 +62,13 @@ final paletteCommandsProvider = Provider<List<PaletteCommand>>((ref) {
       title: 'Run all statements',
       shortcut: '⌘⇧↵',
       run: (context, ref) => runActiveTab(ref, ExecuteMode.all),
+    ),
+    PaletteCommand(
+      id: 'editor.format',
+      title: 'Format SQL',
+      subtitle: 'Selection, or the statement at the cursor',
+      shortcut: '⌥⇧F',
+      run: formatActiveTab,
     ),
     PaletteCommand(
       id: 'editor.cancel',
