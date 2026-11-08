@@ -41,10 +41,14 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 - Cosmos DB and DocumentDB smoke-tested.
 - **Done when:** day-to-day Mongo browsing works without a shell.
 
-### It. 6 — Mongo shell + saved queries
-- goja-based shell with a mongosh-like API subset (`db.coll.find/aggregate/updateMany...`, cursors, `printjson`).
-- Saved queries & scripts as files in a workspace folder (Git-friendly), with folders and search.
-- **Done when:** common mongosh snippets run unchanged.
+### It. 6 — Mongo shell + saved queries ✅ done
+- ✅ goja-based shell with a mongosh-like API subset (`db.coll.find/aggregate/updateMany...`, cursors, `printjson`).
+- ✅ Saved queries & scripts as files in a workspace folder (Git-friendly), with folders and search.
+- ✅ **Done when:** common mongosh snippets run unchanged.
+
+**Status:** merged in PRs #14–#18 (ADRs 0010 and 0011), CI green on each. Perf results in `docs/perf/iteration-6.md`.
+- Core: `internal/shell` (goja runtime, cancellable, no gRPC dependency), `ShellService`, `WorkspaceService`.
+- UI: shell tabs with an output pane, workspace file tree with saved queries and scripts.
 
 ### It. 7 — Indexes, stats, validation, table management ✅ done
 - ✅ Index manager (SQL + Mongo): list, create, drop, usage stats. Usage and size show "n/a" where a server keeps none.
