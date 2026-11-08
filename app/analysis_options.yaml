@@ -5,6 +5,7 @@ analyzer:
     - build/**
     - macos/**
     - lib/core_client/gen/**
+    - third_party/**
   language:
     strict-casts: true
     strict-inference: true
