@@ -19,6 +19,13 @@ final _remotes = Expando<_Remote>();
 /// itself, so the helper follows its own insertions and re-reads the editor's
 /// state whenever the editor published a new one.
 Future<void> typeInEditor(WidgetTester tester, String chars) async {
+  await insertInEditor(tester, chars);
+  await tester.pump();
+  await tester.pump();
+}
+
+/// Delivers the insertion without pumping, so a caller can time the frames.
+Future<void> insertInEditor(WidgetTester tester, String chars) async {
   final log = tester.testTextInput.log;
   final client =
       log.lastWhere((c) => c.method == 'TextInput.setClient').arguments[0]
@@ -69,6 +76,4 @@ Future<void> typeInEditor(WidgetTester tester, String chars) async {
     message,
     (_) {},
   );
-  await tester.pump();
-  await tester.pump();
 }

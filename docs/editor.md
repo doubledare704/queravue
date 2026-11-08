@@ -4,7 +4,7 @@ Design decisions are in [ADR 0015](adr/0015-completion-and-formatting.md); this 
 
 ## Completion & formatting
 
-Status: SQL completion (PR 2), the SQL formatter and Mongo completion (PR 3) are done in core. The UI follows in PR 4.
+Status: SQL completion (PR 2), the SQL formatter and Mongo completion (PR 3) are done in core. The completion popup, snippets and the format shortcut (PR 4) are done in the app. The action registry, palette overhaul and split layout follow in PRs 5 and 6.
 
 ### SQL completion
 - `CompletionService.Complete` takes the current statement and a UTF-16 cursor offset and returns items in ranked order. Sort by `sort_key` ascending to get the same order.
@@ -36,6 +36,40 @@ Shell (`kind = shell`): a lightweight JavaScript lexer (nothing is run) classifi
 Query bar (`kind = mongo_query`): the same key and operator analysis on EJSON text, with the collection from the request. Keys and operators are always inserted quoted. The request does not say whether the input is a filter, a sort or a projection, so the root object is treated as a filter.
 
 Method, cursor-method and operator lists are written by hand from the MongoDB manual (`core/internal/completion/mongo_tables.go`).
+
+### Completion in the app
+Where it works: the SQL editor, the Mongo shell editor and the three Mongo query bar fields (filter, sort, projection). A connection must declare `completion` (SQL), `shell` (shell) or `document_store` (query bar); otherwise the editor never asks.
+
+How a keystroke becomes a popup (`app/lib/features/completion/`):
+- Every edit asks the core in the background and cancels the previous question (`CompletionEngine`). The request carries only the statement around the caret for SQL (split on semicolons outside quotes and comments), or the text around the caret for the shell, never the whole file.
+- `suggest` is synchronous. While the typed text extends the identifier the last answer was asked for, it filters and re-ranks that answer locally with the core's rules, so the popup does not wait for the network. The answer for the context a keystroke opens (a space after `FROM`, a dot) was asked for by the keystroke before it. Local filtering is skipped when the text before the identifier changed, the identifier got shorter (backspace), or the statement changed; the popup then appears with the next keystroke.
+- A newer answer refreshes a popup that is already open, so an incomplete first answer is replaced by the exact one a few milliseconds later.
+- The ranking rules exist twice, in `core/internal/completion/match.go` and `app/lib/features/completion/domain/local_filter.dart`. `core/internal/completion/testdata/match_cases.json` holds the shared cases; `go test ./internal/completion -update-match` rewrites it, and `app/test/features/completion/match_golden_test.dart` checks the Dart side.
+- Keys: ↑ ↓ choose, Enter or Tab accept, Esc closes, a click accepts. In the query bar the popup opens under the field.
+- While the catalog loads, the popup says "loading columns…".
+
+re_editor opened its popup 50 ms after the keystroke, which is the whole budget, and only after a frame had laid the text out. The app vendors re_editor 0.10.0 (`app/third_party/re_editor/`, see `QUERAVUE.md` there) with the popup opening after the frame that laid the typed text out.
+
+### Snippets
+- Built in per context (`app/lib/features/completion/domain/snippets.dart`): `sel`, `selw`, `selc`, `ins`, `upd`, `del`, `cte`, `join` for SQL; `find`, `agg`, `upd1`, `ins1` for the shell.
+- Your own snippets live in `.queravue/snippets.json` in the first workspace folder, read through the workspace service. Edit the file in any editor; it is read once per app run.
+
+```json
+[
+  {
+    "trigger": "ord",
+    "body": "SELECT * FROM orders WHERE $0",
+    "description": "orders filter",
+    "contexts": ["sql"]
+  }
+]
+```
+
+`contexts` is optional (all contexts) and may hold `sql`, `shell` and `mongo_query`. `$0` marks the caret; the editor can only put it on the line where the snippet starts, so a `$0` on a later line puts the caret at the end of the first line. Entries without `trigger` or `body` are skipped.
+- A snippet is offered when the typed text is a prefix of its trigger, above the server's items, and never right after a dot.
+
+### Formatting in the app
+Shift+Alt+F (palette: "Format SQL") formats the selection, or the statement at the caret, through `FormatSQL` with the session's dialect. Failures leave the text as it was: an unterminated string moves the caret to it and shows the message; a text that changed while the core was formatting is not overwritten. The connection must declare `format`.
 
 ### Catalog
 - Core warms a catalog in the background when a session opens: one `ListObjects` and one bulk column query per schema (`engine.ColumnLister`, capability `completion`).

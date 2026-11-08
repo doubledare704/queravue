@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
+.PHONY: test-perf-completion help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -52,6 +52,11 @@ test-e2e-panels: db-up core ## Indexes, Stats and Validation sections on SQLite 
 
 test-e2e-shell: db-up core ## Shell + workspace flow: save a script, restart the app, reopen and run it (docker Mongo)
 	cd app && QUERAVUE_WORKSPACE=$$(mktemp -d) QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/shell_workspace_test.dart -d macos
+
+test-perf-completion: core ## Completion budget: keystroke to popup on the 500-table schema (profile build)
+	docker compose -f dev/docker-compose.yml --profile large-schema up -d --wait postgres
+	docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
+	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/completion_perf_test.dart
 
 test-perf: db-up core ## Grid perf budget: 1M rows through the real core and Postgres (profile build)
 	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart

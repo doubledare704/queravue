@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,7 +40,10 @@ type entry struct {
 	watchers   int
 	started    bool
 	background bool
+	failedAt   time.Time
 }
+
+const retryAfterFailure = 5 * time.Second
 
 func newEntry() *entry {
 	return &entry{changed: make(chan struct{}), done: make(chan struct{})}
@@ -207,11 +212,17 @@ func (m *Manager) CloseSession(sessionID string) {
 
 func (m *Manager) begin(sess *session.Session, database string, e *entry) {
 	e.mu.Lock()
-	if e.started {
+	if e.started || !e.failedAt.IsZero() && time.Since(e.failedAt) < retryAfterFailure {
 		e.mu.Unlock()
 		return
 	}
 	e.started = true
+	select {
+	case <-e.done:
+		e.done = make(chan struct{})
+		e.progress = Progress{}
+	default:
+	}
 	ctx, cancel := context.WithCancel(m.root)
 	e.cancel = cancel
 	e.background = e.watchers == 0
@@ -219,12 +230,22 @@ func (m *Manager) begin(sess *session.Session, database string, e *entry) {
 	go func() {
 		defer cancel()
 		err := warm(ctx, sess, database, e)
+		failed := err != nil && ctx.Err() == nil
+		if failed {
+			slog.Warn("completion: catalog warm-up failed", "error", err)
+		}
 		e.mu.Lock()
 		p := e.progress
 		p.Done, p.Err = true, err
+		done := e.done
 		e.mu.Unlock()
 		e.publish(nil, p)
-		close(e.done)
+		e.mu.Lock()
+		if failed {
+			e.started, e.failedAt = false, time.Now()
+		}
+		e.mu.Unlock()
+		close(done)
 	}()
 }
 
@@ -318,12 +339,8 @@ func withColumns(tables []*Table, refs []engine.ColumnRef) []*Table {
 // running statement to finish. Waiting stops when ctx ends.
 func withConn(ctx context.Context, sess *session.Session, f func(context.Context) error) error {
 	for {
-		runCtx, finish, err := sess.Begin(ctx)
-		if err == nil {
-			defer finish()
-			return f(runCtx)
-		}
-		if !errors.Is(err, session.ErrBusy) {
+		err := runOnce(ctx, sess, f)
+		if err == nil || !isBusy(err) {
 			return err
 		}
 		select {
@@ -332,4 +349,19 @@ func withConn(ctx context.Context, sess *session.Session, f func(context.Context
 			return fmt.Errorf("completion: wait for session: %w", ctx.Err())
 		}
 	}
+}
+
+func runOnce(ctx context.Context, sess *session.Session, f func(context.Context) error) error {
+	runCtx, finish, err := sess.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer finish()
+	return f(runCtx)
+}
+
+// A driver connection that serves another request answers "conn busy"; the
+// schema browser reaches the connection without the session's statement slot.
+func isBusy(err error) bool {
+	return errors.Is(err, session.ErrBusy) || strings.Contains(err.Error(), "conn busy")
 }
