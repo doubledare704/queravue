@@ -71,6 +71,26 @@ re_editor opened its popup 50 ms after the keystroke, which is the whole budget,
 ### Formatting in the app
 Shift+Alt+F (palette: "Format SQL") formats the selection, or the statement at the caret, through `FormatSQL` with the session's dialect. Failures leave the text as it was: an unterminated string moves the caret to it and shows the message; a text that changed while the core was formatting is not overwritten. The connection must declare `format`.
 
+## Actions, palette and shortcuts
+
+### One registry
+`app/lib/shared/actions/` holds `AppAction` (id, title, category, default chord, run). `builtinActionsProvider` lists every action of the app. The command palette, the keyboard shortcuts and the macOS menu bar are all built from that list through `actionRegistryProvider`, so an action added there appears in all three.
+
+A chord is stored platform independent: `primary` is Cmd on macOS and Ctrl elsewhere (`primary+shift+enter`, `alt+shift+f`, `escape`). The palette shows it in the platform's own notation (`⌥⇧F`, `Ctrl+Alt+Shift+F`).
+
+The menu bar items have no key equivalent on purpose: a native one is handled before Flutter sees the key and would take Enter and Escape from the editors. Shortcuts stay with Flutter.
+
+### Palette
+- No prefix: actions, open tabs, connections and workspace files (file names; searched through the core after two characters).
+- `>` actions only, `@` open tabs only, `#` tables and collections the schema tree has loaded for the selected connection.
+- Ranking: prefix of the title, then a word start, then a substring, then a subsequence; ties keep the order actions, tabs, connections, objects, files.
+- "Go to tab" and "Go to database object" open the palette with `@` and `#`.
+
+### Keybindings
+- User chords live in `.queravue/keybindings.json` in the first workspace root: `{"editor.new": "primary+j", "editor.cancel": null}`. `null` removes the shortcut. Bad entries and unknown action ids are skipped and listed in the shortcuts dialog, never fatal.
+- Two actions on one chord is a conflict: neither fires, the palette marks both and the shortcuts dialog (palette: "Keyboard shortcuts") lists them, so one of them can be changed.
+- The dialog changes a shortcut by capturing the next key combination, clears it, or restores the default; changes are written to the file.
+
 ### Catalog
 - Core warms a catalog in the background when a session opens: one `ListObjects` and one bulk column query per schema (`engine.ColumnLister`, capability `completion`).
 - `Complete` never waits for it. `catalog_state` is `COLD`, `WARMING` or `READY`; tables appear before columns.
