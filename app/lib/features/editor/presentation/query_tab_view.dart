@@ -94,7 +94,11 @@ class _RunBar extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) => _build(context, compact: box.maxWidth < 560),
+  );
+
+  Widget _build(BuildContext context, {required bool compact}) {
     final text = Theme.of(context).textTheme;
     return SizedBox(
       height: 40,
@@ -107,13 +111,13 @@ class _RunBar extends StatelessWidget {
                 key: const Key('run-button'),
                 onPressed: onRun,
                 icon: const Icon(Icons.play_arrow, size: 18),
-                label: Text('Run  $primaryLabel↵'),
+                label: Text(compact ? 'Run' : 'Run  $primaryLabel↵'),
               ),
               const SizedBox(width: 8),
               OutlinedButton(
                 key: const Key('run-all-button'),
                 onPressed: onRunAll,
-                child: Text('Run all  $primaryLabel⇧↵'),
+                child: Text(compact ? 'Run all' : 'Run all  $primaryLabel⇧↵'),
               ),
             ] else
               FilledButton.icon(
@@ -124,7 +128,13 @@ class _RunBar extends StatelessWidget {
                 ),
                 onPressed: run.cancelling ? null : onCancel,
                 icon: const Icon(Icons.stop, size: 18),
-                label: Text(run.cancelling ? 'Cancelling…' : 'Cancel  Esc'),
+                label: Text(
+                  run.cancelling
+                      ? 'Cancelling…'
+                      : compact
+                      ? 'Cancel'
+                      : 'Cancel  Esc',
+                ),
               ),
             const SizedBox(width: 12),
             ElapsedText(
@@ -132,9 +142,17 @@ class _RunBar extends StatelessWidget {
               running: run.busy,
               finalDuration: run.totalDuration,
             ),
-            const Spacer(),
-            if (run.serverLabel.isNotEmpty)
-              Text(run.serverLabel, style: text.labelSmall),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  run.serverLabel,
+                  style: text.labelSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           ],
         ),
       ),

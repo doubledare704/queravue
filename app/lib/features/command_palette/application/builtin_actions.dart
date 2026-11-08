@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart' show Axis;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -74,6 +75,55 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       category: ActionCategory.editor,
       defaultChord: const KeyChord(LogicalKeyboardKey.escape),
       run: (context, ref) => cancelActiveTab(ref),
+    ),
+    AppAction(
+      id: 'editor.splitRight',
+      title: 'Split editor right',
+      subtitle: 'Moves the active tab into a new group',
+      category: ActionCategory.editor,
+      defaultChord: const KeyChord(LogicalKeyboardKey.backslash, primary: true),
+      run: (context, ref) async => splitEditor(ref, Axis.horizontal),
+    ),
+    AppAction(
+      id: 'editor.splitDown',
+      title: 'Split editor down',
+      category: ActionCategory.editor,
+      defaultChord: _primary(LogicalKeyboardKey.backslash, shift: true),
+      run: (context, ref) async => splitEditor(ref, Axis.vertical),
+    ),
+    AppAction(
+      id: 'editor.focusNextGroup',
+      title: 'Focus next editor group',
+      category: ActionCategory.editor,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.arrowRight,
+        primary: true,
+        alt: true,
+      ),
+      run: (context, ref) async => focusEditorGroup(ref, 1),
+    ),
+    AppAction(
+      id: 'editor.focusPreviousGroup',
+      title: 'Focus previous editor group',
+      category: ActionCategory.editor,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.arrowLeft,
+        primary: true,
+        alt: true,
+      ),
+      run: (context, ref) async => focusEditorGroup(ref, -1),
+    ),
+    AppAction(
+      id: 'editor.moveToNextGroup',
+      title: 'Move tab to next editor group',
+      category: ActionCategory.editor,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.arrowRight,
+        primary: true,
+        alt: true,
+        shift: true,
+      ),
+      run: (context, ref) async => moveTabToGroup(ref, 1),
     ),
     AppAction(
       id: 'documents.run',

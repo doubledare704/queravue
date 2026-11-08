@@ -408,8 +408,12 @@ List<Override> shellOverrides({
   required FakeWorkspaceRepository workspace,
   required FakeQueryRepository query,
   bool production = false,
+  bool fakeLayoutPersistence = true,
 }) => [
-  ...fakeCoreOverrides(fakeConnections(production: production)),
+  ...fakeCoreOverrides(
+    fakeConnections(production: production),
+    fakeLayoutPersistence: fakeLayoutPersistence,
+  ),
   shellRepositoryProvider.overrideWithValue(shell),
   workspaceRepositoryProvider.overrideWithValue(workspace),
   queryRepositoryProvider.overrideWithValue(query),

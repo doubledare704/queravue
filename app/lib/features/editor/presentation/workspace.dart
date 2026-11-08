@@ -17,94 +17,307 @@ import '../application/editor_actions.dart';
 import '../../connections/presentation/connection_details.dart';
 import '../../table_view/presentation/table_tab_view.dart';
 import '../application/editor_tabs.dart';
+import '../application/editor_layout_controller.dart';
+import '../application/layout_persistence.dart';
+import '../domain/editor_layout.dart';
 import 'query_tab_view.dart';
 
-/// Right-hand pane: editor tabs of the selected connection, or its details
-/// when no tab is open.
+/// Right-hand pane: the editor groups of the selected connection, or its
+/// details when no tab is open.
 class Workspace extends ConsumerWidget {
   const Workspace({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = ref.watch(selectedConnectionProvider);
-    final state = ref.watch(editorTabsProvider);
-    final tabs = id == null ? const <EditorTab>[] : state.tabsFor(id);
+    final tabs = id == null
+        ? const <EditorTab>[]
+        : ref.watch(editorTabsProvider).tabsFor(id);
     if (id == null || tabs.isEmpty) return const ConnectionDetails();
-
-    final active = state.activeFor(id)!;
-    final notifier = ref.read(editorTabsProvider.notifier);
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Material(
-          color: cs.surfaceContainerLow,
-          child: SizedBox(
-            height: 36,
-            child: Row(
-              children: [
-                Expanded(
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      for (final t in tabs)
-                        _TabButton(
-                          tab: t,
-                          selected: t.id == active.id,
-                          onSelect: () => notifier.select(t.id),
-                          onClose: () => notifier.close(t.id),
-                        ),
-                    ],
-                  ),
+    final layout = ref.watch(editorLayoutProvider).of(id);
+    final byId = {for (final t in tabs) t.id: t};
+    return LayoutBuilder(
+      builder: (context, box) {
+        final extent = layout.axis == Axis.horizontal
+            ? box.maxWidth
+            : box.maxHeight;
+        return Flex(
+          direction: layout.axis,
+          children: [
+            for (var i = 0; i < layout.groups.length; i++) ...[
+              if (i > 0)
+                _Divider(
+                  key: Key('group-divider-${i - 1}'),
+                  axis: layout.axis,
+                  onDrag: (px) => ref
+                      .read(editorLayoutProvider.notifier)
+                      .resize(id, i - 1, px / extent),
                 ),
-                if (ref.watch(connectionHasShellProvider(id)))
-                  IconButton(
-                    key: const Key('new-shell-tab'),
-                    tooltip: 'New Mongo shell ($primaryLabel⇧T)',
-                    icon: const Icon(Icons.terminal, size: 18),
-                    onPressed: () => openShellTab(ref),
-                  ),
-                if (!ref.watch(connectionIsDocumentOnlyProvider(id)))
-                  IconButton(
-                    key: const Key('new-tab'),
-                    tooltip: 'New query tab (${primaryLabel}T)',
-                    icon: const Icon(Icons.add, size: 18),
-                    onPressed: () => notifier.open(id),
-                  ),
-              ],
+              Expanded(
+                flex: (layout.fractions[i] * 1000).round(),
+                child: _GroupPane(
+                  key: Key('group-$i'),
+                  connectionId: id,
+                  index: i,
+                  group: layout.groups[i],
+                  focused: i == layout.focused,
+                  split: layout.groups.length > 1,
+                  tabs: byId,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider({super.key, required this.axis, required this.onDrag});
+
+  final Axis axis;
+  final void Function(double pixels) onDrag;
+
+  @override
+  Widget build(BuildContext context) {
+    final horizontal = axis == Axis.horizontal;
+    return MouseRegion(
+      cursor: horizontal
+          ? SystemMouseCursors.resizeColumn
+          : SystemMouseCursors.resizeRow,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: horizontal ? (d) => onDrag(d.delta.dx) : null,
+        onVerticalDragUpdate: horizontal ? null : (d) => onDrag(d.delta.dy),
+        child: SizedBox(
+          width: horizontal ? 6 : null,
+          height: horizontal ? null : 6,
+          child: Center(
+            child: Container(
+              width: horizontal ? 1 : null,
+              height: horizontal ? null : 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
         ),
-        const Divider(height: 1),
-        FileChangeBanner(key: ValueKey('banner-${active.id}'), tab: active),
-        Expanded(
-          child: IndexedStack(
-            index: tabs.indexWhere((t) => t.id == active.id),
-            children: [
-              for (final t in tabs)
-                t.isShell
-                    ? ShellTabView(key: ValueKey(t.id), tab: t)
-                    : t.isDesigner
-                    ? DesignerTabView(key: ValueKey(t.id), tab: t)
-                    : t.isCollection
-                    ? AdminHost(
-                        key: ValueKey(t.id),
-                        tab: t,
-                        child: DocumentTabView(tab: t),
-                      )
-                    : t.isTable
-                    ? AdminHost(
-                        key: ValueKey(t.id),
-                        tab: t,
-                        child: TableTabView(tab: t),
-                      )
-                    : QueryTabView(key: ValueKey(t.id), tab: t),
-            ],
-          ),
+      ),
+    );
+  }
+}
+
+class _GroupPane extends ConsumerWidget {
+  const _GroupPane({
+    super.key,
+    required this.connectionId,
+    required this.index,
+    required this.group,
+    required this.focused,
+    required this.split,
+    required this.tabs,
+  });
+
+  final String connectionId;
+  final int index;
+  final EditorGroup group;
+  final bool focused;
+  final bool split;
+  final Map<String, EditorTab> tabs;
+
+  void _focus(WidgetRef ref) {
+    if (!focused) {
+      ref.read(editorLayoutProvider.notifier).focusGroup(connectionId, index);
+    }
+  }
+
+  Future<void> _showMenu(
+    BuildContext context,
+    WidgetRef ref,
+    EditorTab tab,
+    Offset at,
+  ) async {
+    ref.read(editorTabsProvider.notifier).select(tab.id);
+    final layout = ref.read(editorLayoutProvider);
+    final current = layout.of(connectionId);
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
+      items: [
+        PopupMenuItem(
+          value: 'right',
+          enabled: current.canSplit,
+          child: const Text('Split right'),
         ),
+        PopupMenuItem(
+          value: 'down',
+          enabled: current.canSplit,
+          child: const Text('Split down'),
+        ),
+        PopupMenuItem(
+          value: 'next',
+          enabled: current.groups.length > 1,
+          child: const Text('Move to next group'),
+        ),
+        const PopupMenuItem(value: 'close', child: Text('Close')),
+      ],
+    );
+    final controller = ref.read(editorLayoutProvider.notifier);
+    switch (choice) {
+      case 'right':
+        controller.split(connectionId, Axis.horizontal);
+      case 'down':
+        controller.split(connectionId, Axis.vertical);
+      case 'next':
+        controller.moveActive(connectionId, 1);
+      case 'close':
+        ref.read(editorTabsProvider.notifier).close(tab.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = [
+      for (final id in group.tabIds)
+        if (tabs[id] != null) tabs[id]!,
+    ];
+    if (members.isEmpty) return const SizedBox.shrink();
+    final active = tabs[group.activeId] ?? members.last;
+    final notifier = ref.read(editorTabsProvider.notifier);
+    final cs = Theme.of(context).colorScheme;
+    return Listener(
+      onPointerDown: (_) => _focus(ref),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Material(
+            color: cs.surfaceContainerLow,
+            child: Container(
+              key: Key('group-bar-$index'),
+              height: 36,
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: split && focused ? cs.primary : Colors.transparent,
+                    width: 2,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final t in members)
+                          _TabButton(
+                            tab: t,
+                            selected: t.id == active.id,
+                            onSelect: () => notifier.select(t.id),
+                            onClose: () => notifier.close(t.id),
+                            onContextMenu: (at) =>
+                                _showMenu(context, ref, t, at),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (ref.watch(connectionHasShellProvider(connectionId)))
+                    IconButton(
+                      key: Key(
+                        index == 0 ? 'new-shell-tab' : 'new-shell-tab-$index',
+                      ),
+                      tooltip: 'New Mongo shell ($primaryLabel⇧T)',
+                      icon: const Icon(Icons.terminal, size: 18),
+                      onPressed: () {
+                        _focus(ref);
+                        openShellTab(ref);
+                      },
+                    ),
+                  if (!ref.watch(
+                    connectionIsDocumentOnlyProvider(connectionId),
+                  ))
+                    IconButton(
+                      key: Key(index == 0 ? 'new-tab' : 'new-tab-$index'),
+                      tooltip: 'New query tab (${primaryLabel}T)',
+                      icon: const Icon(Icons.add, size: 18),
+                      onPressed: () {
+                        _focus(ref);
+                        notifier.open(connectionId);
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          FileChangeBanner(key: ValueKey('banner-${active.id}'), tab: active),
+          Expanded(
+            child: _GroupBody(members: members, active: active),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Builds a tab's view only once the tab has been shown, then keeps it alive,
+/// so tabs restored in the background cost nothing until the user looks.
+class _GroupBody extends ConsumerStatefulWidget {
+  const _GroupBody({required this.members, required this.active});
+
+  final List<EditorTab> members;
+  final EditorTab active;
+
+  @override
+  ConsumerState<_GroupBody> createState() => _GroupBodyState();
+}
+
+class _GroupBodyState extends ConsumerState<_GroupBody> {
+  final _shown = <String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    if (_shown.add(widget.active.id)) {
+      final id = widget.active.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(ref.read(layoutPersistenceProvider).ensureLoaded(id));
+        }
+      });
+    }
+    final visible = [
+      for (final t in widget.members)
+        if (_shown.contains(t.id)) t,
+    ];
+    return IndexedStack(
+      index: visible.indexWhere((t) => t.id == widget.active.id),
+      children: [
+        for (final t in visible) _TabView(key: ValueKey(t.id), tab: t),
       ],
     );
   }
+}
+
+class _TabView extends StatelessWidget {
+  const _TabView({super.key, required this.tab});
+
+  final EditorTab tab;
+
+  @override
+  Widget build(BuildContext context) => tab.isShell
+      ? ShellTabView(tab: tab)
+      : tab.isDesigner
+      ? DesignerTabView(tab: tab)
+      : tab.isCollection
+      ? AdminHost(
+          tab: tab,
+          child: DocumentTabView(tab: tab),
+        )
+      : tab.isTable
+      ? AdminHost(
+          tab: tab,
+          child: TableTabView(tab: tab),
+        )
+      : QueryTabView(tab: tab);
 }
 
 class _TabButton extends StatelessWidget {
@@ -113,12 +326,14 @@ class _TabButton extends StatelessWidget {
     required this.selected,
     required this.onSelect,
     required this.onClose,
+    required this.onContextMenu,
   });
 
   final EditorTab tab;
   final bool selected;
   final VoidCallback onSelect;
   final VoidCallback onClose;
+  final void Function(Offset globalPosition) onContextMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +341,7 @@ class _TabButton extends StatelessWidget {
     return InkWell(
       key: Key('tab-${tab.id}'),
       onTap: onSelect,
+      onSecondaryTapDown: (d) => onContextMenu(d.globalPosition),
       child: Container(
         padding: const EdgeInsets.only(left: 12, right: 4),
         decoration: BoxDecoration(
