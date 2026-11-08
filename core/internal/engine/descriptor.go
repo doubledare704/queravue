@@ -30,10 +30,11 @@ const (
 	CapStats Capability = "stats"
 	// CapValidation: ValidationManager (Iteration 7).
 	CapValidation Capability = "validation"
-	// CapCompletion: schema-aware completion (Iteration 8, ADR 0015). Engines
-	// declare it, and get a CapabilityInterfaces entry, when they implement it.
+	// CapCompletion: ColumnLister (Iteration 8, ADR 0015).
 	CapCompletion Capability = "completion"
-	// CapFormat: SQL formatting (Iteration 8, ADR 0015), declared like CapCompletion.
+	// CapFormat: SQL formatting (Iteration 8, ADR 0015). It needs no Conn
+	// interface, so it has no CapabilityInterfaces entry; engines declare it
+	// once the formatter supports their dialect.
 	CapFormat Capability = "format"
 )
 
@@ -48,6 +49,7 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapIndexManager:    reflect.TypeFor[IndexManager](),
 	CapStats:           reflect.TypeFor[StatsProvider](),
 	CapValidation:      reflect.TypeFor[ValidationManager](),
+	CapCompletion:      reflect.TypeFor[ColumnLister](),
 }
 
 // FieldKind tells the UI which input widget to render.

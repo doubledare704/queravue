@@ -65,6 +65,7 @@ func Run(t *testing.T, tg Target) {
 	t.Run("ListIndexesOfMissingTable", func(t *testing.T) { listIndexesOfMissingTable(t, tg) })
 	t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
 	t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })
+	t.Run("BulkColumns", func(t *testing.T) { bulkColumns(t, tg) })
 	if !tg.SkipEdit {
 		t.Run("EditAndRollback", func(t *testing.T) { editRollback(t, tg) })
 	}
