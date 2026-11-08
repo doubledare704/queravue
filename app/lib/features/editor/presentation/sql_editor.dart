@@ -5,6 +5,8 @@ import 'package:re_highlight/languages/sql.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
+import '../../completion/domain/completion_models.dart';
+import '../../completion/presentation/completion_host.dart';
 import '../application/editor_tabs.dart';
 import '../application/query_run.dart';
 import '../domain/text_offsets.dart';
@@ -93,7 +95,7 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
     }
     final failed = run.failedStatement != null && run.phase == RunPhase.failed;
 
-    return CodeEditor(
+    final editor = CodeEditor(
       key: Key('sql-editor-${widget.tab.id}'),
       controller: _c,
       autofocus: true,
@@ -127,6 +129,12 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
           ),
         ],
       ),
+    );
+    return CompletionHost(
+      connectionId: widget.tab.connectionId,
+      context: CompletionContext.sql,
+      controller: _c,
+      child: editor,
     );
   }
 }

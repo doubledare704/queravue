@@ -1,0 +1,167 @@
+[
+  {
+    "prefix": "",
+    "name": "anything",
+    "class": 0
+  },
+  {
+    "prefix": "ord",
+    "name": "orders",
+    "class": 0
+  },
+  {
+    "prefix": "ORD",
+    "name": "orders",
+    "class": 0
+  },
+  {
+    "prefix": "oi",
+    "name": "order_items",
+    "class": 1
+  },
+  {
+    "prefix": "oi",
+    "name": "OrderItems",
+    "class": 1
+  },
+  {
+    "prefix": "ci",
+    "name": "customer_id",
+    "class": 1
+  },
+  {
+    "prefix": "id",
+    "name": "customer_id",
+    "class": 1
+  },
+  {
+    "prefix": "cid",
+    "name": "customer_id",
+    "class": 1
+  },
+  {
+    "prefix": "item",
+    "name": "order_items",
+    "class": 1
+  },
+  {
+    "prefix": "ordit",
+    "name": "order_items",
+    "class": 1
+  },
+  {
+    "prefix": "ot",
+    "name": "order_items",
+    "class": 3
+  },
+  {
+    "prefix": "xyz",
+    "name": "orders",
+    "class": -1
+  },
+  {
+    "prefix": "rdr",
+    "name": "orders",
+    "class": 3
+  },
+  {
+    "prefix": "sku",
+    "name": "items.[].sku",
+    "class": 1
+  },
+  {
+    "prefix": "city",
+    "name": "address.city",
+    "class": 1
+  },
+  {
+    "prefix": "ac",
+    "name": "address.city",
+    "class": 1
+  },
+  {
+    "prefix": "$g",
+    "name": "$gt",
+    "class": 0
+  },
+  {
+    "prefix": "gt",
+    "name": "$gt",
+    "class": 1
+  },
+  {
+    "prefix": "na",
+    "name": "name",
+    "class": 0
+  },
+  {
+    "prefix": "ame",
+    "name": "name",
+    "class": 2
+  },
+  {
+    "prefix": "nme",
+    "name": "name",
+    "class": 3
+  },
+  {
+    "prefix": "nmx",
+    "name": "name",
+    "class": -1
+  },
+  {
+    "prefix": "é",
+    "name": "école",
+    "class": 0
+  },
+  {
+    "prefix": "ab1",
+    "name": "ab12",
+    "class": 0
+  },
+  {
+    "prefix": "a1",
+    "name": "ab12",
+    "class": 1
+  },
+  {
+    "prefix": "UP",
+    "name": "updatedAt",
+    "class": 0
+  },
+  {
+    "prefix": "ua",
+    "name": "updatedAt",
+    "class": 1
+  },
+  {
+    "prefix": "at",
+    "name": "updatedAt",
+    "class": 1
+  },
+  {
+    "prefix": "created",
+    "name": "createdAt",
+    "class": 0
+  },
+  {
+    "prefix": "cra",
+    "name": "createdAt",
+    "class": 1
+  },
+  {
+    "prefix": "x",
+    "name": "",
+    "class": -1
+  },
+  {
+    "prefix": "name",
+    "name": "name",
+    "class": 0
+  },
+  {
+    "prefix": "names",
+    "name": "name",
+    "class": -1
+  }
+]

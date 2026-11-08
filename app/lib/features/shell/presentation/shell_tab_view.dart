@@ -115,6 +115,8 @@ class _ShellTabViewState extends ConsumerState<ShellTabView> {
             key: Key('shell-editor-${tab.id}'),
             controller: tab.controller,
             errorLine: errorLine,
+            connectionId: tab.connectionId,
+            database: tab.shellDatabase,
           ),
         ),
         const Divider(height: 1),

@@ -4,6 +4,9 @@ import 'package:re_highlight/languages/javascript.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 
+import '../../completion/domain/completion_models.dart';
+import '../../completion/presentation/completion_host.dart';
+
 /// JavaScript editor of a shell tab. [errorLine] (0-based) is marked in the
 /// gutter with ✕.
 class JsEditor extends StatelessWidget {
@@ -12,17 +15,23 @@ class JsEditor extends StatelessWidget {
     required this.controller,
     this.errorLine,
     this.autofocus = true,
+    this.connectionId,
+    this.database = '',
   });
 
   final CodeLineEditingController controller;
   final int? errorLine;
   final bool autofocus;
 
+  /// With a connection the editor completes collections, methods and fields.
+  final String? connectionId;
+  final String database;
+
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
-    return CodeEditor(
+    final editor = CodeEditor(
       controller: controller,
       autofocus: autofocus,
       wordWrap: false,
@@ -53,6 +62,15 @@ class JsEditor extends StatelessWidget {
           ),
         ],
       ),
+    );
+    final id = connectionId;
+    if (id == null) return editor;
+    return CompletionHost(
+      connectionId: id,
+      context: CompletionContext.shell,
+      controller: controller,
+      database: database,
+      child: editor,
     );
   }
 }
