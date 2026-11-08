@@ -44,6 +44,10 @@ Go benchmark (`BenchmarkCompleteOn500Tables`, generated 500-table catalog, 200 i
 | `WHERE sta` | 196,000 | 359,886 | 5,211 |
 | keyword start | 170,000 | 335,076 | 4,543 |
 
+## Mongo completion (core)
+
+Go benchmark (`BenchmarkCompleteMongoFilterKeys`, a sample with about 2,000 distinct nested paths, filter key position, Apple M4 Pro): 0.69 ms/op, 1.2 MB/op, 21,263 allocs/op. Budget ≤ 10 ms. Sampling cost on a real server is paid once per collection and 5 minutes; `Complete` never waits more than 150 ms for it.
+
 ## Not measured yet
 - Keystroke → popup frame (50 ms budget): needs the UI, PR 4.
 - Bulk introspection timings on MySQL, MariaDB, SQL Server, CockroachDB and TiDB. The queries are covered by the shared `BulkColumns` integration suite; only PostgreSQL, MySQL and MariaDB were run locally.

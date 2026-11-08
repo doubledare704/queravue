@@ -75,7 +75,7 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 - Split panels / detachable panes.
 - **Done when:** autocomplete is useful on a 500-table schema and stays under 50 ms.
 
-**Status:** PR 1 (ADR 0015, `CompletionService` contract, protocol version 8) merged as #32. PR 2 (SQL completion in core, bulk column introspection, 500-table seed) merged as #33. PR 3 is in progress: the SQL formatter is done (core `format` package, `FormatSQL`, capability `format`); Mongo completion is next. UI, action registry and layout follow in PRs 4–6.
+**Status:** PR 1 (ADR 0015, `CompletionService` contract, protocol version 8) merged as #32. PR 2 (SQL completion in core, bulk column introspection, 500-table seed) merged as #33. PR 3 (SQL formatter, `SampleFieldPaths`, Mongo shell and query-bar completion in core) is in review. UI, action registry and layout follow in PRs 4–6.
 
 ### It. 9 — ER diagrams + materialize
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).

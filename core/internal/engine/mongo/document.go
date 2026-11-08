@@ -409,31 +409,13 @@ func (c *Conn) SampleFields(ctx context.Context, db, collection string, n uint32
 	if err != nil {
 		return engine.FieldSample{}, err
 	}
-	if n == 0 {
-		n = 100
-	}
-	n = min(n, 1000)
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-
-	fallback := false
-	cur, err := coll.Aggregate(ctx, mongo.Pipeline{{{Key: "$sample", Value: bson.D{{Key: "size", Value: int64(n)}}}}})
+	cur, fallback, err := c.openSample(ctx, coll, n)
 	if err != nil {
-		switch engine.KindOf(classify("sample", err, c.secret)) {
-		case engine.KindAuth, engine.KindNetwork, engine.KindTimeout, engine.KindCanceled, engine.KindTLS:
-			return engine.FieldSample{}, c.fail("sample", err)
-		}
-		fallback = true
-		cur, err = coll.Find(ctx, bson.D{}, options.Find().SetLimit(int64(n)))
-		if err != nil {
-			return engine.FieldSample{}, c.fail("sample", err)
-		}
+		return engine.FieldSample{}, err
 	}
-	defer func() {
-		cctx, cc := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cc()
-		_ = cur.Close(cctx)
-	}()
+	defer closeCursor(cur)
 
 	type acc struct {
 		docs  uint32
@@ -488,6 +470,32 @@ func (c *Conn) SampleFields(ctx context.Context, db, collection string, n uint32
 		return a.Name < b.Name
 	})
 	return out, nil
+}
+
+func (c *Conn) openSample(ctx context.Context, coll *mongo.Collection, n uint32) (*mongo.Cursor, bool, error) {
+	if n == 0 {
+		n = 100
+	}
+	n = min(n, 1000)
+	cur, err := coll.Aggregate(ctx, mongo.Pipeline{{{Key: "$sample", Value: bson.D{{Key: "size", Value: int64(n)}}}}})
+	if err == nil {
+		return cur, false, nil
+	}
+	switch engine.KindOf(classify("sample", err, c.secret)) {
+	case engine.KindAuth, engine.KindNetwork, engine.KindTimeout, engine.KindCanceled, engine.KindTLS:
+		return nil, false, c.fail("sample", err)
+	}
+	cur, err = coll.Find(ctx, bson.D{}, options.Find().SetLimit(int64(n)))
+	if err != nil {
+		return nil, false, c.fail("sample", err)
+	}
+	return cur, true, nil
+}
+
+func closeCursor(cur *mongo.Cursor) {
+	cctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = cur.Close(cctx)
 }
 
 // typeAlias returns the $type alias of a BSON type.

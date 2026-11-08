@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
 
@@ -534,4 +536,37 @@ func contains(ss []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestIntegrationSampleFieldPaths(t *testing.T) {
+	c := connect(t)
+	ctx := context.Background()
+	name := scratch(t, c)
+	coll := c.client.Database("queravue").Collection(name)
+	_, err := coll.InsertMany(ctx, []any{
+		bson.D{{Key: "address", Value: bson.D{{Key: "city", Value: "Oslo"}}}, {Key: "items", Value: bson.A{bson.D{{Key: "sku", Value: "a"}}}}},
+		bson.D{{Key: "address", Value: bson.D{{Key: "city", Value: "Rome"}, {Key: "zip", Value: 1}}}, {Key: "tags", Value: bson.A{"x"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := c.SampleFieldPaths(ctx, "queravue", name, engine.PathSampleOptions{})
+	if err != nil || s.Sampled != 2 || s.UsedFallback {
+		t.Fatalf("sample = %+v, %v", s, err)
+	}
+	by := map[string]engine.FieldPathStat{}
+	for _, p := range s.Paths {
+		by[p.Path] = p
+	}
+	for _, want := range []string{"_id", "address.city", "address.zip", "items.[].sku", "tags.[]"} {
+		if _, ok := by[want]; !ok {
+			t.Errorf("missing %q in %v", want, s.Paths)
+		}
+	}
+	if by["address.city"].Frequency != 1 || by["address.zip"].Frequency != 0.5 {
+		t.Errorf("frequencies = %v / %v", by["address.city"].Frequency, by["address.zip"].Frequency)
+	}
+	if v, err := c.SampleFieldPaths(ctx, "queravue", "paid_orders", engine.PathSampleOptions{SampleSize: 5}); err == nil && v.Sampled == 0 {
+		t.Errorf("view sample = %+v", v)
+	}
 }

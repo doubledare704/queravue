@@ -64,12 +64,17 @@ type Manager struct {
 	mu      sync.Mutex
 	entries map[entryKey]*entry
 	recent  map[string]*Recency
+
+	mongo *MongoCatalog
 }
+
+// Mongo returns the catalog that backs Mongo completion.
+func (m *Manager) Mongo() *MongoCatalog { return m.mongo }
 
 // NewManager returns a Manager. Call Shutdown to cancel running warm-ups.
 func NewManager() *Manager {
 	root, stop := context.WithCancel(context.Background())
-	return &Manager{root: root, stop: stop, entries: map[entryKey]*entry{}, recent: map[string]*Recency{}}
+	return &Manager{root: root, stop: stop, entries: map[entryKey]*entry{}, recent: map[string]*Recency{}, mongo: NewMongoCatalog()}
 }
 
 // Shutdown cancels every warm-up.
@@ -172,6 +177,7 @@ func (m *Manager) leave(e *entry) {
 // Invalidate drops the catalogs of a session and warms them again on the next
 // Start or Complete.
 func (m *Manager) Invalidate(sessionID string) {
+	m.mongo.Invalidate(sessionID)
 	m.mu.Lock()
 	var victims []*entry
 	for k, e := range m.entries {

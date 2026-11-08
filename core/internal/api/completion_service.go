@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/doubledare704/queravue/core/internal/completion"
+	"github.com/doubledare704/queravue/core/internal/engine"
 	"github.com/doubledare704/queravue/core/internal/format"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/session"
@@ -47,7 +49,7 @@ func (c *CompletionService) Complete(ctx context.Context, req *queravuev1.Comple
 	case queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SQL:
 	case queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL,
 		queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_MONGO_QUERY:
-		return &queravuev1.CompleteResponse{Error: unsupported("completion for this context is not available yet")}, nil
+		return c.completeMongo(ctx, sess, req)
 	default:
 		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID, "completion context kind is required")}, nil
 	}
@@ -72,14 +74,66 @@ func (c *CompletionService) Complete(ctx context.Context, req *queravuev1.Comple
 		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_CANCELED, "completion was cancelled")}, nil
 	}
 	out := &queravuev1.CompleteResponse{IsIncomplete: res.Incomplete, CatalogState: catalogState(res.State)}
-	out.Items = make([]*queravuev1.CompletionItem, len(res.Items))
-	for i, it := range res.Items {
-		out.Items[i] = &queravuev1.CompletionItem{
+	out.Items = wireItems(res.Items)
+	return out, nil
+}
+
+func wireItems(items []completion.Item) []*queravuev1.CompletionItem {
+	out := make([]*queravuev1.CompletionItem, len(items))
+	for i, it := range items {
+		out[i] = &queravuev1.CompletionItem{
 			Label: it.Label, Kind: itemKind(it.Kind), Detail: it.Detail, InsertText: it.InsertText, SortKey: it.SortKey,
 			Replace: &queravuev1.TextRange{Start: uint32(it.ReplaceStart), End: uint32(it.ReplaceEnd)}, //nolint:gosec // offsets are non-negative
 		}
 	}
-	return out, nil
+	return out
+}
+
+const mongoSampleWait = 150 * time.Millisecond
+
+func (c *CompletionService) completeMongo(ctx context.Context, sess *session.Session, req *queravuev1.CompleteRequest) (*queravuev1.CompleteResponse, error) {
+	if _, ok := engine.As[engine.DocumentStore](sess.Conn); !ok {
+		return &queravuev1.CompleteResponse{Error: unsupported("this connection has no documents")}, nil
+	}
+	res, err := completion.CompleteMongo(ctx, completion.MongoRequest{
+		Shell:      req.GetKind() == queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL,
+		Text:       req.GetText(),
+		Cursor:     int(req.GetCursorOffset()),
+		MaxItems:   int(req.GetMaxItems()),
+		Database:   req.GetDatabase(),
+		Collection: req.GetCollection(),
+		Source:     mongoSource{sess: sess, catalog: c.catalogs.Mongo()},
+	})
+	if err != nil {
+		return &queravuev1.CompleteResponse{Error: adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_CANCELED, "completion was cancelled")}, nil
+	}
+	return &queravuev1.CompleteResponse{Items: wireItems(res.Items), IsIncomplete: res.Incomplete}, nil
+}
+
+type mongoSource struct {
+	sess    *session.Session
+	catalog *completion.MongoCatalog
+}
+
+func (m mongoSource) Collections(ctx context.Context, database string) ([]string, error) {
+	names, err := m.catalog.Collections(ctx, m.sess, database)
+	if err != nil {
+		return nil, fmt.Errorf("completion: collections: %w", err)
+	}
+	return names, nil
+}
+
+func (m mongoSource) FieldPaths(ctx context.Context, database, collection string) (engine.FieldPathSample, bool, error) {
+	waitCtx, cancel := context.WithTimeout(ctx, mongoSampleWait)
+	defer cancel()
+	sample, err := m.catalog.FieldPaths(waitCtx, m.sess, completion.PathsRequest{Database: database, Collection: collection})
+	switch {
+	case err == nil:
+		return sample, true, nil
+	case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
+		return engine.FieldPathSample{}, false, nil
+	}
+	return engine.FieldPathSample{}, false, fmt.Errorf("completion: field paths: %w", err)
 }
 
 // WarmCatalog implements the RPC.
@@ -148,6 +202,14 @@ func itemKind(k completion.Kind) queravuev1.CompletionItemKind {
 		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_SCHEMA
 	case completion.KindAlias:
 		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_ALIAS
+	case completion.KindCollection:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_COLLECTION
+	case completion.KindField:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_FIELD
+	case completion.KindOperator:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_OPERATOR
+	case completion.KindMethod:
+		return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_METHOD
 	}
 	return queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_UNSPECIFIED
 }

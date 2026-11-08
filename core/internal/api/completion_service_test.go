@@ -176,3 +176,56 @@ func TestFormatSQLUnknownSessionIsNotFound(t *testing.T) {
 		t.Errorf("code = %v", status.Code(err))
 	}
 }
+
+func mongoCompletionEnv(t *testing.T, conn *fakeDocConn) (*api.CompletionService, string) {
+	t.Helper()
+	mgr := session.NewManager(fakeDocOpener{conn: conn})
+	t.Cleanup(mgr.Shutdown)
+	sess, err := mgr.Open(context.Background(), "m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogs := completion.NewManager()
+	t.Cleanup(catalogs.Shutdown)
+	return api.NewCompletionService(mgr, catalogs), sess.ID
+}
+
+func TestCompleteShellOffersSampledFieldPaths(t *testing.T) {
+	conn := &fakeDocConn{}
+	svc, sid := mongoCompletionEnv(t, conn)
+	text := "db.users.find({ ad"
+	resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{
+		SessionId: sid, Kind: queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL, Text: text, CursorOffset: uint32(len(text)), Database: "app",
+	})
+	if err != nil || resp.GetError() != nil {
+		t.Fatalf("Complete = %v, %v", resp, err)
+	}
+	first := resp.GetItems()[0]
+	if first.GetLabel() != "address.city" || first.GetKind() != queravuev1.CompletionItemKind_COMPLETION_ITEM_KIND_FIELD ||
+		first.GetInsertText() != `"address.city"` || first.GetReplace().GetStart() != 16 || first.GetReplace().GetEnd() != 18 || first.GetDetail() != "string · 100%" {
+		t.Errorf("first item = %v", first)
+	}
+	if resp.GetCatalogState() != queravuev1.CatalogState_CATALOG_STATE_UNSPECIFIED {
+		t.Errorf("catalog state = %v", resp.GetCatalogState())
+	}
+}
+
+func TestCompleteQueryBarUsesTheRequestCollection(t *testing.T) {
+	svc, sid := mongoCompletionEnv(t, &fakeDocConn{})
+	resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{
+		SessionId: sid, Kind: queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_MONGO_QUERY, Text: `{ "ad`, CursorOffset: 5, Database: "app", Collection: "users",
+	})
+	if err != nil || resp.GetError() != nil || len(resp.GetItems()) == 0 || resp.GetItems()[0].GetLabel() != "address.city" {
+		t.Fatalf("Complete = %v, %v", resp, err)
+	}
+}
+
+func TestCompleteShellOnASQLSessionIsUnsupported(t *testing.T) {
+	svc, sess, _ := completionEnv(t)
+	resp, err := svc.Complete(context.Background(), &queravuev1.CompleteRequest{
+		SessionId: sess.ID, Kind: queravuev1.CompletionContextKind_COMPLETION_CONTEXT_KIND_SHELL, Text: "db.",
+	})
+	if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED {
+		t.Errorf("Complete = %v, %v", resp, err)
+	}
+}

@@ -21,6 +21,10 @@ const (
 	KindColumn
 	KindSchema
 	KindAlias
+	KindCollection
+	KindField
+	KindOperator
+	KindMethod
 )
 
 // Item is one completion candidate. Offsets are UTF-16 code units.

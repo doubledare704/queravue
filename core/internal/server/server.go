@@ -109,6 +109,7 @@ func Serve(ctx context.Context, cfg Config) error {
 		querySvc.SetSchemaChangeHook(func(sessionID string) { schemaCache.Invalidate(sessionID, nil) })
 		queravuev1.RegisterSchemaServiceServer(srv, api.NewSchemaService(cfg.Sessions, schemaCache))
 		docSvc := api.NewDocumentService(cfg.Sessions, cfg.Connections, log)
+		docSvc.SetMongoCatalog(catalogs.Mongo())
 		if cfg.History != nil {
 			docSvc.SetHistory(cfg.History)
 		}

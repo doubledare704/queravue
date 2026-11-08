@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
@@ -34,7 +35,11 @@ type DocumentService struct {
 	connections *connections.Service
 	log         *slog.Logger
 	history     *history.Store
+	mongo       *completion.MongoCatalog
 }
+
+// SetMongoCatalog shares the field path cache with completion.
+func (d *DocumentService) SetMongoCatalog(c *completion.MongoCatalog) { d.mongo = c }
 
 // SetHistory records document operations in the query history.
 func (d *DocumentService) SetHistory(h *history.Store) { d.history = h }
@@ -87,7 +92,7 @@ func NewDocumentService(s *session.Manager, c *connections.Service, log *slog.Lo
 	if log == nil {
 		log = slog.Default()
 	}
-	return &DocumentService{sessions: s, connections: c, log: log}
+	return &DocumentService{sessions: s, connections: c, log: log, mongo: completion.NewMongoCatalog()}
 }
 
 func (d *DocumentService) store(sessionID string) (*session.Session, engine.DocumentStore, error) {
@@ -343,9 +348,25 @@ func documentInput(in engine.Input) queravuev1.DocumentInput {
 }
 
 // SampleFieldPaths implements the RPC.
-func (d *DocumentService) SampleFieldPaths(_ context.Context, _ *queravuev1.SampleFieldPathsRequest) (*queravuev1.SampleFieldPathsResponse, error) {
-	return &queravuev1.SampleFieldPathsResponse{Error: &queravuev1.DocumentError{
-		Kind:    queravuev1.DocumentErrorKind_DOCUMENT_ERROR_KIND_UNSUPPORTED,
-		Message: "field path sampling is not available yet",
-	}}, nil
+func (d *DocumentService) SampleFieldPaths(ctx context.Context, req *queravuev1.SampleFieldPathsRequest) (*queravuev1.SampleFieldPathsResponse, error) {
+	sess, _, err := d.store(req.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	sample, err := d.mongo.FieldPaths(ctx, sess, completion.PathsRequest{
+		Database: req.GetDatabase(), Collection: req.GetCollection(), Refresh: req.GetRefresh(),
+		Options: engine.PathSampleOptions{SampleSize: req.GetSampleSize(), MaxDepth: int(req.GetMaxDepth())},
+	})
+	if err != nil {
+		return &queravuev1.SampleFieldPathsResponse{Error: toDocumentError(err)}, nil
+	}
+	resp := &queravuev1.SampleFieldPathsResponse{Sampled: sample.Sampled, UsedFallback: sample.UsedFallback, Truncated: sample.Truncated}
+	for _, p := range sample.Paths {
+		stat := &queravuev1.FieldPathStat{Path: p.Path, Frequency: p.Frequency, Depth: uint32(p.Depth)} //nolint:gosec // depth is small and non-negative
+		for _, t := range p.Types {
+			stat.Types = append(stat.Types, &queravuev1.TypeCount{Type: t.Type, Count: t.Count})
+		}
+		resp.Paths = append(resp.Paths, stat)
+	}
+	return resp, nil
 }
