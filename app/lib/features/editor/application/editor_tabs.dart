@@ -84,6 +84,10 @@ class EditorTabsState {
 class EditorTabs extends Notifier<EditorTabsState> {
   int _seq = 0;
 
+  /// Chooses the tab to show after one closes; set by the layout, which
+  /// knows the groups. Without it the connection's last tab is shown.
+  String? Function(String connectionId, String tabId)? closeSuccessor;
+
   // Not read from `state`: provider state is off limits during disposal.
   final List<EditorTab> _live = [];
 
@@ -251,6 +255,31 @@ class EditorTabs extends Notifier<EditorTabsState> {
     return tab;
   }
 
+  /// Adds a tab read from a saved layout without changing the active tab.
+  EditorTab restoreTab({
+    required String connectionId,
+    required TabKind kind,
+    required String title,
+    String shellDatabase = '',
+  }) {
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: title,
+      kind: kind,
+      shellDatabase: shellDatabase,
+    );
+    if (kind == TabKind.query) {
+      ref.read(queryRunProvider(tab.id).notifier).bind(connectionId);
+    }
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: state.activeByConnection,
+    );
+    return tab;
+  }
+
   /// Closes a tab: cancels its statement, closes its session and results.
   void close(String tabId) {
     final tab = state.tabs.where((t) => t.id == tabId).firstOrNull;
@@ -259,6 +288,7 @@ class EditorTabs extends Notifier<EditorTabsState> {
       for (final t in state.tabs)
         if (t.id != tabId) t,
     ];
+    final successor = closeSuccessor?.call(tab.connectionId, tabId);
     final active = Map.of(state.activeByConnection);
     if (active[tab.connectionId] == tabId) {
       final siblings = [
@@ -268,7 +298,7 @@ class EditorTabs extends Notifier<EditorTabsState> {
       if (siblings.isEmpty) {
         active.remove(tab.connectionId);
       } else {
-        active[tab.connectionId] = siblings.last.id;
+        active[tab.connectionId] = successor ?? siblings.last.id;
       }
     }
     state = EditorTabsState(tabs: remaining, activeByConnection: active);

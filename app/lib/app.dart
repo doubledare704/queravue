@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core_client/core_providers.dart';
+import 'features/editor/application/layout_persistence.dart';
 import 'features/editor/presentation/workspace.dart';
 import 'features/keybindings/application/keybindings_controller.dart';
 import 'features/workspace/presentation/left_sidebar.dart';
@@ -30,6 +31,7 @@ class _QueravueAppState extends ConsumerState<QueravueApp> {
   }
 
   Future<AppExitResponse> _onExitRequested() async {
+    await ref.read(layoutPersistenceProvider).flush();
     await ref.read(coreSupervisorProvider).dispose();
     return AppExitResponse.exit;
   }
@@ -62,6 +64,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(layoutPersistenceProvider);
     final registry = ref.watch(actionRegistryProvider);
     return ActionMenuBar(
       registry: registry,

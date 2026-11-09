@@ -62,6 +62,9 @@ The test asserts both p95 values in profile mode. The first character is fast be
 
 Along the way the run found a core bug that the unit tests could not: the first warm-up of a session raced with the schema browser on the same driver connection (`conn busy`), failed silently and never retried, so completion stayed cold. Warm-up queries now retry while the connection is busy, a failed warm-up is logged and retried after 5 seconds.
 
+## Layout restore
+Restoring 60 query tabs in two groups from `.queravue/layout.json` takes 6 ms in the unit test (fake repository, so it measures the model and tab creation, not the core's file read). Only the layout file is read; a bound file is read when its tab is first shown, and a tab body is built only then, so cold start does not grow with the number of saved tabs. Whole-app cold start was not re-measured.
+
 ## Not measured yet
 - Bulk introspection timings on MySQL, MariaDB, SQL Server, CockroachDB and TiDB. The queries are covered by the shared `BulkColumns` integration suite; only PostgreSQL, MySQL and MariaDB were run locally.
 - Cold start and idle memory with the warm-up running at session open: the catalog is small, but the whole-process numbers need the perf-check run with the UI.

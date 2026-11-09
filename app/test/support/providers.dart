@@ -5,6 +5,9 @@ import 'package:queravue/features/completion/domain/snippets.dart';
 
 import 'fake_completion.dart';
 import 'fake_keybindings.dart';
+import 'fake_layout.dart';
+
+import 'package:queravue/features/editor/application/layout_persistence.dart';
 
 import 'package:queravue/features/keybindings/application/keybindings_controller.dart';
 
@@ -19,12 +22,15 @@ import 'fake_connections_repository.dart';
 List<Override> fakeCoreOverrides(
   FakeConnectionsRepository repo, {
   bool ready = true,
+  bool fakeLayoutPersistence = true,
 }) => [
   connectionsRepositoryProvider.overrideWithValue(repo),
   coreReadyProvider.overrideWithValue(ready),
   completionRepositoryProvider.overrideWithValue(FakeCompletionRepository()),
   userSnippetsProvider.overrideWith((ref) async => const <Snippet>[]),
   keybindingsProvider.overrideWith(FakeKeybindings.new),
+  if (fakeLayoutPersistence)
+    layoutPersistenceProvider.overrideWith(NoLayoutPersistence.new),
 ];
 
 /// A container backed by [repo], disposed after the test.

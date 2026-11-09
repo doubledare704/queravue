@@ -91,6 +91,14 @@ The menu bar items have no key equivalent on purpose: a native one is handled be
 - Two actions on one chord is a conflict: neither fires, the palette marks both and the shortcuts dialog (palette: "Keyboard shortcuts") lists them, so one of them can be changed.
 - The dialog changes a shortcut by capturing the next key combination, clears it, or restores the default; changes are written to the file.
 
+## Editor groups and layout
+
+- Tab context menu (right-click) and the palette: split right, split down, move tab to next group; focus next and previous group. Defaults: `⌘\`, `⌘⇧\`, `⌘⌥→`, `⌘⌥←`, `⌘⌥⇧→`. Click a group to focus it; the focused group has a coloured top edge when the editor is split.
+- Drag the divider between groups to resize; groups never get smaller than 18 % of the pane, and there are at most four.
+- Closing the last tab of a group removes the group.
+- Layout, open query and shell tabs and unsaved text are saved to `.queravue/layout.json` in the first workspace root and restored on start; tabs bound to a file load it when first shown. Keep the file out of version control. Table, collection and designer tabs are not restored.
+- Design, limits and the detached-window decision: ADR 0016.
+
 ### Catalog
 - Core warms a catalog in the background when a session opens: one `ListObjects` and one bulk column query per schema (`engine.ColumnLister`, capability `completion`).
 - `Complete` never waits for it. `catalog_state` is `COLD`, `WARMING` or `READY`; tables appear before columns.

@@ -21,6 +21,7 @@ import 'package:queravue/features/connections/data/connections_repository.dart';
 import 'package:queravue/features/connections/domain/models.dart';
 import 'package:queravue/features/core_status/core_status_controller.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
+import 'package:queravue/features/editor/application/layout_persistence.dart';
 import 'package:queravue/features/shell/application/cursor_page_controller.dart';
 import 'package:queravue/features/shell/application/shell_tab_controller.dart';
 import 'package:queravue/features/workspace/application/tab_files.dart';
@@ -176,12 +177,17 @@ void main() {
             .title,
         'items.mongo.js',
       );
+      await tester.runAsync(container.read(layoutPersistenceProvider).flush);
       await _stopApp(tester, container);
 
       // ---- second run: a fresh app and core; reopen and run ----
       container = await _startApp(tester);
       addTearDown(container.dispose);
-      expect(container.read(editorTabsProvider).tabs, isEmpty);
+      await _pumpUntil(
+        tester,
+        'layout restored',
+        () => container.read(editorTabsProvider).tabs.length == 1,
+      );
       final entries = await tester.runAsync(
         () => container
             .read(workspaceRepositoryProvider)

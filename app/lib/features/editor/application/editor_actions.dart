@@ -1,3 +1,4 @@
+import 'package:flutter/painting.dart' show Axis;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../connections/application/connection_session.dart';
@@ -6,6 +7,7 @@ import '../domain/query_models.dart';
 import '../../documents/application/document_tab_controller.dart';
 import '../../shell/application/shell_actions.dart';
 import '../../shell/application/shell_tab_controller.dart';
+import 'editor_layout_controller.dart';
 import 'editor_tabs.dart';
 
 /// Opens an editor tab for the selected connection (⌘T).
@@ -63,4 +65,24 @@ Future<void> cancelActiveTab(WidgetRef ref) async {
   } else if (tab != null) {
     await ref.read(editorTabsProvider.notifier).cancel(tab.id);
   }
+}
+
+/// Splits the focused group, moving its active tab into a new group.
+void splitEditor(WidgetRef ref, Axis along) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id != null) ref.read(editorLayoutProvider.notifier).split(id, along);
+}
+
+/// Focuses the group [delta] places from the focused one, wrapping around.
+void focusEditorGroup(WidgetRef ref, int delta) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id != null) {
+    ref.read(editorLayoutProvider.notifier).focusRelative(id, delta);
+  }
+}
+
+/// Moves the active tab into the group [delta] places away.
+void moveTabToGroup(WidgetRef ref, int delta) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id != null) ref.read(editorLayoutProvider.notifier).moveActive(id, delta);
 }
