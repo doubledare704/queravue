@@ -156,6 +156,14 @@ class LayoutPersistence {
     return tab.id;
   }
 
+  /// The restored tab that will show [file] once loaded, if there is one.
+  String? unloadedTabFor(FilePath file) {
+    for (final e in _unloaded.entries) {
+      if (e.value.file == file) return e.key;
+    }
+    return null;
+  }
+
   /// Loads the file or draft of a restored tab; a no-op for any other tab.
   Future<void> ensureLoaded(String tabId) async {
     final pending = _unloaded.remove(tabId);

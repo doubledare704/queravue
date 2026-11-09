@@ -7,6 +7,7 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/models.dart';
 import '../../editor/application/editor_tabs.dart';
+import '../../editor/application/layout_persistence.dart';
 import '../data/workspace_repository.dart';
 import '../domain/file_header.dart';
 import '../domain/workspace_models.dart';
@@ -317,6 +318,21 @@ class FileOpener {
   final Ref _ref;
 
   Future<OpenOutcome> open(FilePath file) async {
+    final persistence = _ref.read(layoutPersistenceProvider);
+    final restored = persistence.unloadedTabFor(file);
+    if (restored != null) {
+      await persistence.ensureLoaded(restored);
+      final tab = _ref
+          .read(editorTabsProvider)
+          .tabs
+          .where((t) => t.id == restored)
+          .firstOrNull;
+      if (tab != null) {
+        _ref.read(selectedConnectionProvider.notifier).select(tab.connectionId);
+        _ref.read(editorTabsProvider.notifier).select(tab.id);
+        return Opened(tab.id);
+      }
+    }
     final tabs = _ref.read(editorTabsProvider);
     for (final t in tabs.tabs) {
       if (_ref.read(tabFileProvider(t.id))?.file == file) {

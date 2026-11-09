@@ -162,6 +162,34 @@ void main() {
       expect(second.read(tabFileProvider(tab.id))?.file.path, 'q/users.sql');
     });
 
+    test(
+      'opening a file reuses its restored tab instead of adding one',
+      () async {
+        final workspace = FakeWorkspaceRepository(
+          files: {'q/users.sql': 'SELECT 1'},
+        );
+        final first = await start(workspace);
+        await restored(first);
+        first.read(selectedConnectionProvider.notifier).select('c2');
+        await first
+            .read(fileOpenerProvider)
+            .open(const FilePath('ws', 'q/users.sql'));
+        await first.read(layoutPersistenceProvider).flush();
+
+        final second = await start(workspace);
+        await restored(second);
+        final restoredTab = second.read(editorTabsProvider).tabs.single;
+        final out =
+            await second
+                    .read(fileOpenerProvider)
+                    .open(const FilePath('ws', 'q/users.sql'))
+                as Opened;
+        expect(out.tabId, restoredTab.id);
+        expect(second.read(editorTabsProvider).tabs, hasLength(1));
+        expect(restoredTab.controller.text, 'SELECT 1');
+      },
+    );
+
     test('unsaved edits of a bound file survive and stay unsaved', () async {
       final workspace = FakeWorkspaceRepository(
         files: {'q/users.sql': 'SELECT 1'},
