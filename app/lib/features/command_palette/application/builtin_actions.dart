@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/actions/app_action.dart';
 import '../../../shared/actions/key_chord.dart';
+import '../../../shared/panes/pane_sizes.dart';
 import '../../completion/application/format_action.dart';
 import '../../connections/presentation/connection_actions.dart';
 import '../../documents/application/document_actions.dart';
@@ -124,6 +125,44 @@ final builtinActionsProvider = Provider<List<AppAction>>(
         shift: true,
       ),
       run: (context, ref) async => moveTabToGroup(ref, 1),
+    ),
+    for (final (index, key) in const [
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+    ].indexed)
+      AppAction(
+        id: 'editor.focusGroup${index + 1}',
+        title: 'Focus editor group ${index + 1}',
+        category: ActionCategory.editor,
+        defaultChord: _primary(key),
+        run: (context, ref) async => focusEditorGroupAt(ref, index),
+      ),
+    AppAction(
+      id: 'view.maximizeEditor',
+      title: 'Maximize editor group',
+      subtitle: 'The focused group fills the window; run again to restore',
+      category: ActionCategory.view,
+      defaultChord: _primary(LogicalKeyboardKey.keyM, shift: true),
+      run: (context, ref) async =>
+          ref.read(paneSizesProvider.notifier).toggleEditorMaximized(),
+    ),
+    AppAction(
+      id: 'view.toggleSidebar',
+      title: 'Toggle sidebar',
+      category: ActionCategory.view,
+      defaultChord: _primary(LogicalKeyboardKey.keyB),
+      run: (context, ref) async =>
+          ref.read(paneSizesProvider.notifier).toggleSidebar(),
+    ),
+    AppAction(
+      id: 'view.toggleOutput',
+      title: 'Toggle results and output pane',
+      category: ActionCategory.view,
+      defaultChord: _primary(LogicalKeyboardKey.keyJ),
+      run: (context, ref) async =>
+          ref.read(paneSizesProvider.notifier).toggleOutput(),
     ),
     AppAction(
       id: 'documents.run',

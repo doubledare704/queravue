@@ -7,6 +7,7 @@ import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/editor/application/layout_persistence.dart';
 import 'package:queravue/features/workspace/application/tab_files.dart';
 import 'package:queravue/features/workspace/domain/workspace_models.dart';
+import 'package:queravue/shared/panes/pane_sizes.dart';
 
 import '../../support/fake_query_repository.dart';
 import '../../support/shell_workspace_fakes.dart';
@@ -98,6 +99,30 @@ void main() {
   });
 
   group('persistence', () {
+    test('pane sizes come back, maximize does not', () async {
+      final workspace = FakeWorkspaceRepository();
+      final first = await start(workspace);
+      await restored(first);
+      final panes = first.read(paneSizesProvider.notifier)
+        ..dragSidebar(70)
+        ..setEditorShare(0.65)
+        ..toggleOutput()
+        ..toggleEditorMaximized();
+      expect(panes.state.editorMaximized, isTrue);
+      await first.read(layoutPersistenceProvider).flush();
+
+      final second = await start(workspace);
+      await restored(second);
+      expect(
+        second.read(paneSizesProvider),
+        const PaneSizes(
+          sidebarWidth: 330,
+          editorShare: 0.65,
+          outputCollapsed: true,
+        ),
+      );
+    });
+
     test('a split layout comes back with its tabs, files and drafts', () async {
       final workspace = FakeWorkspaceRepository(
         files: {'q/users.sql': 'SELECT * FROM users'},

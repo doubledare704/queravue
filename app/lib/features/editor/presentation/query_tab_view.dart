@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/panes/editor_over_output.dart';
 import '../../../shared/shortcuts.dart';
 import '../../grid/presentation/result_grid.dart';
 import '../application/editor_tabs.dart';
@@ -21,8 +22,6 @@ class QueryTabView extends ConsumerStatefulWidget {
 }
 
 class _QueryTabViewState extends ConsumerState<QueryTabView> {
-  double _split = 0.4; // editor share of the height
-
   @override
   Widget build(BuildContext context) {
     final run = ref.watch(queryRunProvider(widget.tab.id));
@@ -39,40 +38,9 @@ class _QueryTabViewState extends ConsumerState<QueryTabView> {
         ),
         const Divider(height: 1),
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final h = box.maxHeight;
-              final editorH = (h * _split).clamp(
-                80.0,
-                h - 80.0 < 80 ? 80.0 : h - 80.0,
-              );
-              return Column(
-                children: [
-                  SizedBox(
-                    height: editorH,
-                    child: SqlEditor(tab: widget.tab),
-                  ),
-                  MouseRegion(
-                    cursor: SystemMouseCursors.resizeRow,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onVerticalDragUpdate: (d) => setState(() {
-                        _split = ((editorH + d.delta.dy) / h).clamp(0.1, 0.9);
-                      }),
-                      child: Container(
-                        height: 6,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHigh,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _ResultArea(tabId: widget.tab.id, run: run),
-                  ),
-                ],
-              );
-            },
+          child: EditorOverOutput(
+            editor: SqlEditor(tab: widget.tab),
+            output: _ResultArea(tabId: widget.tab.id, run: run),
           ),
         ),
       ],

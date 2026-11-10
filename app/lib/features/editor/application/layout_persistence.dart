@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/panes/pane_sizes.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../workspace/application/tab_files.dart';
 import '../../workspace/data/workspace_repository.dart';
@@ -58,6 +59,7 @@ class LayoutPersistence {
       editorTabsProvider,
       editorLayoutProvider,
       selectedConnectionProvider,
+      paneSizesProvider,
     ]) {
       _ref.listen(source, (_, _) => _scheduleSave());
     }
@@ -94,6 +96,12 @@ class LayoutPersistence {
     final json = jsonDecode(file.content);
     if (json is! Map<String, Object?> || json['version'] != layoutFileVersion) {
       return;
+    }
+    if (_disposed) return;
+    if (json['panes'] != null) {
+      _ref
+          .read(paneSizesProvider.notifier)
+          .restore(PaneSizes.fromJson(json['panes']));
     }
     final known = {
       for (final c in await _ref.read(connectionsControllerProvider.future))
@@ -209,6 +217,7 @@ class LayoutPersistence {
     return {
       'version': layoutFileVersion,
       'selected': _ref.read(selectedConnectionProvider),
+      'panes': _ref.read(paneSizesProvider).toJson(),
       'connections': connections,
     };
   }

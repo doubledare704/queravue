@@ -2,9 +2,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/command_palette/application/builtin_actions.dart';
+import 'package:queravue/features/command_palette/application/palette_items.dart';
+import 'package:queravue/features/command_palette/domain/palette_search.dart';
+import 'package:queravue/features/keybindings/application/keybindings_controller.dart';
 import 'package:queravue/shared/actions/action_registry.dart';
 import 'package:queravue/shared/actions/app_action.dart';
 import 'package:queravue/shared/actions/key_chord.dart';
+
+import '../../support/fake_connections_repository.dart';
+import '../../support/providers.dart';
 
 AppAction action(String id, [KeyChord? chord]) => AppAction(
   id: id,
@@ -110,6 +116,25 @@ void main() {
       'palette.open',
     ]) {
       expect(registry.chordOf(id), isNotNull, reason: id);
+    }
+  });
+
+  test('every registered action has a palette entry with its shortcut', () {
+    final container = makeContainer(FakeConnectionsRepository());
+    final registry = container.read(actionRegistryProvider);
+    final entries = {
+      for (final item in container.read(paletteItemsProvider))
+        if (item.group == PaletteGroup.action) item.id: item,
+    };
+    expect(registry.actions, isNotEmpty);
+    for (final action in registry.actions) {
+      final entry = entries[action.id];
+      expect(entry, isNotNull, reason: action.id);
+      expect(entry!.title, action.title);
+      expect(entry.trailing, registry.shortcutLabel(action.id));
+      if (action.defaultChord != null) {
+        expect(entry.trailing, isNotEmpty, reason: action.id);
+      }
     }
   });
 }

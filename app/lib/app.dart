@@ -9,6 +9,7 @@ import 'features/editor/presentation/workspace.dart';
 import 'features/keybindings/application/keybindings_controller.dart';
 import 'features/workspace/presentation/left_sidebar.dart';
 import 'shared/actions/action_shortcuts.dart';
+import 'shared/panes/pane_sizes.dart';
 import 'shared/widgets/status_bar.dart';
 
 /// Root widget.
@@ -66,6 +67,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(layoutPersistenceProvider);
     final registry = ref.watch(actionRegistryProvider);
+    final panes = ref.watch(paneSizesProvider);
     return ActionMenuBar(
       registry: registry,
       child: ActionShortcuts(
@@ -76,11 +78,33 @@ class HomeScreen extends ConsumerWidget {
             body: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(width: 260, child: LeftSidebar()),
-                VerticalDivider(
-                  width: 1,
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
+                if (panes.sidebarVisible) ...[
+                  SizedBox(
+                    width: panes.sidebarWidth,
+                    child: const LeftSidebar(),
+                  ),
+                  MouseRegion(
+                    cursor: SystemMouseCursors.resizeColumn,
+                    child: GestureDetector(
+                      key: const Key('sidebar-divider'),
+                      behavior: HitTestBehavior.opaque,
+                      onHorizontalDragUpdate: (d) => ref
+                          .read(paneSizesProvider.notifier)
+                          .dragSidebar(d.delta.dx),
+                      onDoubleTap: ref
+                          .read(paneSizesProvider.notifier)
+                          .toggleSidebar,
+                      child: SizedBox(
+                        width: 5,
+                        child: VerticalDivider(
+                          width: 5,
+                          thickness: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const Expanded(child: Workspace()),
               ],
             ),
