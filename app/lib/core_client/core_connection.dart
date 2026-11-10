@@ -5,6 +5,7 @@ import 'package:grpc/grpc.dart';
 
 import 'core_launcher.dart';
 import 'gen/queravue/v1/completion.pbgrpc.dart';
+import 'gen/queravue/v1/diagram.pbgrpc.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
 import 'gen/queravue/v1/design.pbgrpc.dart';
@@ -86,6 +87,9 @@ abstract interface class CoreConnection {
   /// Client for editor completion and SQL formatting.
   CompletionServiceClient get completionService;
 
+  /// Client for schema diagrams.
+  DiagramServiceClient get diagramService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -112,6 +116,7 @@ class GrpcCoreConnection implements CoreConnection {
     validationService = ValidationServiceClient(_channel, options: _auth);
     designService = SchemaDesignServiceClient(_channel, options: _auth);
     completionService = CompletionServiceClient(_channel, options: _auth);
+    diagramService = DiagramServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -177,6 +182,9 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final CompletionServiceClient completionService;
+
+  @override
+  late final DiagramServiceClient diagramService;
 
   @override
   Future<CoreInfo> hello() async {

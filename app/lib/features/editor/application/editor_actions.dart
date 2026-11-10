@@ -30,6 +30,21 @@ void openShellTab(WidgetRef ref) {
   }
 }
 
+/// Opens the diagram of the schema the active tab works in, or of the
+/// connection's default schema.
+void openSchemaDiagram(WidgetRef ref) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id == null || !ref.read(connectionHasSchemaGraphProvider(id))) return;
+  final scope = ref.read(editorTabsProvider).activeFor(id)?.tableRef;
+  ref
+      .read(editorTabsProvider.notifier)
+      .openDiagram(
+        id,
+        database: scope?.database ?? '',
+        schema: scope?.schema ?? '',
+      );
+}
+
 /// Closes the active editor tab of the selected connection (⌘W).
 void closeQueryTab(WidgetRef ref) {
   final tab = ref

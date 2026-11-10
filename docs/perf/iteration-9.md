@@ -30,6 +30,23 @@ The two bulk queries on the standard seed (about 35 columns and 2 foreign keys p
 | TiDB 8.5 | 2.7 ms | 8.2 ms |
 | SQL Server 2022 (amd64 under emulation, first call) | 31.1 ms | 51.6 ms |
 
+## PR 3: diagram view (app, profile build)
+
+`make test-perf-diagram` (`app/integration_test/diagram_perf_test.dart`): the real app and core, schema `large` on PostgreSQL 17 (500 tables, 480 relations), Apple M4 Pro, macOS profile build, 1440 x 900 window. Panning is a mouse drag of 120 steps, one frame per step.
+
+| Measurement | Result | Budget |
+|---|---|---|
+| Open: tab created to diagram on screen (load, layout, first frames) | 137 ms | 1 s |
+| Pan, whole diagram visible (10 % zoom, boxes only): UI frame p90 / worst | 2.8 ms / 3.3 ms | 16 ms |
+| Pan at 30 % (names only): UI frame p90 / worst | 2.1 ms / 3.8 ms | 16 ms |
+| Pan at 80 % (columns shown): UI frame p90 / worst | 2.2 ms / 2.7 ms | 16 ms |
+
+The test asserts the open time and a p90 UI frame time under 8 ms in profile mode. Raster times are not asserted: this backend reports them as zero.
+
+Layout alone (unit test, debug mode): 100 tables in 0.3 ms, 500 tables in 1.4 ms (budget 100 ms for 100 tables), so it stays on the UI thread.
+
 ## Not measured yet
+- Memory of the app with a 500-table diagram open.
+- The diagram perf test is local only (`make test-perf-diagram`), not in CI.
 - A 500-table schema on engines other than PostgreSQL: only PostgreSQL has the large seed.
 - The streamed RPC end to end, and memory of a cached 500-table graph in the running core.

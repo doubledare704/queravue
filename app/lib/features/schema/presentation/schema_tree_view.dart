@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../connections/application/connection_session.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../application/schema_controller.dart';
 import '../domain/schema_models.dart';
@@ -430,6 +431,12 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           const PopupMenuItem(value: 'new-table', child: Text('New table')),
         );
       }
+      if (node is SchemaNamespaceNode &&
+          ref.read(connectionHasSchemaGraphProvider(widget.connectionId))) {
+        items.add(
+          const PopupMenuItem(value: 'diagram', child: Text('Open diagram')),
+        );
+      }
       items.addAll([
         const PopupMenuItem(value: 'copy', child: Text('Copy name')),
         const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
@@ -466,6 +473,16 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           ref
               .read(editorTabsProvider.notifier)
               .openDesigner(widget.connectionId, node.tableRef);
+        }
+      case 'diagram':
+        if (node is SchemaNamespaceNode) {
+          ref
+              .read(editorTabsProvider.notifier)
+              .openDiagram(
+                widget.connectionId,
+                database: node.database,
+                schema: node.label,
+              );
         }
       case 'new-table':
         if (node is SchemaNamespaceNode) {

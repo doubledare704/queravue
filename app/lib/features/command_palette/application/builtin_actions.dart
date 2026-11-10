@@ -255,6 +255,18 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       run: (context, ref) async => openShellTab(ref),
     ),
     AppAction(
+      id: 'diagram.open',
+      title: 'Open schema diagram',
+      subtitle: 'Tables and relations of the current schema',
+      category: ActionCategory.view,
+      defaultChord: _primary(LogicalKeyboardKey.keyD, shift: true),
+      enabledWhen: (watch) {
+        final id = watch(selectedConnectionProvider);
+        return id != null && watch(connectionHasSchemaGraphProvider(id));
+      },
+      run: (context, ref) async => openSchemaDiagram(ref),
+    ),
+    AppAction(
       id: 'workspace.open',
       title: 'Open workspace file',
       category: ActionCategory.workspace,

@@ -58,6 +58,11 @@ test-perf-completion: core ## Completion budget: keystroke to popup on the 500-t
 	docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
 	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/completion_perf_test.dart
 
+test-perf-diagram: core ## Diagram budget: open, pan and zoom the 500-table schema (profile build)
+	docker compose -f dev/docker-compose.yml --profile large-schema up -d --wait postgres
+	docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
+	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/diagram_perf_test.dart
+
 test-perf: db-up core ## Grid perf budget: 1M rows through the real core and Postgres (profile build)
 	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart
 
