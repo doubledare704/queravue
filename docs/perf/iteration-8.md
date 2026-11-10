@@ -89,7 +89,7 @@ One `ListColumns` call against the docker servers with the standard seed (not th
 
 ## In CI
 - Core completion (10 ms p95) runs in the PostgreSQL integration job on Linux, after loading the large seed.
-- Keystroke to popup (50 ms p95) runs in the `completion-perf` job: a macOS runner, PostgreSQL 17 installed natively with the same seed, the profile build through `flutter drive`.
+- Keystroke to popup runs in the `completion-perf` job: a macOS runner, PostgreSQL 17 installed natively with the same seed, the profile build through `flutter drive`. The shared runner is about three times slower than an M4 Pro (first run: first character 42 ms p95, narrowing 85 ms p95, round trip 10.7 ms p95), so CI asserts 150 ms (`COMPLETION_BUDGET_MS`) to catch gross regressions. The 50 ms budget itself is still checked locally with `make test-perf-completion`.
 
 ## Not measured yet
 - Bulk introspection on a 500-table schema for engines other than PostgreSQL: only the PostgreSQL large seed exists.
