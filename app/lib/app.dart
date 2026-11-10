@@ -70,8 +70,10 @@ class HomeScreen extends ConsumerWidget {
     final panes = ref.watch(paneSizesProvider);
     return ActionMenuBar(
       registry: registry,
+      enabledActionIds: enabledActionIdsProvider,
       child: ActionShortcuts(
         registry: registry,
+        enabledActionIds: enabledActionIdsProvider,
         child: Focus(
           autofocus: true,
           child: Scaffold(

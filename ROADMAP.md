@@ -77,13 +77,12 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 
 **Status:** done in six PRs (#32 to #37): ADR 0015 and the completion contract; SQL completion in core; SQL formatter and Mongo completion; completion popup, snippets and format shortcut (keystroke to popup p95 19.4 ms first character, 25.1 ms narrowing, on 500 tables); action registry, palette and user keybindings; split editor groups with a persisted layout (ADR 0016).
 
-A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` focus a group, the focused group maximizes in the window, and the sidebar and the results/output pane resize, collapse and persist. Cold start (289 ms to core socket) and idle memory (107 MB footprint) were measured on the release build (`docs/perf/iteration-8.md`).
+A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` focus a group, the focused group maximizes in the window, and the sidebar and the results/output pane resize, collapse and persist. Palette prefixes now follow the brief (`@` objects, `#` files; `:` is tabs), actions have an enabled-when predicate, and both completion budgets run in CI. Cold start (289 ms to core socket) and idle memory (107 MB footprint) were measured on the release build (`docs/perf/iteration-8.md`).
 
 **Known gaps (carry forward):**
 - Detached OS windows are not built and the spike was desk research without a prototype: Flutter's windowing API is still experimental (ADR 0016). Maximize in the window stands in.
 - Table, collection and designer tabs are not restored after a restart.
-- The completion p95 assertion runs only locally (`make test-perf-completion`), not in CI; bulk introspection on a 500-table schema was measured on PostgreSQL only.
-- Palette prefixes are `>` actions, `@` tabs, `#` database objects; workspace files have no prefix of their own. Actions have no enabled-when predicate yet: an action that does not apply is a no-op.
+- Bulk introspection on a 500-table schema was measured on PostgreSQL only.
 
 ### It. 9 — ER diagrams + materialize
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).

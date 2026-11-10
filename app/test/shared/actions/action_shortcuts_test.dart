@@ -21,12 +21,17 @@ void main() {
     run: (_, _) async => ran.add(id),
   );
 
-  Future<void> press(WidgetTester tester, ActionRegistry registry) async {
+  Future<void> press(
+    WidgetTester tester,
+    ActionRegistry registry, {
+    Set<String> enabled = const {'a', 'b'},
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
           home: ActionShortcuts(
             registry: registry,
+            enabledActionIds: Provider((_) => enabled),
             child: const Focus(autofocus: true, child: SizedBox()),
           ),
         ),
@@ -56,5 +61,15 @@ void main() {
     ran = [];
     await press(tester, ActionRegistry([action('a', k), action('b', k)]));
     expect(ran, isEmpty);
+  });
+
+  testWidgets('the chord of a disabled action runs nothing', (tester) async {
+    ran = [];
+    await press(
+      tester,
+      ActionRegistry([action('a', k), action('b', j)]),
+      enabled: {'b'},
+    );
+    expect(ran, ['b']);
   });
 }

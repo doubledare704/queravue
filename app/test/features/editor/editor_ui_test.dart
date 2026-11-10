@@ -367,6 +367,8 @@ void main() {
 
   testWidgets('the palette lists the editor commands', (tester) async {
     await pumpApp(tester);
+    await tester.tap(find.byKey(const Key('details-new-query')));
+    await tester.pumpAndSettle();
     await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.control);

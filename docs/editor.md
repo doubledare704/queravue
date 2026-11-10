@@ -74,7 +74,7 @@ Shift+Alt+F (palette: "Format SQL") formats the selection, or the statement at t
 ## Actions, palette and shortcuts
 
 ### One registry
-`app/lib/shared/actions/` holds `AppAction` (id, title, category, default chord, run). `builtinActionsProvider` lists every action of the app. The command palette, the keyboard shortcuts and the macOS menu bar are all built from that list through `actionRegistryProvider`, so an action added there appears in all three.
+`app/lib/shared/actions/` holds `AppAction` (id, title, category, default chord, enabled-when, run). `enabledWhen` reads providers through a `watch` function; an action that is not enabled is greyed out in the palette and the menu bar, sorts after the enabled ones, and its shortcut does nothing (the key is still consumed). `builtinActionsProvider` lists every action of the app. The command palette, the keyboard shortcuts and the macOS menu bar are all built from that list through `actionRegistryProvider`, so an action added there appears in all three.
 
 A chord is stored platform independent: `primary` is Cmd on macOS and Ctrl elsewhere (`primary+shift+enter`, `alt+shift+f`, `escape`). The palette shows it in the platform's own notation (`⌥⇧F`, `Ctrl+Alt+Shift+F`).
 
@@ -82,9 +82,9 @@ The menu bar items have no key equivalent on purpose: a native one is handled be
 
 ### Palette
 - No prefix: actions, open tabs, connections and workspace files (file names; searched through the core after two characters).
-- `>` actions only, `@` open tabs only, `#` tables and collections the schema tree has loaded for the selected connection.
+- `>` actions only, `@` tables and collections the schema tree has loaded for the selected connection, `#` workspace files (searched from the first character), `:` open tabs.
 - Ranking: prefix of the title, then a word start, then a substring, then a subsequence; ties keep the order actions, tabs, connections, objects, files.
-- "Go to tab" and "Go to database object" open the palette with `@` and `#`.
+- "Go to tab" and "Go to database object" open the palette with `:` and `@`.
 
 ### Keybindings
 - User chords live in `.queravue/keybindings.json` in the first workspace root: `{"editor.new": "primary+j", "editor.cancel": null}`. `null` removes the shortcut. Bad entries and unknown action ids are skipped and listed in the shortcuts dialog, never fatal.

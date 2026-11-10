@@ -1,9 +1,14 @@
+import 'package:flutter/painting.dart' show Axis;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/command_palette/application/builtin_actions.dart';
 import 'package:queravue/features/command_palette/application/palette_items.dart';
 import 'package:queravue/features/command_palette/domain/palette_search.dart';
+import 'package:queravue/features/connections/application/connections_controller.dart';
+import 'package:queravue/features/connections/domain/models.dart';
+import 'package:queravue/features/editor/application/editor_layout_controller.dart';
+import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/keybindings/application/keybindings_controller.dart';
 import 'package:queravue/shared/actions/action_registry.dart';
 import 'package:queravue/shared/actions/app_action.dart';
@@ -136,5 +141,35 @@ void main() {
         expect(entry.trailing, isNotEmpty, reason: action.id);
       }
     }
+  });
+
+  test('tab actions are disabled until a tab is open', () {
+    final container = makeContainer(
+      FakeConnectionsRepository(
+        initial: const [
+          ConnectionProfile(id: 'c1', name: 'Local PG', engineId: 'postgres'),
+        ],
+      ),
+    );
+    Set<String> enabled() => container.read(enabledActionIdsProvider);
+    expect(enabled(), contains('connection.new'));
+    expect(enabled(), isNot(contains('editor.close')));
+    expect(enabled(), isNot(contains('editor.splitRight')));
+    expect(enabled(), isNot(contains('documents.insert')));
+
+    container.read(selectedConnectionProvider.notifier).select('c1');
+    final tabs = container.read(editorTabsProvider.notifier)..open('c1');
+    expect(enabled(), containsAll(['editor.close', 'editor.format']));
+    expect(enabled(), isNot(contains('editor.splitRight')));
+    expect(enabled(), isNot(contains('editor.focusGroup2')));
+
+    tabs.open('c1');
+    expect(enabled(), contains('editor.splitRight'));
+    container.read(editorLayoutProvider.notifier).split('c1', Axis.horizontal);
+    expect(
+      enabled(),
+      containsAll(['editor.focusGroup2', 'editor.moveToNextGroup']),
+    );
+    expect(enabled(), isNot(contains('editor.focusGroup3')));
   });
 }

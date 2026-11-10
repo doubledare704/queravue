@@ -87,7 +87,10 @@ One `ListColumns` call against the docker servers with the standard seed (not th
 | CockroachDB 25.4 | 34 | 44 ms | 16 to 30 ms |
 | TiDB 8.5 | 39 | 10 ms | 4 to 6 ms |
 
+## In CI
+- Core completion (10 ms p95) runs in the PostgreSQL integration job on Linux, after loading the large seed.
+- Keystroke to popup (50 ms p95) runs in the `completion-perf` job: a macOS runner, PostgreSQL 17 installed natively with the same seed, the profile build through `flutter drive`.
+
 ## Not measured yet
 - Bulk introspection on a 500-table schema for engines other than PostgreSQL: only the PostgreSQL large seed exists.
 - Idle memory and first-frame time with a session open and the catalog warm-up running. The catalog itself held +0.46 MiB in the core (above).
-- The keystroke-to-popup assertion still runs only through `make test-perf-completion`, not in CI: it needs a macOS profile build and the docker PostgreSQL.

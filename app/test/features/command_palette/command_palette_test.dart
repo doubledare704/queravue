@@ -32,6 +32,13 @@ void main() {
           paletteItemsProvider.overrideWithValue([
             item('New query tab', PaletteGroup.action, shortcut: '⌘T'),
             item('Run statement', PaletteGroup.action, shortcut: '⌘↵'),
+            PaletteItem(
+              id: 'action.close',
+              title: 'Close query tab',
+              group: PaletteGroup.action,
+              enabled: false,
+              run: (_, _) async => ran.add('Close query tab'),
+            ),
             item('orders', PaletteGroup.tab),
             item('orders', PaletteGroup.object),
             item('users', PaletteGroup.object),
@@ -76,16 +83,16 @@ void main() {
     expect(find.text('Run statement'), findsOneWidget);
   });
 
-  testWidgets('a @ prefix lists tabs only', (tester) async {
-    await pumpPalette(tester, initialQuery: '@');
+  testWidgets('a : prefix lists tabs only', (tester) async {
+    await pumpPalette(tester, initialQuery: ':');
     expect(find.text('orders'), findsOneWidget);
     expect(find.text('Run statement'), findsNothing);
   });
 
-  testWidgets('a # prefix lists objects and Enter opens the best match', (
+  testWidgets('a @ prefix lists objects and Enter opens the best match', (
     tester,
   ) async {
-    await pumpPalette(tester, initialQuery: '#ord');
+    await pumpPalette(tester, initialQuery: '@ord');
     expect(find.text('orders'), findsOneWidget);
     expect(find.text('users'), findsNothing);
     await tester.testTextInput.receiveAction(TextInputAction.done);
@@ -100,5 +107,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('monthly.sql'), findsOneWidget);
     expect(find.text('Files'), findsOneWidget);
+  });
+
+  testWidgets('a # prefix lists workspace files only, from one character', (
+    tester,
+  ) async {
+    await pumpPalette(
+      tester,
+      initialQuery: '#',
+      files: {'reports/orders.sql': 'select 1'},
+    );
+    expect(find.text('orders'), findsNothing);
+    await tester.enterText(find.byKey(const Key('palette-query')), '#o');
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('orders.sql'), findsOneWidget);
+    expect(find.text('orders'), findsNothing);
+  });
+
+  testWidgets('a disabled action is greyed out and Enter does not run it', (
+    tester,
+  ) async {
+    await pumpPalette(tester, initialQuery: '>close');
+    final tile = tester.widget<ListTile>(
+      find.widgetWithText(ListTile, 'Close query tab'),
+    );
+    expect(tile.enabled, isFalse);
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(ran, isEmpty);
+    expect(find.byKey(const Key('palette-query')), findsOneWidget);
   });
 }
