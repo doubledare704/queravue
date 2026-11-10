@@ -35,6 +35,9 @@ const (
 	// CapFormat: SQL formatting (Iteration 8, ADR 0015). It needs no Conn
 	// interface; see CapabilitiesWithoutInterface.
 	CapFormat Capability = "format"
+	// CapSchemaGraph: bulk relations for diagrams (Iteration 9, ADR 0017). No
+	// engine declares it until RelationLister exists.
+	CapSchemaGraph Capability = "schema_graph"
 )
 
 // CapabilitiesWithoutInterface lists capabilities that core implements on its
