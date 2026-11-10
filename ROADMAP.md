@@ -69,13 +69,18 @@ Each iteration ≈ 1–2 weeks part-time and ends with a runnable app plus green
 
 ## Phase C — Productivity (it. 8–12)
 
-### It. 8 — Editor intelligence & layout 🚧 in progress
+### It. 8 — Editor intelligence & layout ✅ done
 - Schema-aware autocomplete (tables, columns, aliases, Mongo fields from sampled schema).
 - Formatter, snippets, command palette, shortcuts.
 - Split panels / detachable panes.
 - **Done when:** autocomplete is useful on a 500-table schema and stays under 50 ms.
 
-**Status:** PR 1 (ADR 0015, `CompletionService` contract, protocol version 8) merged as #32. PR 2 (SQL completion in core, bulk column introspection, 500-table seed) merged as #33. PR 3 (SQL formatter, `SampleFieldPaths`, Mongo shell and query-bar completion in core) merged as #34. PR 4 (completion popup, snippets, format shortcut, keystroke-to-popup test) merged as #35. PR 5 (action registry, palette sources and prefixes, user keybindings with a conflict screen) merged as #36. PR 6 (split editor groups, resizable panes, layout persistence, ADR 0016 detached-window decision) is in review.
+**Status:** done in six PRs (#32 to #37): ADR 0015 and the completion contract; SQL completion in core; SQL formatter and Mongo completion; completion popup, snippets and format shortcut (keystroke to popup p95 19.4 ms first character, 25.1 ms narrowing, on 500 tables); action registry, palette and user keybindings; split editor groups with a persisted layout (ADR 0016).
+
+**Known gaps (carry forward):**
+- Detached OS windows are not built: Flutter's windowing API is still experimental (ADR 0016).
+- Table, collection and designer tabs are not restored after a restart.
+- The completion p95 assertion runs only locally (`make test-perf-completion`), not in CI; bulk introspection timings on SQL Server, CockroachDB and TiDB and whole-app cold start were not re-measured.
 
 ### It. 9 — ER diagrams + materialize
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).
