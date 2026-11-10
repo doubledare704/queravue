@@ -16,6 +16,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/api"
 	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/connections"
+	"github.com/doubledare704/queravue/core/internal/diagram"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/history"
 	"github.com/doubledare704/queravue/core/internal/results"
@@ -129,7 +130,9 @@ func Serve(ctx context.Context, cfg Config) error {
 		queravuev1.RegisterValidationServiceServer(srv, api.NewValidationService(cfg.Sessions, cfg.Connections, cfg.History))
 		queravuev1.RegisterStatsServiceServer(srv, api.NewStatsService(cfg.Sessions))
 		queravuev1.RegisterCompletionServiceServer(srv, api.NewCompletionService(cfg.Sessions, catalogs))
-		queravuev1.RegisterDiagramServiceServer(srv, api.NewDiagramService(cfg.Sessions))
+		graphs := diagram.NewStore()
+		schemaCache.OnInvalidate(graphs.Invalidate)
+		queravuev1.RegisterDiagramServiceServer(srv, api.NewDiagramService(cfg.Sessions, graphs))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

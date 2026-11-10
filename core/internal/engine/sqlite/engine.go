@@ -46,7 +46,7 @@ func New() *Engine {
 			{Key: ParamReadOnly, Label: "Read-only", Kind: engine.FieldBoolean, Default: "false"},
 			{Key: ParamCreateIfMissing, Label: "Create file if missing", Kind: engine.FieldBoolean, Default: "false"},
 		},
-		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat},
+		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph},
 	}}
 }
 

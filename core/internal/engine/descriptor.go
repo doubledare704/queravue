@@ -35,8 +35,7 @@ const (
 	// CapFormat: SQL formatting (Iteration 8, ADR 0015). It needs no Conn
 	// interface; see CapabilitiesWithoutInterface.
 	CapFormat Capability = "format"
-	// CapSchemaGraph: bulk relations for diagrams (Iteration 9, ADR 0017). No
-	// engine declares it until RelationLister exists.
+	// CapSchemaGraph: RelationLister (Iteration 9, ADR 0017).
 	CapSchemaGraph Capability = "schema_graph"
 )
 
@@ -56,6 +55,7 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapStats:           reflect.TypeFor[StatsProvider](),
 	CapValidation:      reflect.TypeFor[ValidationManager](),
 	CapCompletion:      reflect.TypeFor[ColumnLister](),
+	CapSchemaGraph:     reflect.TypeFor[RelationLister](),
 }
 
 // FieldKind tells the UI which input widget to render.
