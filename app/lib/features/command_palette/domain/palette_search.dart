@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum PaletteMode { all, actions, tabs, objects }
+enum PaletteMode { all, actions, objects, files, tabs }
 
 /// Declaration order is the order groups appear in for equal scores.
 enum PaletteGroup {
@@ -21,14 +21,16 @@ class PaletteQuery {
   final String text;
 }
 
-/// `>` limits the palette to actions, `@` to tabs and `#` to database objects.
+/// `>` limits the palette to actions, `@` to database objects, `#` to
+/// workspace files and `:` to open tabs.
 PaletteQuery parsePaletteQuery(String raw) {
   if (raw.isEmpty) return const PaletteQuery(PaletteMode.all, '');
   final rest = raw.substring(1).trim();
   return switch (raw[0]) {
     '>' => PaletteQuery(PaletteMode.actions, rest),
-    '@' => PaletteQuery(PaletteMode.tabs, rest),
-    '#' => PaletteQuery(PaletteMode.objects, rest),
+    '@' => PaletteQuery(PaletteMode.objects, rest),
+    '#' => PaletteQuery(PaletteMode.files, rest),
+    ':' => PaletteQuery(PaletteMode.tabs, rest),
     _ => PaletteQuery(PaletteMode.all, raw.trim()),
   };
 }
@@ -75,6 +77,7 @@ class PaletteItem {
     this.subtitle = '',
     this.trailing = '',
     this.conflicted = false,
+    this.enabled = true,
   });
 
   final String id;
@@ -83,10 +86,12 @@ class PaletteItem {
   final String trailing;
   final PaletteGroup group;
   final bool conflicted;
+  final bool enabled;
   final Future<void> Function(BuildContext context, WidgetRef ref) run;
 }
 
-/// Items matching [query], best first; ties keep group then source order.
+/// Items matching [query]: enabled ones first, then best score; ties keep
+/// group then source order.
 List<PaletteItem> rankPaletteItems(
   List<PaletteItem> items,
   String query, {
@@ -98,6 +103,7 @@ List<PaletteItem> rankPaletteItems(
     if (score != null) scored.add((score, i, items[i]));
   }
   scored.sort((a, b) {
+    if (a.$3.enabled != b.$3.enabled) return a.$3.enabled ? -1 : 1;
     final byScore = b.$1.compareTo(a.$1);
     if (byScore != 0) return byScore;
     final byGroup = a.$3.group.index.compareTo(b.$3.group.index);

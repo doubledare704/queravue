@@ -28,12 +28,13 @@ Future<void> showCommandPalette(
 const _hints = {
   PaletteMode.all: 'Search actions, tabs, files, connections and objects',
   PaletteMode.actions: 'Run an action',
-  PaletteMode.tabs: 'Go to an open tab',
   PaletteMode.objects: 'Open a table or collection',
+  PaletteMode.files: 'Open a workspace file',
+  PaletteMode.tabs: 'Go to an open tab',
 };
 
-/// ⌘K palette. A leading `>` searches actions, `@` open tabs and `#` the
-/// database objects loaded for the selected connection.
+/// ⌘K palette. A leading `>` searches actions, `@` the database objects loaded
+/// for the selected connection, `#` workspace files and `:` open tabs.
 class CommandPalette extends ConsumerStatefulWidget {
   const CommandPalette({super.key, this.initialQuery = ''});
 
@@ -74,6 +75,7 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
       PaletteMode.actions => {PaletteGroup.action},
       PaletteMode.tabs => {PaletteGroup.tab},
       PaletteMode.objects => {PaletteGroup.object},
+      PaletteMode.files => {PaletteGroup.file},
     };
     final searching = parsed.text.isNotEmpty;
     final pool = [
@@ -81,10 +83,13 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
         if (wanted.contains(i.group) &&
             (searching || i.group != PaletteGroup.object))
           i,
-      if (parsed.mode == PaletteMode.all) ..._files,
+      if (_searchesFiles(parsed.mode)) ..._files,
     ];
     return rankPaletteItems(pool, parsed.text);
   }
+
+  bool _searchesFiles(PaletteMode mode) =>
+      mode == PaletteMode.all || mode == PaletteMode.files;
 
   void _onChanged(String _) {
     setState(() => _index = 0);
@@ -95,7 +100,8 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
   void _searchFiles() {
     unawaited(_fileSearch?.cancel());
     final parsed = _parsed;
-    if (parsed.mode != PaletteMode.all || parsed.text.length < 2) {
+    final shortest = parsed.mode == PaletteMode.files ? 1 : 2;
+    if (!_searchesFiles(parsed.mode) || parsed.text.length < shortest) {
       if (_files.isNotEmpty) setState(() => _files = const []);
       return;
     }
@@ -127,7 +133,7 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
   void _pick([PaletteItem? item]) {
     final m = _matches;
     item ??= m.isEmpty ? null : m[_index.clamp(0, m.length - 1)];
-    if (item != null) Navigator.of(context).pop(item);
+    if (item != null && item.enabled) Navigator.of(context).pop(item);
   }
 
   @override
@@ -175,6 +181,7 @@ class _CommandPaletteState extends ConsumerState<CommandPalette> {
                           return ListTile(
                             key: Key('palette-${c.id}'),
                             dense: true,
+                            enabled: c.enabled,
                             selected: i == _index,
                             selectedTileColor: scheme.secondaryContainer,
                             title: Text(c.title),

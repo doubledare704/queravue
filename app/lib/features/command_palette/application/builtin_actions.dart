@@ -6,9 +6,14 @@ import '../../../shared/actions/app_action.dart';
 import '../../../shared/actions/key_chord.dart';
 import '../../../shared/panes/pane_sizes.dart';
 import '../../completion/application/format_action.dart';
+import '../../connections/application/connection_session.dart';
+import '../../connections/application/connections_controller.dart';
 import '../../connections/presentation/connection_actions.dart';
 import '../../documents/application/document_actions.dart';
 import '../../editor/application/editor_actions.dart';
+import '../../editor/application/editor_layout_controller.dart';
+import '../../editor/application/editor_tabs.dart';
+import '../../editor/domain/editor_layout.dart';
 import '../../editor/domain/query_models.dart';
 import '../../history/presentation/history_dialog.dart';
 import '../../keybindings/presentation/keybindings_dialog.dart';
@@ -18,6 +23,36 @@ import '../presentation/command_palette.dart';
 
 KeyChord _primary(LogicalKeyboardKey key, {bool shift = false}) =>
     KeyChord(key, primary: true, shift: shift);
+
+EditorTab? _activeTab(ActionWatch watch) =>
+    watch(editorTabsProvider).activeFor(watch(selectedConnectionProvider));
+
+bool _hasActiveTab(ActionWatch watch) => _activeTab(watch) != null;
+
+bool _inCollectionTab(ActionWatch watch) =>
+    _activeTab(watch)?.isCollection ?? false;
+
+bool _inScriptTab(ActionWatch watch) {
+  final tab = _activeTab(watch);
+  return tab != null && (tab.isQuery || tab.isShell);
+}
+
+EditorLayout _layout(ActionWatch watch) {
+  final id = watch(selectedConnectionProvider);
+  return id == null ? const EditorLayout() : watch(editorLayoutProvider).of(id);
+}
+
+bool _isSplit(ActionWatch watch) => _layout(watch).groups.length > 1;
+
+bool _canOpenQueryTab(ActionWatch watch) {
+  final id = watch(selectedConnectionProvider);
+  return id != null && !watch(connectionIsDocumentOnlyProvider(id));
+}
+
+bool _canOpenShellTab(ActionWatch watch) {
+  final id = watch(selectedConnectionProvider);
+  return id != null && watch(connectionHasShellProvider(id));
+}
 
 /// Every action of the app. Chords here are defaults; the user can change them.
 final builtinActionsProvider = Provider<List<AppAction>>(
@@ -31,6 +66,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.new',
+      enabledWhen: _canOpenQueryTab,
       title: 'New query tab',
       category: ActionCategory.editor,
       defaultChord: _primary(LogicalKeyboardKey.keyT),
@@ -38,6 +74,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.close',
+      enabledWhen: _hasActiveTab,
       title: 'Close query tab',
       category: ActionCategory.editor,
       defaultChord: _primary(LogicalKeyboardKey.keyW),
@@ -45,6 +82,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.run',
+      enabledWhen: _hasActiveTab,
       title: 'Run statement at cursor',
       subtitle: 'In a collection tab: run the query bar',
       category: ActionCategory.editor,
@@ -53,6 +91,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.runAll',
+      enabledWhen: _hasActiveTab,
       title: 'Run all statements',
       category: ActionCategory.editor,
       defaultChord: _primary(LogicalKeyboardKey.enter, shift: true),
@@ -60,6 +99,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.format',
+      enabledWhen: (watch) => _activeTab(watch)?.isQuery ?? false,
       title: 'Format SQL',
       subtitle: 'Selection, or the statement at the cursor',
       category: ActionCategory.editor,
@@ -72,6 +112,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.cancel',
+      enabledWhen: _hasActiveTab,
       title: 'Cancel running statement',
       category: ActionCategory.editor,
       defaultChord: const KeyChord(LogicalKeyboardKey.escape),
@@ -79,6 +120,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.splitRight',
+      enabledWhen: (watch) => _layout(watch).canSplit,
       title: 'Split editor right',
       subtitle: 'Moves the active tab into a new group',
       category: ActionCategory.editor,
@@ -87,6 +129,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.splitDown',
+      enabledWhen: (watch) => _layout(watch).canSplit,
       title: 'Split editor down',
       category: ActionCategory.editor,
       defaultChord: _primary(LogicalKeyboardKey.backslash, shift: true),
@@ -94,6 +137,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.focusNextGroup',
+      enabledWhen: _isSplit,
       title: 'Focus next editor group',
       category: ActionCategory.editor,
       defaultChord: const KeyChord(
@@ -105,6 +149,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.focusPreviousGroup',
+      enabledWhen: _isSplit,
       title: 'Focus previous editor group',
       category: ActionCategory.editor,
       defaultChord: const KeyChord(
@@ -116,6 +161,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'editor.moveToNextGroup',
+      enabledWhen: _isSplit,
       title: 'Move tab to next editor group',
       category: ActionCategory.editor,
       defaultChord: const KeyChord(
@@ -134,6 +180,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ].indexed)
       AppAction(
         id: 'editor.focusGroup${index + 1}',
+        enabledWhen: (watch) => _layout(watch).groups.length > index,
         title: 'Focus editor group ${index + 1}',
         category: ActionCategory.editor,
         defaultChord: _primary(key),
@@ -141,6 +188,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       ),
     AppAction(
       id: 'view.maximizeEditor',
+      enabledWhen: _hasActiveTab,
       title: 'Maximize editor group',
       subtitle: 'The focused group fills the window; run again to restore',
       category: ActionCategory.view,
@@ -158,6 +206,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'view.toggleOutput',
+      enabledWhen: _inScriptTab,
       title: 'Toggle results and output pane',
       category: ActionCategory.view,
       defaultChord: _primary(LogicalKeyboardKey.keyJ),
@@ -166,6 +215,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'documents.run',
+      enabledWhen: _inCollectionTab,
       title: 'Run document query',
       subtitle: 'Collection tab: filter, sort, projection',
       category: ActionCategory.documents,
@@ -174,6 +224,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'documents.insert',
+      enabledWhen: _inCollectionTab,
       title: 'Insert document',
       subtitle: 'Collection tab',
       category: ActionCategory.documents,
@@ -181,6 +232,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'documents.refresh',
+      enabledWhen: _inCollectionTab,
       title: 'Refresh documents',
       subtitle: 'Collection tab',
       category: ActionCategory.documents,
@@ -195,6 +247,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'shell.new',
+      enabledWhen: _canOpenShellTab,
       title: 'New Mongo shell tab',
       subtitle: 'MongoDB connections',
       category: ActionCategory.editor,
@@ -231,6 +284,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'workspace.save',
+      enabledWhen: _inScriptTab,
       title: 'Save to workspace',
       category: ActionCategory.workspace,
       defaultChord: _primary(LogicalKeyboardKey.keyS),
@@ -238,6 +292,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'workspace.saveAs',
+      enabledWhen: _inScriptTab,
       title: 'Save to workspace as…',
       category: ActionCategory.workspace,
       defaultChord: _primary(LogicalKeyboardKey.keyS, shift: true),
@@ -246,7 +301,7 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     AppAction(
       id: 'palette.open',
       title: 'Command palette',
-      subtitle: 'Prefix > actions, @ tabs, # database objects',
+      subtitle: 'Prefix > actions, @ database objects, # files, : tabs',
       category: ActionCategory.view,
       defaultChord: _primary(LogicalKeyboardKey.keyK),
       run: showCommandPalette,
@@ -256,14 +311,14 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       title: 'Go to tab',
       category: ActionCategory.view,
       run: (context, ref) =>
-          showCommandPalette(context, ref, initialQuery: '@'),
+          showCommandPalette(context, ref, initialQuery: ':'),
     ),
     AppAction(
       id: 'palette.objects',
       title: 'Go to database object',
       category: ActionCategory.view,
       run: (context, ref) =>
-          showCommandPalette(context, ref, initialQuery: '#'),
+          showCommandPalette(context, ref, initialQuery: '@'),
     ),
     AppAction(
       id: 'view.keybindings',

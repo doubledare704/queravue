@@ -219,15 +219,18 @@ void main() {
       debugPrint('COMPLETION PERF ${binding.reportData}');
 
       expect(firstChar.length, greaterThanOrEqualTo(20));
+      // Shared CI runners are several times slower than the Apple Silicon the
+      // budget is defined on; CI raises the limit to catch gross regressions.
+      final budgetMs = num.parse(_env('COMPLETION_BUDGET_MS', '50'));
       if (kProfileMode) {
         expect(
           _ms(_p95(firstChar)),
-          lessThanOrEqualTo(50),
+          lessThanOrEqualTo(budgetMs),
           reason: 'keystroke to popup p95 (first character of a word)',
         );
         expect(
           _ms(_p95(extend)),
-          lessThanOrEqualTo(50),
+          lessThanOrEqualTo(budgetMs),
           reason: 'keystroke to popup p95 (narrowing the list)',
         );
       }

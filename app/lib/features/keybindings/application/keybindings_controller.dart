@@ -64,6 +64,13 @@ class KeybindingsController extends AsyncNotifier<KeybindingOverrides> {
   }
 }
 
+final enabledActionIdsProvider = Provider<Set<String>>(
+  (ref) => {
+    for (final a in ref.watch(builtinActionsProvider))
+      if (a.enabledWhen?.call(ref.watch) ?? true) a.id,
+  },
+);
+
 /// Actions with the user's chords applied.
 final actionRegistryProvider = Provider<ActionRegistry>((ref) {
   final overrides =

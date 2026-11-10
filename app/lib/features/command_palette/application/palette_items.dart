@@ -12,6 +12,7 @@ import '../domain/palette_search.dart';
 /// selected connection.
 final paletteItemsProvider = Provider<List<PaletteItem>>((ref) {
   final registry = ref.watch(actionRegistryProvider);
+  final enabled = ref.watch(enabledActionIdsProvider);
   final connections =
       ref.watch(connectionsControllerProvider).value ?? const [];
   final nameOf = {for (final c in connections) c.id: c.name};
@@ -26,6 +27,7 @@ final paletteItemsProvider = Provider<List<PaletteItem>>((ref) {
         subtitle: a.subtitle,
         trailing: registry.shortcutLabel(a.id),
         conflicted: registry.isConflicted(a.id),
+        enabled: enabled.contains(a.id),
         group: PaletteGroup.action,
         run: a.run,
       ),

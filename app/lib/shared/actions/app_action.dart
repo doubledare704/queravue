@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 
 import 'key_chord.dart';
 
@@ -14,6 +15,8 @@ enum ActionCategory {
   final String label;
 }
 
+typedef ActionWatch = T Function<T>(ProviderListenable<T> provider);
+typedef ActionEnabled = bool Function(ActionWatch watch);
 typedef ActionRun = Future<void> Function(BuildContext context, WidgetRef ref);
 
 /// Something the user can do. The palette, the shortcuts and the menus are all
@@ -28,6 +31,7 @@ class AppAction {
     this.subtitle = '',
     this.defaultChord,
     this.inMenu = true,
+    this.enabledWhen,
   });
 
   final String id;
@@ -37,4 +41,8 @@ class AppAction {
   final KeyChord? defaultChord;
   final bool inMenu;
   final ActionRun run;
+
+  /// Null means always enabled. A disabled action is greyed out in the
+  /// palette and the menus, and its shortcut does nothing.
+  final ActionEnabled? enabledWhen;
 }

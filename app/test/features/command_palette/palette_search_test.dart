@@ -7,8 +7,9 @@ PaletteItem item(String title, PaletteGroup group) =>
 void main() {
   test('prefixes pick the source', () {
     expect(parsePaletteQuery('>run').mode, PaletteMode.actions);
-    expect(parsePaletteQuery('@ users').mode, PaletteMode.tabs);
-    expect(parsePaletteQuery('#acc').mode, PaletteMode.objects);
+    expect(parsePaletteQuery('@ users').mode, PaletteMode.objects);
+    expect(parsePaletteQuery('#acc').mode, PaletteMode.files);
+    expect(parsePaletteQuery(':q').mode, PaletteMode.tabs);
     expect(parsePaletteQuery('#acc').text, 'acc');
     expect(parsePaletteQuery('@ users').text, 'users');
     expect(parsePaletteQuery('plain').mode, PaletteMode.all);
@@ -47,5 +48,19 @@ void main() {
       for (var i = 0; i < 100; i++) item('item $i', PaletteGroup.object),
     ];
     expect(rankPaletteItems(many, 'item', limit: 10), hasLength(10));
+  });
+
+  test('disabled items rank after enabled ones whatever their score', () {
+    final ranked = rankPaletteItems([
+      PaletteItem(
+        id: 'off',
+        title: 'Run',
+        group: PaletteGroup.action,
+        enabled: false,
+        run: (_, _) async {},
+      ),
+      item('Rerun last', PaletteGroup.action),
+    ], 'run');
+    expect(ranked.map((i) => i.id), ['Rerun last', 'off']);
   });
 }
