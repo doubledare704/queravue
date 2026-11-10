@@ -9,6 +9,44 @@ EditorLayout three() => const EditorLayout().reconcile(
 
 void main() {
   _groupCap();
+  test('a tab dropped on another group joins it and is shown there', () {
+    final moved = three().split(Axis.horizontal).moveTab('a', 1);
+    expect(moved.groups.map((g) => g.tabIds), [
+      ['b'],
+      ['c', 'a'],
+    ]);
+    expect(moved.focused, 1);
+    expect(moved.groups[1].activeId, 'a');
+    expect(moved.groups[0].activeId, 'b');
+  });
+
+  test(
+    'a tab dropped on a tab lands in front of it, also in its own group',
+    () {
+      final split = three().split(Axis.horizontal);
+      expect(split.moveTab('a', 1, before: 'c').groups[1].tabIds, ['a', 'c']);
+      expect(three().moveTab('c', 0, before: 'a').groups.single.tabIds, [
+        'c',
+        'a',
+        'b',
+      ]);
+    },
+  );
+
+  test('moving the last tab out of a group removes the group', () {
+    final moved = three().split(Axis.horizontal).moveTab('c', 0);
+    expect(moved.groups.single.tabIds, ['a', 'b', 'c']);
+    expect(moved.fractions, [1.0]);
+    expect(moved.focused, 0);
+  });
+
+  test('moving an unknown tab or to a missing group changes nothing', () {
+    final split = three().split(Axis.horizontal);
+    expect(split.moveTab('zz', 0), split);
+    expect(split.moveTab('a', 5), split);
+    expect(split.moveTab('a', 0, before: 'a'), split);
+  });
+
   test('new tabs join the focused group and become active', () {
     final l = three();
     expect(l.groups.single.tabIds, ['a', 'b', 'c']);

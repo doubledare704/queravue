@@ -4,7 +4,7 @@ Design decisions are in [ADR 0015](adr/0015-completion-and-formatting.md); this 
 
 ## Completion & formatting
 
-Status: SQL completion (PR 2), the SQL formatter and Mongo completion (PR 3) are done in core. The completion popup, snippets and the format shortcut (PR 4) are done in the app. The action registry, palette overhaul and split layout follow in PRs 5 and 6.
+Status: SQL completion (PR 2), the SQL formatter and Mongo completion (PR 3) are done in core. The completion popup, snippets and the format shortcut (PR 4) are done in the app. The action registry and palette (PR 5) and the split layout (PR 6) are done; tab dragging, maximize and resizable panes came in a follow-up.
 
 ### SQL completion
 - `CompletionService.Complete` takes the current statement and a UTF-16 cursor offset and returns items in ranked order. Sort by `sort_key` ascending to get the same order.
@@ -93,10 +93,14 @@ The menu bar items have no key equivalent on purpose: a native one is handled be
 
 ## Editor groups and layout
 
-- Tab context menu (right-click) and the palette: split right, split down, move tab to next group; focus next and previous group. Defaults: `⌘\`, `⌘⇧\`, `⌘⌥→`, `⌘⌥←`, `⌘⌥⇧→`. Click a group to focus it; the focused group has a coloured top edge when the editor is split.
+- Tab context menu (right-click) and the palette: split right, split down, move tab to next group; focus next and previous group. Defaults: `⌘\`, `⌘⇧\`, `⌘⌥→`, `⌘⌥←`, `⌘⌥⇧→`. `⌘1` to `⌘4` focus a group by position. Click a group to focus it; the focused group has a coloured top edge when the editor is split.
+- Drag a tab to move it: dropped on another tab it lands in front of that tab (this also reorders tabs inside a group), dropped anywhere else on a group it joins the end of that group. The target is outlined while the tab is over it.
 - Drag the divider between groups to resize; groups never get smaller than 18 % of the pane, and there are at most four.
-- Closing the last tab of a group removes the group.
-- Layout, open query and shell tabs and unsaved text are saved to `.queravue/layout.json` in the first workspace root and restored on start; tabs bound to a file load it when first shown. Keep the file out of version control. Table, collection and designer tabs are not restored.
+- Closing or dragging away the last tab of a group removes the group.
+- Maximize (`⌘⇧M`, or the button at the right of a group's tab bar): the focused group fills the window, the sidebar and the other groups are hidden and keep their state; the same shortcut restores them. This stands in for detached windows (ADR 0016).
+- Sidebar: drag its right edge to resize (180 to 520 px), `⌘B` or a double-click on the edge hides it.
+- Results and shell output: drag the bar under the editor to resize, `⌘J` or a double-click on the bar hides the pane, a click on the bar brings it back. The share is the same for every tab.
+- Layout, open query and shell tabs, unsaved text and the pane sizes are saved to `.queravue/layout.json` in the first workspace root and restored on start; tabs bound to a file load it when first shown. Maximize is not saved. Keep the file out of version control. Table, collection and designer tabs are not restored.
 - Design, limits and the detached-window decision: ADR 0016.
 
 ### Catalog

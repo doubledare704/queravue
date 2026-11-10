@@ -62,6 +62,13 @@ class EditorLayoutController extends Notifier<EditorLayoutState> {
   void moveActive(String connectionId, int delta) =>
       _apply(connectionId, (l) => l.moveActive(delta));
 
+  void moveTab(
+    String connectionId,
+    String tabId,
+    int toGroup, {
+    String? before,
+  }) => _apply(connectionId, (l) => l.moveTab(tabId, toGroup, before: before));
+
   void focusGroup(String connectionId, int index) =>
       _apply(connectionId, (l) => l.focusGroup(index));
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/panes/editor_over_output.dart';
 import '../../../shared/shortcuts.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../editor/application/editor_tabs.dart';
@@ -110,22 +111,19 @@ class _ShellTabViewState extends ConsumerState<ShellTabView> {
           ),
         const Divider(height: 1),
         Expanded(
-          flex: 5,
-          child: JsEditor(
-            key: Key('shell-editor-${tab.id}'),
-            controller: tab.controller,
-            errorLine: errorLine,
-            connectionId: tab.connectionId,
-            database: tab.shellDatabase,
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          flex: 6,
-          child: ShellOutputPane(
-            entries: state.entries,
-            shellId: state.shellId,
-            onJump: (line, col) => jumpToLine(tab, line, col),
+          child: EditorOverOutput(
+            editor: JsEditor(
+              key: Key('shell-editor-${tab.id}'),
+              controller: tab.controller,
+              errorLine: errorLine,
+              connectionId: tab.connectionId,
+              database: tab.shellDatabase,
+            ),
+            output: ShellOutputPane(
+              entries: state.entries,
+              shellId: state.shellId,
+              onJump: (line, col) => jumpToLine(tab, line, col),
+            ),
           ),
         ),
       ],

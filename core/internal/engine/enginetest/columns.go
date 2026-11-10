@@ -26,10 +26,12 @@ func bulkColumns(t *testing.T, tg Target) {
 		}
 		schema = schemas[0]
 	}
+	started := time.Now()
 	refs, err := lister.ListColumns(ctx, tg.Database, schema)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("ListColumns(%q): %d columns in %s", schema, len(refs), time.Since(started))
 	byTable := map[string][]string{}
 	for _, r := range refs {
 		if r.TypeName == "" {

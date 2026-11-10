@@ -86,3 +86,9 @@ void moveTabToGroup(WidgetRef ref, int delta) {
   final id = ref.read(selectedConnectionProvider);
   if (id != null) ref.read(editorLayoutProvider.notifier).moveActive(id, delta);
 }
+
+/// Focuses the editor group at [index], counted from 0.
+void focusEditorGroupAt(WidgetRef ref, int index) {
+  final id = ref.read(selectedConnectionProvider);
+  if (id != null) ref.read(editorLayoutProvider.notifier).focusGroup(id, index);
+}

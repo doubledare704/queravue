@@ -192,6 +192,36 @@ class EditorLayout {
     ).reconcile(tabIds: allTabIds, requestedActive: moving);
   }
 
+  /// Moves [tabId] into group [toGroup], in front of [before] or at the end,
+  /// and shows it there. The source group disappears when it becomes empty.
+  EditorLayout moveTab(String tabId, int toGroup, {String? before}) {
+    if (groupOf(tabId) < 0 || before == tabId) return this;
+    if (toGroup < 0 || toGroup >= groups.length) return this;
+    final moved = [
+      for (final g in groups)
+        g.copyWith(
+          tabIds: [
+            for (final id in g.tabIds)
+              if (id != tabId) id,
+          ],
+          activeId: g.activeId == tabId ? null : g.activeId,
+        ),
+    ];
+    final target = moved[toGroup].tabIds;
+    final found = before == null ? -1 : target.indexOf(before);
+    final at = found < 0 ? target.length : found;
+    moved[toGroup] = EditorGroup(
+      tabIds: [...target.take(at), tabId, ...target.skip(at)],
+      activeId: tabId,
+    );
+    return EditorLayout(
+      groups: moved,
+      focused: toGroup,
+      axis: axis,
+      fractions: fractions,
+    ).reconcile(tabIds: allTabIds, requestedActive: tabId);
+  }
+
   EditorLayout focusGroup(int index) => index < 0 || index >= groups.length
       ? this
       : EditorLayout(

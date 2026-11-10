@@ -65,6 +65,29 @@ Along the way the run found a core bug that the unit tests could not: the first 
 ## Layout restore
 Restoring 60 query tabs in two groups from `.queravue/layout.json` takes 6 ms in the unit test (fake repository, so it measures the model and tab creation, not the core's file read). Only the layout file is read; a bound file is read when its tab is first shown, and a tab body is built only then, so cold start does not grow with the number of saved tabs. Whole-app cold start was not re-measured.
 
+## Cold start and idle memory (app, release build)
+
+Apple M4 Pro, 2026-11-10, `flutter build macos --release` with the embedded core, no workspace tabs to restore and no session open. Five launches of the binary; the clock runs from process start until the core has opened its Unix socket, polled every 5 ms from outside. The app logs no first-frame time, so this is a proxy for "core connected", not for the first frame.
+
+| Measurement | Result | Budget |
+|---|---|---|
+| Launch to core socket open, median of 5 (first launch after the build: 657 ms) | 289 ms | 1.5 s |
+| Idle after 30 s, `footprint`: app 96 MB + core 11 MB | 107 MB | 150 MB |
+| Same moment, `ps` RSS: app 155 MB + core 27 MB | 182 MB | |
+
+RSS counts shared framework pages; `footprint` is what Activity Monitor shows as Memory. Earlier notes (`iteration-2.md`, `iteration-6.md`) quote RSS of the profile build.
+
+## Bulk column introspection on the other engines
+
+One `ListColumns` call against the docker servers with the standard seed (not the 500-table schema), three runs each, logged by the shared `BulkColumns` integration test:
+
+| Engine | Columns | First run | Later runs |
+|---|---|---|---|
+| SQL Server 2022 (amd64 under emulation) | 40 | 59 to 78 ms | 4 to 7 ms |
+| CockroachDB 25.4 | 34 | 44 ms | 16 to 30 ms |
+| TiDB 8.5 | 39 | 10 ms | 4 to 6 ms |
+
 ## Not measured yet
-- Bulk introspection timings on MySQL, MariaDB, SQL Server, CockroachDB and TiDB. The queries are covered by the shared `BulkColumns` integration suite; only PostgreSQL, MySQL and MariaDB were run locally.
-- Cold start and idle memory with the warm-up running at session open: the catalog is small, but the whole-process numbers need the perf-check run with the UI.
+- Bulk introspection on a 500-table schema for engines other than PostgreSQL: only the PostgreSQL large seed exists.
+- Idle memory and first-frame time with a session open and the catalog warm-up running. The catalog itself held +0.46 MiB in the core (above).
+- The keystroke-to-popup assertion still runs only through `make test-perf-completion`, not in CI: it needs a macOS profile build and the docker PostgreSQL.
