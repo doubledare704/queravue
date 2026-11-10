@@ -127,12 +127,12 @@ jobs:
           # Read only by TestSmokeDocumentDB; dev-only credentials from compose.
           QV_DOCDB_URI: mongodb://queravue:Queravue_dev1@127.0.0.1:10260/?tls=true&tlsAllowInvalidCertificates=true&directConnection=true
         run: go test -tags=integration -run '^${{ matrix.test }}$' ./internal/engine/${{ matrix.pkg }}/...
-      - name: Core completion budget on 500 tables (10 ms p95)
+      - name: Core budgets on 500 tables (completion 10 ms p95, schema graph 200 ms p95)
         if: matrix.service == 'postgres'
         working-directory: core
         run: |
           docker compose -f ../dev/docker-compose.yml --profile large-schema up postgres-large-seed
-          go test -count=1 -tags=integration -v -run TestIntegrationLargeSchema ./internal/completion/ | tee "$RUNNER_TEMP/large.log"
+          go test -count=1 -tags=integration -v -run TestIntegrationLargeSchema ./internal/completion/ ./internal/diagram/ | tee "$RUNNER_TEMP/large.log"
           # The test skips when the seed is missing; a skip here would hide the budget.
           ! grep -q -- '--- SKIP' "$RUNNER_TEMP/large.log"
       - name: Mongo shell corpus

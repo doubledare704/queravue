@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,8 +24,6 @@ type Progress struct {
 
 // ErrNotSupported means the connection cannot list schemas and columns.
 var ErrNotSupported = errors.New("completion: connection cannot list schemas and columns")
-
-const busyRetryDelay = 25 * time.Millisecond
 
 type entryKey struct{ session, database string }
 
@@ -335,33 +332,6 @@ func withColumns(tables []*Table, refs []engine.ColumnRef) []*Table {
 	return out
 }
 
-// withConn runs f while holding the session's statement slot, waiting for a
-// running statement to finish. Waiting stops when ctx ends.
 func withConn(ctx context.Context, sess *session.Session, f func(context.Context) error) error {
-	for {
-		err := runOnce(ctx, sess, f)
-		if err == nil || !isBusy(err) {
-			return err
-		}
-		select {
-		case <-time.After(busyRetryDelay):
-		case <-ctx.Done():
-			return fmt.Errorf("completion: wait for session: %w", ctx.Err())
-		}
-	}
-}
-
-func runOnce(ctx context.Context, sess *session.Session, f func(context.Context) error) error {
-	runCtx, finish, err := sess.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer finish()
-	return f(runCtx)
-}
-
-// A driver connection that serves another request answers "conn busy"; the
-// schema browser reaches the connection without the session's statement slot.
-func isBusy(err error) bool {
-	return errors.Is(err, session.ErrBusy) || strings.Contains(err.Error(), "conn busy")
+	return sess.RunWhenFree(ctx, f)
 }
