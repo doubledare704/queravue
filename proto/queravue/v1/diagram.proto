@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/admin.proto";
+import "queravue/v1/design.proto";
+import "queravue/v1/schema.proto";
+
+// DiagramService feeds schema diagrams and applies what was designed on one
+// (ADR 0017). The UI enables it from the "schema_graph" capability and never
+// from engine ids.
+//
+// Failures are returned in-band as AdminError so streams and transport stay
+// healthy. Unknown sessions are NOT_FOUND.
+service DiagramService {
+  // GetSchemaGraph streams every table of a schema with its columns and
+  // relations, in batches, using one query per kind of object rather than one
+  // per table. On document stores it samples each collection and infers the
+  // relations. The last message has done=true. Cancel the call to stop it.
+  rpc GetSchemaGraph(GetSchemaGraphRequest) returns (stream GetSchemaGraphResponse);
+
+  // PreviewDiagramDDL returns the DDL for changes to several tables without
+  // running it. The core orders the statements so that tables exist before
+  // the foreign keys that point at them.
+  rpc PreviewDiagramDDL(PreviewDiagramDDLRequest) returns (PreviewDiagramDDLResponse);
+
+  // ApplyDiagramDDL runs the DDL for changes to several tables, in the order
+  // PreviewDiagramDDL reports. It needs confirmed=true for destructive
+  // statements and on connections flagged production.
+  rpc ApplyDiagramDDL(ApplyDiagramDDLRequest) returns (ApplyDiagramDDLResponse);
+}
+
+// GetSchemaGraphRequest selects the schema to draw.
+message GetSchemaGraphRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Database name; empty means the session default.
+  string database = 2;
+  // Schema name; empty means the engine's default schema. Ignored by
+  // document stores.
+  string schema = 3;
+  // Skip the cache and read the schema again.
+  bool refresh = 4;
+  // Document stores only: documents to sample per collection. 0 means 100;
+  // the core clamps it to [1, 1000].
+  uint32 sample_size = 5;
+}
+
+// GraphColumn is one column or sampled field of a diagram table.
+message GraphColumn {
+  // Column name, or dotted field path on document stores.
+  string name = 1;
+  // Native type name, or the most frequent sampled type.
+  string type_name = 2;
+  // True if the column allows NULL, or the field is missing in some sampled documents.
+  bool nullable = 3;
+  // 1-based order within the primary key; 0 if not part of it.
+  uint32 primary_key_order = 4;
+}
+
+// GraphRelation is a reference from one table to another.
+message GraphRelation {
+  // Constraint name; empty for inferred relations.
+  string name = 1;
+  // Referencing columns of the owning table, in order.
+  repeated string columns = 2;
+  // Referenced schema; empty means the same schema.
+  string referenced_schema = 3;
+  // Referenced table or collection.
+  string referenced_table = 4;
+  // Referenced columns, matching columns by position.
+  repeated string referenced_columns = 5;
+  // Action when a referenced row is deleted.
+  ReferentialAction on_delete = 6;
+  // Action when a referenced key is updated.
+  ReferentialAction on_update = 7;
+  // True if no constraint backs the relation and the core guessed it from
+  // names and types.
+  bool inferred = 8;
+  // For inferred relations: how sure the guess is, in (0, 1]. 0 otherwise.
+  double confidence = 9;
+}
+
+// GraphTable is one node of the diagram.
+message GraphTable {
+  // Table, view or collection name.
+  string name = 1;
+  // Kind of object.
+  SchemaObjectType type = 2;
+  // Estimated row count, or -1 if unknown.
+  int64 row_count_estimate = 3;
+  // Columns in ordinal order, or sampled fields by frequency.
+  repeated GraphColumn columns = 4;
+  // Relations this table owns.
+  repeated GraphRelation relations = 5;
+  // True if the column list was cut at the core's per-table limit.
+  bool columns_truncated = 6;
+}
+
+// GetSchemaGraphResponse is one batch of the graph, or the final message.
+message GetSchemaGraphResponse {
+  // Tables of this batch.
+  repeated GraphTable tables = 1;
+  // Tables the schema has, once known.
+  uint32 tables_total = 2;
+  // Tables sent so far, including this batch.
+  uint32 tables_done = 3;
+  // True on the last message.
+  bool done = 4;
+  // Set on the last message if loading failed, was cancelled or is unsupported.
+  AdminError error = 5;
+}
+
+// TableChanges is the ordered list of changes to one table.
+message TableChanges {
+  // Target table (the new table's name for CreateTable).
+  TableRef table_ref = 1;
+  // Steps in order.
+  repeated SchemaChange changes = 2;
+}
+
+// PreviewDiagramDDLRequest asks what DDL a set of table changes produces.
+message PreviewDiagramDDLRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Changes per table. The core chooses the statement order.
+  repeated TableChanges tables = 2;
+}
+
+// PreviewDiagramDDLResponse lists the statements and warnings.
+message PreviewDiagramDDLResponse {
+  // Statements in execution order.
+  repeated DdlStatement statements = 1;
+  // Cautions, for example that the engine commits DDL implicitly.
+  repeated string warnings = 2;
+  // True if the engine runs these statements in one rollback-able transaction.
+  bool transactional = 3;
+  // Set when the changes cannot be turned into DDL for this engine.
+  AdminError error = 4;
+}
+
+// ApplyDiagramDDLRequest asks to run the DDL for a set of table changes.
+message ApplyDiagramDDLRequest {
+  // Session id from SessionService.Open.
+  string session_id = 1;
+  // Changes per table. The core chooses the statement order.
+  repeated TableChanges tables = 2;
+  // Required when any statement is destructive, and always on connections
+  // flagged production.
+  bool confirmed = 3;
+}
+
+// ApplyDiagramDDLResponse reports what ran.
+message ApplyDiagramDDLResponse {
+  // The statements that were run, in order.
+  repeated DdlStatement statements = 1;
+  // How many statements completed. Less than the list length means the run
+  // stopped on error; on engines that commit DDL implicitly those statements
+  // stay applied.
+  uint32 executed_statements = 2;
+  // True if the run was one rollback-able transaction.
+  bool transactional = 3;
+  // Set when the call failed or was refused.
+  AdminError error = 4;
+}

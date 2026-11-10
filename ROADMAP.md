@@ -84,11 +84,13 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Table, collection and designer tabs are not restored after a restart.
 - Bulk introspection on a 500-table schema was measured on PostgreSQL only.
 
-### It. 9 — ER diagrams + materialize
+### It. 9 — ER diagrams + materialize 🚧 in progress
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).
 - Design mode: draw tables/relations → generate DDL → apply.
 - Mongo: inferred schema diagram from sampling.
 - **Done when:** a 100-table schema renders readably, and a designed diagram creates real tables.
+
+**Status:** PR 1 of 6 (ADR 0017, `DiagramService` contract, protocol version 9) in review. Then: bulk schema graph in core; read-only diagram with auto-layout; export and saved diagrams; design mode; Mongo inferred diagram.
 
 ### It. 10 — Remaining engines + connectivity
 - Oracle (go-ora), ClickHouse, DuckDB.
