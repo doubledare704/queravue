@@ -117,6 +117,15 @@ final connectionHasShellProvider = Provider.family<bool, String>(
       false,
 );
 
+/// True when the connection can serve a schema diagram.
+final connectionHasSchemaGraphProvider = Provider.family<bool, String>(
+  (ref, connectionId) =>
+      ref
+          .watch(connectionCapabilitiesProvider(connectionId))
+          ?.contains('schema_graph') ??
+      false,
+);
+
 /// True for connections to document engines that cannot run SQL: they have
 /// the `document_store` capability and not `execute`; unknown means false, so
 /// SQL entry points stay available.

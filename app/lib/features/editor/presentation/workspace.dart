@@ -10,6 +10,7 @@ import '../../connections/application/connection_session.dart';
 import '../../admin/presentation/admin_host.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../designer/presentation/designer_tab_view.dart';
+import '../../diagram/presentation/diagram_tab_view.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
 import '../../workspace/application/tab_files.dart';
@@ -402,6 +403,8 @@ class _TabView extends StatelessWidget {
       ? ShellTabView(tab: tab)
       : tab.isDesigner
       ? DesignerTabView(tab: tab)
+      : tab.isDiagram
+      ? DiagramTabView(tab: tab)
       : tab.isCollection
       ? AdminHost(
           tab: tab,
@@ -485,6 +488,8 @@ class _TabButton extends StatelessWidget {
                   ? Icons.data_object
                   : tab.isTable
                   ? Icons.table_chart_outlined
+                  : tab.isDiagram
+                  ? Icons.account_tree_outlined
                   : Icons.code,
               size: 14,
               color: selected ? cs.primary : cs.onSurfaceVariant,

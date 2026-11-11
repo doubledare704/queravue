@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
 import 'package:queravue/core_client/gen/queravue/v1/completion.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/diagram.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/design.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
@@ -167,6 +168,10 @@ class FakeCoreConnection implements CoreConnection {
   @override
   CompletionServiceClient get completionService =>
       throw UnimplementedError('use a fake CompletionRepository');
+
+  @override
+  DiagramServiceClient get diagramService =>
+      throw UnimplementedError('use a fake DiagramRepository');
 
   @override
   Future<void> close() async {

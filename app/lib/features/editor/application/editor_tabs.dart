@@ -10,7 +10,7 @@ import '../../schema/domain/schema_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table, collection, shell, designer }
+enum TabKind { query, table, collection, shell, designer, diagram }
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -41,6 +41,7 @@ class EditorTab {
   bool get isCollection => kind == TabKind.collection;
   bool get isShell => kind == TabKind.shell;
   bool get isDesigner => kind == TabKind.designer;
+  bool get isDiagram => kind == TabKind.diagram;
 
   /// The same tab, with its editor kept, under a new title.
   EditorTab withTitle(String newTitle) => EditorTab(
@@ -178,6 +179,41 @@ class EditorTabs extends Notifier<EditorTabsState> {
       kind: TabKind.designer,
       tableRef: tableRef,
       newTable: newTable,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  /// Opens the diagram of a schema; an open one is focused instead.
+  EditorTab openDiagram(
+    String connectionId, {
+    String database = '',
+    String schema = '',
+  }) {
+    final scope = TableRef(database: database, schema: schema, table: '');
+    final existing = state.tabs
+        .where(
+          (t) =>
+              t.isDiagram &&
+              t.connectionId == connectionId &&
+              t.tableRef == scope,
+        )
+        .firstOrNull;
+    if (existing != null) {
+      select(existing.id);
+      return existing;
+    }
+    final named = schema.isNotEmpty ? schema : database;
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: named.isEmpty ? 'Diagram' : 'Diagram $named',
+      kind: TabKind.diagram,
+      tableRef: scope,
     );
     _live.add(tab);
     state = EditorTabsState(
