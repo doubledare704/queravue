@@ -7,6 +7,7 @@ import 'package:re_editor/re_editor.dart';
 import '../domain/query_models.dart';
 import '../domain/text_offsets.dart';
 import '../../schema/domain/schema_models.dart';
+import '../../workspace/domain/workspace_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
@@ -22,6 +23,7 @@ class EditorTab {
     this.tableRef,
     this.newTable = false,
     this.shellDatabase = '',
+    this.diagramFile,
     CodeLineEditingController? controller,
   }) : controller = controller ?? CodeLineEditingController();
 
@@ -34,6 +36,9 @@ class EditorTab {
   /// For a designer tab: the table does not exist yet.
   final bool newTable;
   final String shellDatabase;
+
+  /// For a diagram tab: the saved diagram it shows, if any.
+  final FilePath? diagramFile;
   final CodeLineEditingController controller;
 
   bool get isQuery => kind == TabKind.query;
@@ -44,16 +49,25 @@ class EditorTab {
   bool get isDiagram => kind == TabKind.diagram;
 
   /// The same tab, with its editor kept, under a new title.
-  EditorTab withTitle(String newTitle) => EditorTab(
-    id: id,
-    connectionId: connectionId,
-    title: newTitle,
-    kind: kind,
-    tableRef: tableRef,
-    newTable: newTable,
-    shellDatabase: shellDatabase,
-    controller: controller,
-  );
+  EditorTab withTitle(String newTitle) =>
+      _copy(title: newTitle, diagramFile: diagramFile);
+
+  /// The same diagram tab, now showing the saved diagram [file].
+  EditorTab withDiagramFile(FilePath? file, String newTitle) =>
+      _copy(title: newTitle, diagramFile: file);
+
+  EditorTab _copy({required String title, required FilePath? diagramFile}) =>
+      EditorTab(
+        id: id,
+        connectionId: connectionId,
+        title: title,
+        kind: kind,
+        tableRef: tableRef,
+        newTable: newTable,
+        shellDatabase: shellDatabase,
+        diagramFile: diagramFile,
+        controller: controller,
+      );
 }
 
 @immutable
@@ -188,19 +202,23 @@ class EditorTabs extends Notifier<EditorTabsState> {
     return tab;
   }
 
-  /// Opens the diagram of a schema; an open one is focused instead.
+  /// Opens the diagram of a schema, or the saved diagram [savedFile]; one
+  /// that is open already is focused instead.
   EditorTab openDiagram(
     String connectionId, {
     String database = '',
     String schema = '',
+    FilePath? savedFile,
+    String? title,
   }) {
     final scope = TableRef(database: database, schema: schema, table: '');
     final existing = state.tabs
         .where(
           (t) =>
               t.isDiagram &&
-              t.connectionId == connectionId &&
-              t.tableRef == scope,
+              t.diagramFile == savedFile &&
+              (savedFile != null ||
+                  t.connectionId == connectionId && t.tableRef == scope),
         )
         .firstOrNull;
     if (existing != null) {
@@ -211,9 +229,10 @@ class EditorTabs extends Notifier<EditorTabsState> {
     final tab = EditorTab(
       id: 'tab-${++_seq}',
       connectionId: connectionId,
-      title: named.isEmpty ? 'Diagram' : 'Diagram $named',
+      title: title ?? (named.isEmpty ? 'Diagram' : 'Diagram $named'),
       kind: TabKind.diagram,
       tableRef: scope,
+      diagramFile: savedFile,
     );
     _live.add(tab);
     state = EditorTabsState(
@@ -271,11 +290,21 @@ class EditorTabs extends Notifier<EditorTabsState> {
     return tab;
   }
 
+  /// Shows the saved diagram [file] in diagram tab [tabId], under [title].
+  void bindDiagram(String tabId, FilePath? file, String title) =>
+      _replace(tabId, (t) => t.withDiagramFile(file, title));
+
   /// Renames a tab, e.g. after it was saved as a workspace file.
   void retitle(String tabId, String title) {
     final i = state.tabs.indexWhere((t) => t.id == tabId);
     if (i < 0 || state.tabs[i].title == title) return;
-    final renamed = state.tabs[i].withTitle(title);
+    _replace(tabId, (t) => t.withTitle(title));
+  }
+
+  void _replace(String tabId, EditorTab Function(EditorTab) change) {
+    final i = state.tabs.indexWhere((t) => t.id == tabId);
+    if (i < 0) return;
+    final renamed = change(state.tabs[i]);
     final live = _live.indexWhere((t) => t.id == tabId);
     if (live >= 0) _live[live] = renamed;
     state = EditorTabsState(
@@ -297,6 +326,8 @@ class EditorTabs extends Notifier<EditorTabsState> {
     required TabKind kind,
     required String title,
     String shellDatabase = '',
+    TableRef? tableRef,
+    FilePath? diagramFile,
   }) {
     final tab = EditorTab(
       id: 'tab-${++_seq}',
@@ -304,6 +335,8 @@ class EditorTabs extends Notifier<EditorTabsState> {
       title: title,
       kind: kind,
       shellDatabase: shellDatabase,
+      tableRef: tableRef,
+      diagramFile: diagramFile,
     );
     if (kind == TabKind.query) {
       ref.read(queryRunProvider(tab.id).notifier).bind(connectionId);

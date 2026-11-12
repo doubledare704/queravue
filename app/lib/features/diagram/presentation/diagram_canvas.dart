@@ -19,20 +19,25 @@ class DiagramCanvas extends StatefulWidget {
     required this.graph,
     required this.rects,
     required this.selected,
-    required this.layoutRevision,
+    required this.fitKey,
     required this.onSelect,
     required this.onMoveTable,
     required this.onOpenTable,
+    this.onTableMenu,
     this.onScaleChanged,
   });
 
   final SchemaGraph graph;
   final Map<String, Rect> rects;
   final String? selected;
-  final int layoutRevision;
+
+  /// The diagram is fitted to the view whenever this changes: a new graph or
+  /// a new automatic arrangement, not a moved or hidden table.
+  final Object fitKey;
   final ValueChanged<String?> onSelect;
   final void Function(String table, Offset delta) onMoveTable;
   final ValueChanged<String> onOpenTable;
+  final void Function(String table, Offset globalPosition)? onTableMenu;
   final ValueChanged<double>? onScaleChanged;
 
   @override
@@ -45,7 +50,7 @@ class DiagramCanvasState extends State<DiagramCanvas> {
   double scale = 1;
   Offset offset = Offset.zero;
   Size _size = Size.zero;
-  (SchemaGraph, int)? _fitted;
+  Object? _fitted;
   SchemaGraph? _indexed;
   Map<String, DiagramTable> _tablesByName = const {};
   ColorScheme? _paintedWith;
@@ -109,6 +114,14 @@ class DiagramCanvasState extends State<DiagramCanvas> {
   }
 
   void _onDown(PointerDownEvent event) {
+    if (event.buttons == kSecondaryButton) {
+      final hit = _tableAt(event.localPosition);
+      if (hit != null) {
+        widget.onSelect(hit);
+        widget.onTableMenu?.call(hit, event.position);
+      }
+      return;
+    }
     if (event.buttons != kPrimaryButton) return;
     _focus.requestFocus();
     final hit = _tableAt(event.localPosition);
@@ -175,7 +188,7 @@ class DiagramCanvasState extends State<DiagramCanvas> {
     return LayoutBuilder(
       builder: (context, box) {
         _size = box.biggest;
-        final wanted = (widget.graph, widget.layoutRevision);
+        final wanted = widget.fitKey;
         if (_fitted != wanted && !_size.isEmpty) {
           _fitted = wanted;
           WidgetsBinding.instance.addPostFrameCallback((_) {

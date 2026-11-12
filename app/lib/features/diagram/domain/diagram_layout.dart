@@ -161,6 +161,18 @@ int _tablesPerColumn(List<Size> sizes) {
   );
 }
 
+/// Lays [tables] out on their own and puts the result to the right of
+/// [occupied], top aligned; where [occupied] is empty, at the origin.
+Map<String, Rect> layoutBeside(List<DiagramTable> tables, Rect occupied) {
+  final own = layoutGraph(SchemaGraph(tables));
+  if (occupied.isEmpty || own.rects.isEmpty) return own.rects;
+  final shift = Offset(
+    occupied.right + _columnGap - own.bounds.left,
+    occupied.top - own.bounds.top,
+  );
+  return own.rects.map((name, rect) => MapEntry(name, rect.shift(shift)));
+}
+
 /// Longest chain of references below each table; a reference that closes a
 /// cycle is ignored.
 List<int> _ranks(List<Set<int>> references) {

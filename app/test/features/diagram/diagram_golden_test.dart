@@ -44,7 +44,7 @@ Future<void> pumpDiagram(WidgetTester tester, Brightness brightness) async {
           graph: _graph,
           rects: layoutGraph(_graph).rects,
           selected: 'orders',
-          layoutRevision: 0,
+          fitKey: 0,
           onSelect: (_) {},
           onMoveTable: (_, _) {},
           onOpenTable: (_) {},

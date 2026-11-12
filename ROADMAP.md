@@ -90,7 +90,7 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Mongo: inferred schema diagram from sampling.
 - **Done when:** a 100-table schema renders readably, and a designed diagram creates real tables.
 
-**Status:** PR 1 (ADR 0017, `DiagramService` contract, protocol version 9) and PR 2 (bulk schema graph in core for the SQL engines: 500 tables in 27 ms p95) are merged; PR 3 of 6 (read-only diagram with auto-layout, pan and zoom: 500 tables open in 0.14 s, pan frames under 4 ms) is in review. Then: export and saved diagrams; design mode; Mongo inferred diagram.
+**Status:** PR 1 (ADR 0017, `DiagramService` contract, protocol version 9) PR 2 (bulk schema graph in core for the SQL engines: 500 tables in 27 ms p95) and PR 3 (read-only diagram with auto-layout, pan and zoom: 500 tables open in 0.14 s, pan frames under 4 ms) are merged; PR 4 of 6 (SVG and PNG export, saved diagrams in the workspace, hidden tables, diagram tabs restored after a restart) is in review. Then: design mode; Mongo inferred diagram.
 
 ### It. 10 — Remaining engines + connectivity
 - Oracle (go-ora), ClickHouse, DuckDB.

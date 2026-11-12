@@ -30,7 +30,9 @@ import 'package:queravue/features/connections/domain/models.dart';
 import 'package:queravue/features/core_status/core_status_controller.dart';
 import 'package:queravue/features/diagram/application/diagram_controller.dart';
 import 'package:queravue/features/diagram/presentation/diagram_canvas.dart';
+import 'package:queravue/features/diagram/presentation/diagram_export.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
+import 'package:queravue/shared/theme.dart';
 
 String _env(String k, String d) => Platform.environment[k] ?? d;
 
@@ -131,7 +133,9 @@ void main() {
       addTearDown(() => repo.delete(saved.id));
       await container.read(connectionsControllerProvider.notifier).reload();
       container.read(selectedConnectionProvider.notifier).select(saved.id);
-      await tester.pumpAndSettle();
+      // Not pumpAndSettle: a spinner in the live schema tree can keep it from
+      // ever settling.
+      await tester.pump(const Duration(milliseconds: 100));
       final session = await container
           .read(connectionSessionProvider(saved.id).notifier)
           .connect();
@@ -186,12 +190,42 @@ void main() {
         reportKey: 'pan_columns',
       );
 
+      final svgWatch = Stopwatch()..start();
+      final svg = diagramToSvg(
+        graph: ready.visibleGraph,
+        rects: ready.visibleRects,
+        colors: lightTheme.colorScheme,
+        title: tab.title,
+      );
+      report['svg_ms'] = svgWatch.elapsedMilliseconds;
+      report['svg_kb'] = svg.length ~/ 1024;
+      final pngWatch = Stopwatch()..start();
+      final png = await diagramToPng(
+        graph: ready.visibleGraph,
+        rects: ready.visibleRects,
+        colors: lightTheme.colorScheme,
+      );
+      report['png_ms'] = pngWatch.elapsedMilliseconds;
+      report['png_px'] = '${png.width}x${png.height}';
+      report['png_ratio'] = png.pixelRatio;
+      report['png_kb'] = png.bytes.length ~/ 1024;
+      final exportDir = Platform.environment['DIAGRAM_SHOT_DIR'];
+      if (exportDir != null) {
+        File('$exportDir/export.svg').writeAsStringSync(svg);
+        File('$exportDir/export.png').writeAsBytesSync(png.bytes);
+      }
+
       binding.reportData = {...?binding.reportData, ...report};
       debugPrint('DIAGRAM PERF ${binding.reportData}');
 
-      expect(ready.graph.tables.length, greaterThanOrEqualTo(100));
+      expect(
+        ready.graph.tables.length,
+        greaterThanOrEqualTo(int.parse(_env('DIAGRAM_MIN_TABLES', '100'))),
+      );
       if (kProfileMode) {
         expect(report['open_ms']! as int, lessThan(1000));
+        expect(report['svg_ms']! as int, lessThan(1000));
+        expect(report['png_ms']! as int, lessThan(5000));
         for (final key in ['pan_fitted', 'pan_titles', 'pan_columns']) {
           final frames = binding.reportData![key]! as Map<String, dynamic>;
           expect(
