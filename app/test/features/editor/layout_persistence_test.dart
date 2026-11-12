@@ -5,6 +5,7 @@ import 'package:queravue/features/connections/application/connections_controller
 import 'package:queravue/features/editor/application/editor_layout_controller.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/editor/application/layout_persistence.dart';
+import 'package:queravue/features/schema/domain/schema_models.dart';
 import 'package:queravue/features/workspace/application/tab_files.dart';
 import 'package:queravue/features/workspace/domain/workspace_models.dart';
 import 'package:queravue/shared/panes/pane_sizes.dart';
@@ -99,6 +100,40 @@ void main() {
   });
 
   group('persistence', () {
+    test('diagram tabs come back with their schema and saved file', () async {
+      final workspace = FakeWorkspaceRepository();
+      final first = await start(workspace);
+      await restored(first);
+      final tabs = first.read(editorTabsProvider.notifier);
+      tabs.openDiagram('c2', database: 'shop', schema: 'public');
+      tabs.openDiagram(
+        'c2',
+        schema: 'sales',
+        savedFile: const FilePath('ws', '.queravue/diagrams/sales.json'),
+        title: 'sales',
+      );
+      await first.read(layoutPersistenceProvider).flush();
+
+      final second = await start(workspace);
+      await restored(second);
+      final diagrams = second
+          .read(editorTabsProvider)
+          .tabs
+          .where((t) => t.isDiagram)
+          .toList();
+      expect(diagrams.map((t) => t.title), ['Diagram public', 'sales']);
+      expect(
+        diagrams[0].tableRef,
+        const TableRef(database: 'shop', schema: 'public', table: ''),
+      );
+      expect(diagrams[0].diagramFile, isNull);
+      expect(diagrams[1].tableRef!.schema, 'sales');
+      expect(
+        diagrams[1].diagramFile,
+        const FilePath('ws', '.queravue/diagrams/sales.json'),
+      );
+    });
+
     test('pane sizes come back, maximize does not', () async {
       final workspace = FakeWorkspaceRepository();
       final first = await start(workspace);

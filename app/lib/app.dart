@@ -10,6 +10,7 @@ import 'features/keybindings/application/keybindings_controller.dart';
 import 'features/workspace/presentation/left_sidebar.dart';
 import 'shared/actions/action_shortcuts.dart';
 import 'shared/panes/pane_sizes.dart';
+import 'shared/theme.dart';
 import 'shared/widgets/status_bar.dart';
 
 /// Root widget.
@@ -48,12 +49,8 @@ class _QueravueAppState extends ConsumerState<QueravueApp> {
     return MaterialApp(
       title: 'Queravue',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: lightTheme,
+      darkTheme: darkTheme,
       home: const HomeScreen(),
     );
   }

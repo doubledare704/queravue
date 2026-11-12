@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../diagram/application/saved_diagram_opener.dart';
+import '../../diagram/data/diagram_files.dart';
 import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/domain/models.dart';
@@ -318,6 +320,7 @@ class FileOpener {
   final Ref _ref;
 
   Future<OpenOutcome> open(FilePath file) async {
+    if (isSavedDiagramPath(file)) return openSavedDiagram(_ref.read, file);
     final persistence = _ref.read(layoutPersistenceProvider);
     final restored = persistence.unloadedTabFor(file);
     if (restored != null) {

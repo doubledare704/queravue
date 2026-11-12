@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../schema/domain/schema_models.dart';
 import '../domain/diagram_layout.dart';
 import '../domain/diagram_models.dart';
+import '../domain/diagram_scene.dart';
 
 /// Below this zoom a table shows only its name; below [boxesOnlyScale] not
 /// even that, and relations are straight lines.
@@ -50,6 +51,7 @@ class DiagramPainter extends CustomPainter {
     required this.offset,
     required this.colors,
     required this.texts,
+    this.fullDetail = false,
   });
 
   final SchemaGraph graph;
@@ -61,8 +63,11 @@ class DiagramPainter extends CustomPainter {
   final ColorScheme colors;
   final DiagramTextCache texts;
 
-  bool get _showsColumns => scale >= titlesOnlyScale;
-  bool get _showsTitles => scale >= boxesOnlyScale;
+  /// Draws columns and titles at any scale, for export.
+  final bool fullDetail;
+
+  bool get _showsColumns => fullDetail || scale >= titlesOnlyScale;
+  bool get _showsTitles => fullDetail || scale >= boxesOnlyScale;
 
   // Far out, or beside a highlighted table, plain relations step back.
   double get _relationOpacity => selected != null
@@ -105,90 +110,50 @@ class DiagramPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.2 / math.min(scale, 1)
       ..color = colors.primary;
-    final later = <(DiagramTable, DiagramRelation, Rect, Rect)>[];
-    for (final table in graph.tables) {
-      final from = rects[table.name];
-      if (from == null) continue;
-      for (final relation in table.relations) {
-        final to = rects[relation.referencedTable];
-        if (to == null || relation.referencedTable == table.name) continue;
-        if (!from.expandToInclude(to).overlaps(visible)) continue;
-        if (selected != null &&
-            (table.name == selected || relation.referencedTable == selected)) {
-          later.add((table, relation, from, to));
-        } else {
-          _paintRelation(canvas, table, relation, from, to, plain);
-        }
+    final later = <DrawnRelation>[];
+    for (final r in drawnRelations(graph, rects)) {
+      if (!r.fromRect.expandToInclude(r.toRect).overlaps(visible)) continue;
+      if (selected != null &&
+          (r.from.name == selected || r.relation.referencedTable == selected)) {
+        later.add(r);
+      } else {
+        _paintRelation(canvas, r, plain);
       }
     }
-    for (final (table, relation, from, to) in later) {
-      _paintRelation(canvas, table, relation, from, to, highlighted);
+    for (final r in later) {
+      _paintRelation(canvas, r, highlighted);
     }
   }
 
-  double _rowY(DiagramTable table, Rect rect, String? column) {
-    if (!_showsColumns || column == null) return rect.center.dy;
-    final at = table.columns.indexWhere((c) => c.name == column);
-    if (at < 0 || at >= maxRowsShown) return rect.top + tableHeaderHeight / 2;
-    return rect.top + tableHeaderHeight + (at + 0.5) * tableRowHeight;
-  }
-
-  void _paintRelation(
-    Canvas canvas,
-    DiagramTable table,
-    DiagramRelation relation,
-    Rect from,
-    Rect to,
-    Paint paint,
-  ) {
-    final target = tablesByName[relation.referencedTable];
-    final fromY = _rowY(table, from, relation.columns.firstOrNull);
-    final toY = target == null
-        ? to.center.dy
-        : _rowY(target, to, relation.referencedColumns.firstOrNull);
-    final Offset start, end;
-    final double startOut, endOut;
-    if (from.left > to.right + 24) {
-      start = Offset(from.left, fromY);
-      end = Offset(to.right, toY);
-      startOut = -1;
-      endOut = 1;
-    } else if (to.left > from.right + 24) {
-      start = Offset(from.right, fromY);
-      end = Offset(to.left, toY);
-      startOut = 1;
-      endOut = -1;
-    } else {
-      start = Offset(from.right, fromY);
-      end = Offset(to.right, toY);
-      startOut = 1;
-      endOut = 1;
-    }
+  void _paintRelation(Canvas canvas, DrawnRelation r, Paint paint) {
+    final curve = relationCurve(
+      r,
+      target: tablesByName[r.relation.referencedTable],
+      rowsDrawn: _showsColumns,
+    );
     if (!_showsTitles) {
-      canvas.drawLine(start, end, paint);
+      canvas.drawLine(curve.start, curve.end, paint);
       return;
     }
-    final reach = math.max(36.0, (end.dx - start.dx).abs() / 2);
     final path = Path()
-      ..moveTo(start.dx, start.dy)
+      ..moveTo(curve.start.dx, curve.start.dy)
       ..cubicTo(
-        start.dx + startOut * reach,
-        start.dy,
-        end.dx + endOut * reach,
-        end.dy,
-        end.dx,
-        end.dy,
+        curve.control1.dx,
+        curve.control1.dy,
+        curve.control2.dx,
+        curve.control2.dy,
+        curve.end.dx,
+        curve.end.dy,
       );
-    if (relation.inferred) {
+    if (r.relation.inferred) {
       _paintDashed(canvas, path, paint);
     } else {
       canvas.drawPath(path, paint);
     }
-    final fork = Offset(start.dx + startOut * 9, start.dy);
     canvas
-      ..drawLine(fork, Offset(start.dx, start.dy - 5), paint)
-      ..drawLine(fork, Offset(start.dx, start.dy + 5), paint)
-      ..drawCircle(end, 3, Paint()..color = paint.color);
+      ..drawLine(curve.forkTip, curve.forkUpper, paint)
+      ..drawLine(curve.forkTip, curve.forkLower, paint)
+      ..drawCircle(curve.end, endDotRadius, Paint()..color = paint.color);
   }
 
   void _paintDashed(Canvas canvas, Path path, Paint paint) {
@@ -369,5 +334,6 @@ class DiagramPainter extends CustomPainter {
       old.selected != selected ||
       old.scale != scale ||
       old.offset != offset ||
-      old.colors != colors;
+      old.colors != colors ||
+      old.fullDetail != fullDetail;
 }

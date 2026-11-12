@@ -31,7 +31,7 @@ Nothing is copied from another tool.
 The diagram is one custom-painted scene under a pan and zoom transform, not a widget per table. Only tables that intersect the viewport are painted. Below a zoom threshold a table collapses to its title box, and below a second one relations are drawn as straight lines. This keeps the rule that nothing off-screen builds widgets.
 
 ### 4. Export from the same scene
-SVG is written by a small serializer over the scene model; PNG is the scene rasterised at a chosen scale. Both export the whole diagram, not the viewport. Files are saved through `file_selector`, which the app already depends on.
+SVG is written by a small serializer over the scene model; PNG is the scene rasterised at a chosen scale. Both export the whole diagram, not the viewport, in the light theme. The PNG scale is two pixels per unit, lowered to stay under 24 megapixels and 16,384 px a side; the SVG estimates text widths rather than measuring them. Files are saved through `file_selector`, which the app already depends on.
 
 ### 5. Saved diagrams are workspace files
 A diagram is saved as `.queravue/diagrams/<name>.json` through `WorkspaceService`: connection id, database, schema, table positions, hidden tables and, in design mode, the draft objects. It holds no schema snapshot; opening it loads the graph again and places known tables. Persistence needs no contract change.

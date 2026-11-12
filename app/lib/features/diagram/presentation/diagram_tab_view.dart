@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/shortcuts.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../../schema/domain/schema_models.dart';
 import '../application/diagram_controller.dart';
+import '../data/diagram_files.dart';
+import '../data/export_target.dart';
 import 'diagram_canvas.dart';
+import 'diagram_flows.dart';
 
 /// A schema as an entity-relationship diagram: toolbar and canvas, or the
 /// loading, failed and empty states.
@@ -44,20 +48,44 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
     }
   }
 
+  Future<void> _tableMenu(DiagramReady ready, String table, Offset at) async {
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
+      items: const [
+        PopupMenuItem(value: 'open', child: Text('Open table')),
+        PopupMenuItem(value: 'hide', child: Text('Hide from diagram')),
+      ],
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'open':
+        _openTable(ready, table);
+      case 'hide':
+        ref.read(diagramProvider(widget.tab.id).notifier).hide(table);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(diagramProvider(widget.tab.id));
     final controller = ref.read(diagramProvider(widget.tab.id).notifier);
+    final tabId = widget.tab.id;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _Toolbar(
+          tab: widget.tab,
           state: state,
           scale: _scale,
           onFit: () => _canvas.currentState?.fit(),
           onZoom: (factor) => _canvas.currentState?.zoomBy(factor),
           onRelayout: controller.relayout,
           onRefresh: () => unawaited(controller.load(refresh: true)),
+          onShowHidden: controller.showAll,
+          onSave: () => unawaited(saveDiagramFlow(context, ref, tabId)),
+          onExport: (format) =>
+              unawaited(exportDiagramFlow(context, ref, tabId, format)),
         ),
         const Divider(height: 1),
         Expanded(
@@ -80,13 +108,14 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
             ),
             DiagramReady() => DiagramCanvas(
               key: _canvas,
-              graph: state.graph,
-              rects: state.rects,
+              graph: state.visibleGraph,
+              rects: state.visibleRects,
               selected: state.selected,
-              layoutRevision: state.layoutRevision,
+              fitKey: (state.graph, state.layoutRevision),
               onSelect: controller.select,
               onMoveTable: controller.moveTable,
               onOpenTable: (name) => _openTable(state, name),
+              onTableMenu: (name, at) => unawaited(_tableMenu(state, name, at)),
               onScaleChanged: (s) => _scale.value = s,
             ),
           },
@@ -98,20 +127,28 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
 
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
+    required this.tab,
     required this.state,
     required this.scale,
     required this.onFit,
     required this.onZoom,
     required this.onRelayout,
     required this.onRefresh,
+    required this.onShowHidden,
+    required this.onSave,
+    required this.onExport,
   });
 
+  final EditorTab tab;
   final DiagramState state;
   final ValueNotifier<double> scale;
   final VoidCallback onFit;
   final ValueChanged<double> onZoom;
   final VoidCallback onRelayout;
   final VoidCallback onRefresh;
+  final VoidCallback onShowHidden;
+  final VoidCallback onSave;
+  final ValueChanged<ExportFormat> onExport;
 
   @override
   Widget build(BuildContext context) {
@@ -119,20 +156,52 @@ class _Toolbar extends StatelessWidget {
     final ready = current is DiagramReady ? current : null;
     final shown = ready != null && !ready.isEmpty;
     final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final file = tab.diagramFile;
     return SizedBox(
       height: 40,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
           children: [
-            if (ready != null)
+            if (ready != null) ...[
               Text(
                 '${ready.graph.tables.length} tables · '
                 '${ready.graph.relationCount} relations',
                 key: const Key('diagram-summary'),
                 style: text.labelLarge,
               ),
+              const SizedBox(width: 12),
+              Text(
+                [
+                  if (file != null) diagramNameOf(file),
+                  if (ready.dirty) file == null ? 'not saved' : 'changed',
+                ].join(' · '),
+                key: const Key('diagram-saved-state'),
+                style: text.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              if (ready.notice != null) ...[
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    ready.notice!,
+                    key: const Key('diagram-notice'),
+                    overflow: TextOverflow.ellipsis,
+                    style: text.labelMedium?.copyWith(color: colors.error),
+                  ),
+                ),
+              ],
+            ],
             const Spacer(),
+            if (ready != null && ready.hidden.isNotEmpty)
+              TextButton.icon(
+                key: const Key('diagram-show-hidden'),
+                onPressed: onShowHidden,
+                icon: const Icon(Icons.visibility_outlined, size: 18),
+                label: Text('Show ${ready.hidden.length} hidden'),
+              ),
             IconButton(
               key: const Key('diagram-zoom-out'),
               tooltip: 'Zoom out (−)',
@@ -174,6 +243,31 @@ class _Toolbar extends StatelessWidget {
               tooltip: 'Reload from the database',
               icon: const Icon(Icons.refresh, size: 18),
               onPressed: state is DiagramLoading ? null : onRefresh,
+            ),
+            IconButton(
+              key: const Key('diagram-save'),
+              tooltip: 'Save diagram to the workspace (${primaryLabel}S)',
+              icon: const Icon(Icons.save_outlined, size: 18),
+              onPressed: ready != null ? onSave : null,
+            ),
+            PopupMenuButton<ExportFormat>(
+              key: const Key('diagram-export'),
+              tooltip: 'Export',
+              enabled: shown,
+              icon: const Icon(Icons.ios_share, size: 18),
+              onSelected: onExport,
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  key: const Key('diagram-export-svg'),
+                  value: ExportFormat.svg,
+                  child: Text('Export as SVG ($primaryLabel⇧E)'),
+                ),
+                PopupMenuItem(
+                  key: const Key('diagram-export-png'),
+                  value: ExportFormat.png,
+                  child: Text('Export as PNG ($primaryLabel⌥⇧E)'),
+                ),
+              ],
             ),
           ],
         ),

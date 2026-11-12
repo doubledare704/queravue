@@ -1,4 +1,4 @@
-import 'package:flutter/painting.dart' show Axis;
+import 'package:flutter/widgets.dart' show Axis, BuildContext;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +10,9 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/presentation/connection_actions.dart';
 import '../../documents/application/document_actions.dart';
+import '../../diagram/application/diagram_controller.dart';
+import '../../diagram/data/export_target.dart';
+import '../../diagram/presentation/diagram_flows.dart';
 import '../../editor/application/editor_actions.dart';
 import '../../editor/application/editor_layout_controller.dart';
 import '../../editor/application/editor_tabs.dart';
@@ -31,6 +34,39 @@ bool _hasActiveTab(ActionWatch watch) => _activeTab(watch) != null;
 
 bool _inCollectionTab(ActionWatch watch) =>
     _activeTab(watch)?.isCollection ?? false;
+
+bool _inDiagramTab(ActionWatch watch) => _activeTab(watch)?.isDiagram ?? false;
+
+bool _diagramShows(ActionWatch watch, bool Function(DiagramReady) test) {
+  final tab = _activeTab(watch);
+  if (tab == null || !tab.isDiagram) return false;
+  return watch(
+    diagramProvider(tab.id).select((s) => s is DiagramReady && test(s)),
+  );
+}
+
+bool _canExportDiagram(ActionWatch watch) =>
+    _diagramShows(watch, (s) => !s.isEmpty);
+
+bool _inSavableTab(ActionWatch watch) =>
+    _inScriptTab(watch) || _inDiagramTab(watch);
+
+Future<void> _save(BuildContext context, WidgetRef ref, {required bool as}) {
+  final diagram = activeDiagramTab(ref);
+  if (diagram != null) {
+    return saveDiagramFlow(context, ref, diagram.id, saveAs: as);
+  }
+  return as
+      ? saveActiveTabAsFlow(context, ref)
+      : saveActiveTabFlow(context, ref);
+}
+
+Future<void> _export(BuildContext context, WidgetRef ref, ExportFormat format) {
+  final diagram = activeDiagramTab(ref);
+  return diagram == null
+      ? Future.value()
+      : exportDiagramFlow(context, ref, diagram.id, format);
+}
 
 bool _inScriptTab(ActionWatch watch) {
   final tab = _activeTab(watch);
@@ -267,6 +303,47 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       run: (context, ref) async => openSchemaDiagram(ref),
     ),
     AppAction(
+      id: 'diagram.openSaved',
+      title: 'Open saved diagram…',
+      subtitle: 'Diagrams saved in .queravue/diagrams',
+      category: ActionCategory.view,
+      run: openSavedDiagramFlow,
+    ),
+    AppAction(
+      id: 'diagram.exportSvg',
+      title: 'Export diagram as SVG',
+      category: ActionCategory.view,
+      defaultChord: _primary(LogicalKeyboardKey.keyE, shift: true),
+      enabledWhen: _canExportDiagram,
+      run: (context, ref) => _export(context, ref, ExportFormat.svg),
+    ),
+    AppAction(
+      id: 'diagram.exportPng',
+      title: 'Export diagram as PNG',
+      category: ActionCategory.view,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.keyE,
+        primary: true,
+        alt: true,
+        shift: true,
+      ),
+      enabledWhen: _canExportDiagram,
+      run: (context, ref) => _export(context, ref, ExportFormat.png),
+    ),
+    AppAction(
+      id: 'diagram.showHidden',
+      title: 'Show hidden tables',
+      subtitle: 'Schema diagram',
+      category: ActionCategory.view,
+      enabledWhen: (watch) => _diagramShows(watch, (s) => s.hidden.isNotEmpty),
+      run: (context, ref) async {
+        final diagram = activeDiagramTab(ref);
+        if (diagram != null) {
+          ref.read(diagramProvider(diagram.id).notifier).showAll();
+        }
+      },
+    ),
+    AppAction(
       id: 'workspace.open',
       title: 'Open workspace file',
       category: ActionCategory.workspace,
@@ -296,19 +373,19 @@ final builtinActionsProvider = Provider<List<AppAction>>(
     ),
     AppAction(
       id: 'workspace.save',
-      enabledWhen: _inScriptTab,
+      enabledWhen: _inSavableTab,
       title: 'Save to workspace',
       category: ActionCategory.workspace,
       defaultChord: _primary(LogicalKeyboardKey.keyS),
-      run: saveActiveTabFlow,
+      run: (context, ref) => _save(context, ref, as: false),
     ),
     AppAction(
       id: 'workspace.saveAs',
-      enabledWhen: _inScriptTab,
+      enabledWhen: _inSavableTab,
       title: 'Save to workspace as…',
       category: ActionCategory.workspace,
       defaultChord: _primary(LogicalKeyboardKey.keyS, shift: true),
-      run: saveActiveTabAsFlow,
+      run: (context, ref) => _save(context, ref, as: true),
     ),
     AppAction(
       id: 'palette.open',

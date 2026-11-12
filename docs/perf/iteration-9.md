@@ -45,6 +45,19 @@ The test asserts the open time and a p90 UI frame time under 8 ms in profile mod
 
 Layout alone (unit test, debug mode): 100 tables in 0.3 ms, 500 tables in 1.4 ms (budget 100 ms for 100 tables), so it stays on the UI thread.
 
+## PR 4: export (app, profile build)
+
+Same run as PR 3 (`make test-perf-diagram`), exporting what the diagram shows with the functions the export actions use, file writing excluded.
+
+| Schema | SVG | PNG |
+|---|---|---|
+| `large`: 500 tables, 480 relations | 17 ms, 1.9 MB | 1.07 s, 5,713 × 4,202 px at 0.58 px per unit (24 MP cap), 6.3 MB |
+| `public`: 9 tables, 2 relations | under 1 ms, 11 KB | 0.15 s, 3,684 × 824 px at 2 px per unit, 0.3 MB |
+
+The test asserts SVG under 1 s and PNG under 5 s in profile mode. Making the PNG blocks no frame for long: the picture is recorded on the UI thread in about the time of one frame, the encoding happens off it. Peak memory during a 24 MP export was not measured.
+
+Two of nine local runs of this test stalled until the 5-minute timeout, and one took 77 s; the stall was never caught in the act. The likely cause is the test's `pumpAndSettle` after selecting the connection, which never returns while a spinner in the live schema tree keeps animating; it now pumps once. Four runs after the change passed in about 10 s each. That is too few to call the stall gone.
+
 ## Not measured yet
 - Memory of the app with a 500-table diagram open.
 - The diagram perf test is local only (`make test-perf-diagram`), not in CI.

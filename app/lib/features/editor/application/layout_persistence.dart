@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/panes/pane_sizes.dart';
 import '../../connections/application/connections_controller.dart';
+import '../../schema/domain/schema_models.dart';
 import '../../workspace/application/tab_files.dart';
 import '../../workspace/data/workspace_repository.dart';
 import '../../workspace/domain/workspace_models.dart';
@@ -25,7 +26,7 @@ class _Unloaded {
   final String? draft;
 }
 
-/// Saves the open query and shell tabs and how they are split to
+/// Saves the open query, shell and diagram tabs and how they are split to
 /// `.queravue/layout.json` in the first workspace root, and puts them back on
 /// the next start. Table, collection and designer tabs need a live session
 /// and are not restored.
@@ -137,9 +138,33 @@ class LayoutPersistence {
     final kind = switch (raw['kind']) {
       'query' => TabKind.query,
       'shell' => TabKind.shell,
+      'diagram' => TabKind.diagram,
       _ => null,
     };
     if (kind == null) return null;
+    final fileJson = raw['file'];
+    final file =
+        fileJson is Map<String, Object?> &&
+            fileJson['root'] is String &&
+            fileJson['path'] is String
+        ? FilePath(fileJson['root']! as String, fileJson['path']! as String)
+        : null;
+    if (kind == TabKind.diagram) {
+      String text(String key) => raw[key] is String ? raw[key]! as String : '';
+      return tabs
+          .restoreTab(
+            connectionId: connectionId,
+            kind: kind,
+            title: text('title').isEmpty ? 'Diagram' : text('title'),
+            tableRef: TableRef(
+              database: text('database'),
+              schema: text('schema'),
+              table: '',
+            ),
+            diagramFile: file,
+          )
+          .id;
+    }
     final tab = tabs.restoreTab(
       connectionId: connectionId,
       kind: kind,
@@ -148,13 +173,6 @@ class LayoutPersistence {
           ? raw['database']! as String
           : '',
     );
-    final fileJson = raw['file'];
-    final file =
-        fileJson is Map<String, Object?> &&
-            fileJson['root'] is String &&
-            fileJson['path'] is String
-        ? FilePath(fileJson['root']! as String, fileJson['path']! as String)
-        : null;
     final draft = raw['draft'] is String ? raw['draft']! as String : null;
     if (file != null) {
       _unloaded[tab.id] = _Unloaded(file: file, draft: draft);
@@ -202,7 +220,7 @@ class LayoutPersistence {
     final connections = <String, Object?>{};
     final byConnection = <String, List<EditorTab>>{};
     for (final t in tabsState.tabs) {
-      if (t.isQuery || t.isShell) {
+      if (t.isQuery || t.isShell || t.isDiagram) {
         byConnection.putIfAbsent(t.connectionId, () => []).add(t);
       }
     }
@@ -223,6 +241,16 @@ class LayoutPersistence {
   }
 
   Map<String, Object?> _tabJson(EditorTab tab) {
+    if (tab.isDiagram) {
+      final file = tab.diagramFile;
+      return {
+        'kind': 'diagram',
+        'title': tab.title,
+        'database': tab.tableRef?.database ?? '',
+        'schema': tab.tableRef?.schema ?? '',
+        if (file != null) 'file': {'root': file.root, 'path': file.path},
+      };
+    }
     final pending = _unloaded[tab.id];
     final bound = _ref.read(tabFileProvider(tab.id));
     final file = pending?.file ?? bound?.file;
