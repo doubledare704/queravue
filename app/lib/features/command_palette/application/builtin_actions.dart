@@ -45,6 +45,14 @@ bool _diagramShows(ActionWatch watch, bool Function(DiagramReady) test) {
   );
 }
 
+bool _canDesignDiagram(ActionWatch watch) {
+  final tab = _activeTab(watch);
+  return tab != null &&
+      tab.isDiagram &&
+      watch(connectionCanDesignDiagramProvider(tab.connectionId)) &&
+      _diagramShows(watch, (_) => true);
+}
+
 bool _canExportDiagram(ActionWatch watch) =>
     _diagramShows(watch, (s) => !s.isEmpty);
 
@@ -341,6 +349,43 @@ final builtinActionsProvider = Provider<List<AppAction>>(
         if (diagram != null) {
           ref.read(diagramProvider(diagram.id).notifier).showAll();
         }
+      },
+    ),
+    AppAction(
+      id: 'diagram.newTable',
+      title: 'New table on the diagram',
+      subtitle: 'Design mode: drafted until you apply it',
+      category: ActionCategory.view,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.keyT,
+        primary: true,
+        alt: true,
+      ),
+      enabledWhen: _canDesignDiagram,
+      run: (context, ref) async {
+        final diagram = activeDiagramTab(ref);
+        if (diagram != null) await newDraftTableFlow(context, ref, diagram.id);
+      },
+    ),
+    AppAction(
+      id: 'diagram.reviewDraft',
+      title: 'Review and apply diagram changes',
+      subtitle: 'Shows the DDL of the drafted tables and relations',
+      category: ActionCategory.view,
+      enabledWhen: (watch) => _diagramShows(watch, (s) => !s.draft.isEmpty),
+      run: (context, ref) async {
+        final diagram = activeDiagramTab(ref);
+        if (diagram != null) await reviewDraftFlow(context, ref, diagram.id);
+      },
+    ),
+    AppAction(
+      id: 'diagram.discardDraft',
+      title: 'Discard diagram draft',
+      category: ActionCategory.view,
+      enabledWhen: (watch) => _diagramShows(watch, (s) => !s.draft.isEmpty),
+      run: (context, ref) async {
+        final diagram = activeDiagramTab(ref);
+        if (diagram != null) await discardDraftFlow(context, ref, diagram.id);
       },
     ),
     AppAction(

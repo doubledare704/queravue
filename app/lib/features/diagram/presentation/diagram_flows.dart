@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../editor/application/editor_tabs.dart';
+import '../../schema/domain/schema_models.dart';
 import '../../workspace/application/tab_files.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../../workspace/presentation/workspace_dialogs.dart';
@@ -15,7 +16,9 @@ import '../application/saved_diagram_opener.dart';
 import '../data/diagram_files.dart';
 import '../data/export_target.dart';
 import '../domain/diagram_models.dart';
+import '../../designer/presentation/ddl_preview_dialog.dart';
 import 'diagram_export.dart';
+import 'draft_dialogs.dart';
 
 void _say(BuildContext context, String message) {
   ScaffoldMessenger.maybeOf(context)
@@ -209,4 +212,166 @@ Future<void> openSavedDiagramFlow(BuildContext context, WidgetRef ref) async {
   if (picked == null || !context.mounted) return;
   final out = await openSavedDiagram(ref.read, picked);
   if (out is OpenFailed && context.mounted) _say(context, out.message);
+}
+
+DiagramReady? _ready(WidgetRef ref, String tabId) {
+  final state = ref.read(diagramProvider(tabId));
+  return state is DiagramReady ? state : null;
+}
+
+/// Drafts a new table and puts it at [at], in diagram coordinates.
+Future<void> newDraftTableFlow(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId, {
+  Offset? at,
+}) async {
+  final controller = ref.read(diagramProvider(tabId).notifier);
+  if (_ready(ref, tabId) == null) {
+    _say(context, 'The diagram is still loading.');
+    return;
+  }
+  final table = await showDraftTableDialog(
+    context,
+    taken: controller.tableNames,
+  );
+  if (table != null) controller.addDraftTable(table, at: at);
+}
+
+Future<void> editDraftTableFlow(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId,
+  String name,
+) async {
+  final ready = _ready(ref, tabId);
+  final initial = ready?.draft.table(name);
+  if (initial == null) return;
+  final controller = ref.read(diagramProvider(tabId).notifier);
+  final table = await showDraftTableDialog(
+    context,
+    initial: initial,
+    taken: {...controller.tableNames}..remove(name),
+  );
+  if (table != null) controller.replaceDraftTable(name, table);
+}
+
+/// Drafts a reference from [from] to a table the user picks.
+Future<void> addRelationFlow(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId,
+  String from,
+) async {
+  final ready = _ready(ref, tabId);
+  final table = ready?.table(from);
+  if (ready == null || table == null) return;
+  final relation = await showDraftRelationDialog(
+    context,
+    from: table,
+    targets: [
+      for (final t in ready.drawnGraph.tables)
+        if (t.type == SchemaObjectType.table) t,
+    ],
+    takenNames: {
+      for (final t in ready.drawnGraph.tables)
+        for (final r in t.relations) r.name,
+    },
+  );
+  if (relation != null) {
+    ref.read(diagramProvider(tabId).notifier).addDraftRelation(relation);
+  }
+}
+
+/// Shows the DDL of the draft and applies it on the user's word.
+Future<void> reviewDraftFlow(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId,
+) async {
+  final ready = _ready(ref, tabId);
+  if (ready == null || ready.draft.isEmpty) {
+    _say(context, 'Nothing is drafted on this diagram.');
+    return;
+  }
+  final controller = ref.read(diagramProvider(tabId).notifier);
+  await showDialog<void>(
+    context: context,
+    builder: (_) => DdlPreviewDialog(
+      preview: controller.previewDraft,
+      apply: () => controller.applyDraft(confirmed: true),
+    ),
+  );
+}
+
+Future<void> discardDraftFlow(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId,
+) async {
+  final ready = _ready(ref, tabId);
+  if (ready == null || ready.draft.isEmpty) return;
+  final n = ready.draft.size;
+  final discard = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Discard the draft?'),
+      content: Text(
+        'The $n drafted ${n == 1 ? 'change' : 'changes'} on this diagram will be lost.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Keep'),
+        ),
+        FilledButton(
+          key: const Key('diagram-discard-confirm'),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Discard'),
+        ),
+      ],
+    ),
+  );
+  if (discard ?? false) {
+    ref.read(diagramProvider(tabId).notifier).discardDraft();
+  }
+}
+
+/// What the table menu offers in design mode for [table].
+List<(String, String)> draftMenuItems(DiagramReady ready, String table) {
+  final drawn = ready.table(table);
+  return [
+    if (drawn != null && drawn.type == SchemaObjectType.table)
+      ('relation', 'Add relation…'),
+    if (ready.draft.table(table) != null) ...[
+      ('edit', 'Edit table…'),
+      ('remove', 'Remove drafted table'),
+    ],
+    for (final (i, r) in ready.draft.relationsFrom(table).indexed)
+      ('unrelate-$i', 'Remove relation to ${r.toTable}'),
+  ];
+}
+
+Future<void> draftMenuAction(
+  BuildContext context,
+  WidgetRef ref,
+  String tabId,
+  String table,
+  String choice,
+) async {
+  final controller = ref.read(diagramProvider(tabId).notifier);
+  switch (choice) {
+    case 'relation':
+      await addRelationFlow(context, ref, tabId, table);
+    case 'edit':
+      await editDraftTableFlow(context, ref, tabId, table);
+    case 'remove':
+      controller.removeDraftTable(table);
+    default:
+      final i = int.tryParse(choice.replaceFirst('unrelate-', ''));
+      final relations = _ready(ref, tabId)?.draft.relationsFrom(table) ?? [];
+      if (i != null && i < relations.length) {
+        controller.removeDraftRelation(relations[i]);
+      }
+  }
 }

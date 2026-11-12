@@ -1,6 +1,6 @@
 # Schema diagrams
 
-Status: the diagram, export and saved diagrams work for SQL engines. Design mode and the Mongo diagram are not built yet; `PreviewDiagramDDL` / `ApplyDiagramDDL` still answer UNSUPPORTED. This page fills in as the Iteration 9 PRs land.
+Status: the diagram, export, saved diagrams and design mode work for SQL engines. The Mongo diagram is not built yet. This page fills in as the Iteration 9 PRs land.
 
 ## Using the diagram
 - Open it from the schema tree (right-click a schema, "Open diagram"), from the palette ("Open schema diagram") or with `⌘⇧D`. The palette and the shortcut use the schema of the active tab, or the connection's default schema. One diagram tab per schema.
@@ -14,11 +14,28 @@ Status: the diagram, export and saved diagrams work for SQL engines. Design mode
 
 ## Saving
 - `⌘S` on a diagram tab saves it to `.queravue/diagrams/<name>.json` in the first workspace root, asking for a name the first time; `⌘⇧S` saves under a new name. A name that is taken asks before replacing the file. The tab takes the name; the toolbar shows it, with "changed" after a table moved or was hidden. Unsaved diagrams show "not saved".
-- The file keeps the connection (id and name), database, schema, the top-left corner of every table and the hidden tables, one table per line and sorted, so it diffs well in Git. It does not copy the schema.
+- The file keeps the connection (id and name), database, schema, the top-left corner of every table and the hidden tables, one table per line and sorted, so it diffs well in Git. It does not copy the schema. A draft is kept under `draft`, one drafted table or relation per line.
 - Opening a saved diagram (palette "Open saved diagram…", or the file from the workspace tree) reads the schema again: known tables go where they were saved, tables added since are laid out beside them, dropped tables are left out. The connection is found by id, else by name, so a diagram works on another machine with a connection of the same name.
 - A diagram tab, saved or not, comes back after a restart, and loads when it is first shown. A saved diagram whose file is gone or broken opens with the automatic layout and says so in the toolbar.
 - Unsaved moves are lost when the tab closes or the app quits; nothing asks first.
 - "Reload" keeps the current arrangement and reads only the schema again.
+
+## Design mode
+Draw new tables and relations on the diagram, review the DDL, apply it. Available when the connection draws diagrams and runs SQL (`schema_graph` and `execute` capabilities).
+- **New table:** the toolbar button, the palette entry "New table on the diagram" or `⌘⌥T`; on an empty schema, the button in the middle. A dialog asks for the name and the columns (name, type, default, nullable, primary key, auto-increment), starting with `id integer` as the key. The table appears near the middle of the view, where it covers nothing, with a dashed outline and a differently coloured header.
+- **Relation:** right-click a table, "Add relation…", pick the referenced table and what happens on delete. The relation points at the referenced table's primary key through a column named `<table>_<key>`: reused when the table has it, added otherwise, with the key's type (`serial` becomes `integer`). Only tables with a one-column primary key can be referenced here; composite references go through the table designer. A relation can start at a drafted table or an existing one; on an existing table it adds the column and the foreign key.
+- Drafted columns and relations are drawn in the primary colour, relations dashed.
+- **Edit:** double-click a drafted table, or right-click it for "Edit table…", "Remove drafted table" and "Remove relation to …". Renaming a drafted table carries its relations along.
+- **Review:** "Review n changes" in the toolbar (or the palette entry "Review and apply diagram changes") shows the statements the core will run, its warnings, and whether they run in one transaction. Apply runs them; the dialog is the confirmation for destructive statements and connections flagged production, as in the table designer. If a statement fails, the error shows and the draft stays.
+- After an apply the draft is cleared and the schema read again; the new tables stay where they were drawn.
+- "Discard" in the toolbar drops the whole draft after asking.
+- The draft is saved with the diagram (see Saving) and survives "Reload". A drafted table that exists in the database by the time the diagram loads is dropped from the draft.
+
+### How the statements are ordered
+The core receives the changes per table and orders them (`core/internal/sqldialect/diagram_ddl.go`):
+- New tables are created first, then the other changes, then every foreign key as `ALTER TABLE … ADD CONSTRAINT`. A table can reference one drafted after it, and two tables can reference each other.
+- SQLite cannot add a foreign key to an existing table, but does not check the referenced table when one is created. There, foreign keys stay inside `CREATE TABLE`, and created tables are ordered so a table follows those it references. A relation from an existing SQLite table is refused at review with the reason.
+- PostgreSQL, SQL Server and SQLite run the script in one transaction. MySQL, MariaDB, TiDB and CockroachDB run the statements one at a time; the review says so, and after a failure the error says how many statements stay applied.
 
 ## Export
 - `⌘⇧E` exports SVG, `⌘⌥⇧E` PNG; also in the toolbar's export menu and the palette. The file goes wherever the save dialog says, outside the workspace.
@@ -26,6 +43,7 @@ Status: the diagram, export and saved diagrams work for SQL engines. Design mode
 - Exports use the light theme, so they read well in documents and on paper.
 - PNG is drawn at twice the screen size when that stays under 24 megapixels and 16,384 px a side, smaller when it does not; the message after an export says the size and the scale.
 - SVG text widths are estimated, so long names and types are cut with `…` a little earlier than on screen. The font is the system sans-serif.
+- Drafted tables are exported too. PNG draws them as on screen; SVG draws them like the other tables.
 - Loading shows the table count and can be cancelled.
 
 ## How it is drawn
@@ -39,13 +57,12 @@ Status: the diagram, export and saved diagrams work for SQL engines. Design mode
 - A relation to a table in another schema is not drawn.
 
 ## What is still to come
-- **Design mode:** draw tables and relations, review the generated DDL, apply it. The same confirmation rules as the table designer apply.
 - **Mongo:** collections with their sampled fields; references between collections are guesses and are drawn as such.
 
 ## Contract
 `proto/queravue/v1/diagram.proto`:
 - `GetSchemaGraph` streams the tables of a schema in batches, each with columns and relations, and progress counters.
-- `PreviewDiagramDDL` and `ApplyDiagramDDL` take `SchemaChange` steps for several tables; the core orders the statements.
+- `PreviewDiagramDDL` and `ApplyDiagramDDL` take `SchemaChange` steps for several tables, one entry per table; the core orders the statements as above. A table listed twice, an entry without changes and a change the engine cannot express are refused in band (INVALID or UNSUPPORTED). They share the planning, confirmation, history and cache invalidation of `SchemaDesignService`.
 
 The app enables diagrams from the `schema_graph` capability.
 

@@ -81,6 +81,9 @@ class DiagramCanvasState extends State<DiagramCanvas> {
   }
 
   /// Shows the whole diagram, never magnified beyond its natural size.
+  /// The diagram point in the middle of the view.
+  Offset get viewCenter => (_size.center(Offset.zero) - offset) / scale;
+
   void fit() {
     final bounds = _bounds;
     if (bounds.isEmpty || _size.isEmpty) return;

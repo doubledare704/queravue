@@ -47,37 +47,91 @@ type designPlan struct {
 	script        sqldialect.Script
 	transactional bool
 	destructive   bool
+	refs          []*queravuev1.TableRef
 }
 
-func (s *SchemaDesignService) plan(ctx context.Context, sessionID string, ref *queravuev1.TableRef, changes []*queravuev1.SchemaChange) (*designPlan, *queravuev1.AdminError, error) {
+func (s *SchemaDesignService) designSession(sessionID string) (*session.Session, error) {
 	sess, err := s.sessions.Get(sessionID)
 	if err != nil {
-		return nil, nil, status.Error(codes.NotFound, "session not found")
-	}
-	if ref.GetTable() == "" {
-		return nil, nil, status.Error(codes.InvalidArgument, "table reference is required")
+		return nil, status.Error(codes.NotFound, "session not found")
 	}
 	if sess.Dialect == nil {
-		return nil, nil, status.Error(codes.FailedPrecondition, "connection cannot design tables")
+		return nil, status.Error(codes.FailedPrecondition, "connection cannot design tables")
 	}
+	return sess, nil
+}
+
+func convertChanges(changes []*queravuev1.SchemaChange) ([]sqldialect.Change, error) {
 	converted := make([]sqldialect.Change, 0, len(changes))
 	for _, c := range changes {
 		ch, err := changeFromProto(c)
 		if err != nil {
-			return nil, adminInvalid(err.Error()), nil
+			return nil, err
 		}
 		converted = append(converted, ch)
 	}
-	target := sqldialect.Target{Database: ref.GetDatabase(), Schema: ref.GetSchema(), Table: ref.GetTable()}
-	script, err := sqldialect.BuildDDL(sess.Dialect, target, s.currentTable(ctx, sess, ref, converted), converted)
+	return converted, nil
+}
+
+func scriptError(err error) *queravuev1.AdminError {
+	var unsupported *sqldialect.UnsupportedError
+	if errors.As(err, &unsupported) {
+		return &queravuev1.AdminError{Kind: queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED, Message: err.Error()}
+	}
+	return adminInvalid(err.Error())
+}
+
+func (s *SchemaDesignService) plan(ctx context.Context, sessionID string, ref *queravuev1.TableRef, changes []*queravuev1.SchemaChange) (*designPlan, *queravuev1.AdminError, error) {
+	sess, err := s.designSession(sessionID)
 	if err != nil {
-		var unsupported *sqldialect.UnsupportedError
-		if errors.As(err, &unsupported) {
-			return nil, &queravuev1.AdminError{Kind: queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED, Message: err.Error()}, nil
-		}
+		return nil, nil, err
+	}
+	if ref.GetTable() == "" {
+		return nil, nil, status.Error(codes.InvalidArgument, "table reference is required")
+	}
+	converted, err := convertChanges(changes)
+	if err != nil {
 		return nil, adminInvalid(err.Error()), nil
 	}
-	p := &designPlan{sess: sess, script: script, transactional: script.Transactional}
+	script, err := sqldialect.BuildDDL(sess.Dialect, targetOf(ref), s.currentTable(ctx, sess, ref, converted), converted)
+	if err != nil {
+		return nil, scriptError(err), nil
+	}
+	return s.finishPlan(sess, script, []*queravuev1.TableRef{ref}), nil, nil
+}
+
+func (s *SchemaDesignService) planTables(ctx context.Context, sessionID string, tables []*queravuev1.TableChanges) (*designPlan, *queravuev1.AdminError, error) {
+	sess, err := s.designSession(sessionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	converted := make([]sqldialect.TableChanges, 0, len(tables))
+	refs := make([]*queravuev1.TableRef, 0, len(tables))
+	for _, t := range tables {
+		changes, err := convertChanges(t.GetChanges())
+		if err != nil {
+			return nil, adminInvalid(t.GetTableRef().GetTable() + ": " + err.Error()), nil
+		}
+		tc := sqldialect.TableChanges{Target: targetOf(t.GetTableRef()), Changes: changes}
+		if len(changes) > 0 && t.GetTableRef().GetTable() != "" {
+			tc.Current = s.currentTable(ctx, sess, t.GetTableRef(), changes)
+		}
+		converted = append(converted, tc)
+		refs = append(refs, t.GetTableRef())
+	}
+	script, err := sqldialect.BuildDiagramDDL(sess.Dialect, converted)
+	if err != nil {
+		return nil, scriptError(err), nil
+	}
+	return s.finishPlan(sess, script, refs), nil, nil
+}
+
+func targetOf(ref *queravuev1.TableRef) sqldialect.Target {
+	return sqldialect.Target{Database: ref.GetDatabase(), Schema: ref.GetSchema(), Table: ref.GetTable()}
+}
+
+func (s *SchemaDesignService) finishPlan(sess *session.Session, script sqldialect.Script, refs []*queravuev1.TableRef) *designPlan {
+	p := &designPlan{sess: sess, script: script, transactional: script.Transactional, refs: refs}
 	if t, ok := engine.As[DDLTransactionality](sess.Conn); ok && !t.TransactionalDDL() {
 		p.transactional = false
 		if script.Transactional {
@@ -87,7 +141,7 @@ func (s *SchemaDesignService) plan(ctx context.Context, sessionID string, ref *q
 	for _, st := range script.Statements {
 		p.destructive = p.destructive || st.Destructive
 	}
-	return p, nil, nil
+	return p
 }
 
 func (s *SchemaDesignService) currentTable(ctx context.Context, sess *session.Session, ref *queravuev1.TableRef, changes []sqldialect.Change) *engine.TableDetails {
@@ -132,38 +186,67 @@ func (s *SchemaDesignService) ApplyDDL(ctx context.Context, req *queravuev1.Appl
 	if aerr != nil {
 		return &queravuev1.ApplyDDLResponse{Error: aerr}, nil
 	}
-	resp := &queravuev1.ApplyDDLResponse{Statements: statementsToProto(p.script.Statements), Transactional: p.transactional}
-	if !req.GetConfirmed() {
+	executed, transactional, aerr := s.run(ctx, p, req.GetConfirmed())
+	return &queravuev1.ApplyDDLResponse{Statements: statementsToProto(p.script.Statements), ExecutedStatements: executed, Transactional: transactional, Error: aerr}, nil
+}
+
+func (s *SchemaDesignService) run(ctx context.Context, p *designPlan, confirmed bool) (uint32, bool, *queravuev1.AdminError) {
+	if !confirmed {
 		switch {
 		case p.destructive:
-			resp.Error = adminConfirmation("apply schema changes", "These changes can remove data or structure. Confirmation is required.")
-			return resp, nil
+			return 0, p.transactional, adminConfirmation("apply schema changes", "These changes can remove data or structure. Confirmation is required.")
 		case isProduction(ctx, s.connections, p.sess):
-			resp.Error = adminConfirmation("apply schema changes", "This connection is flagged as production. Confirmation is required to change its schema.")
-			return resp, nil
+			return 0, p.transactional, adminConfirmation("apply schema changes", "This connection is flagged as production. Confirmation is required to change its schema.")
 		}
 	}
 	ex, ok := engine.As[engine.Executor](p.sess.Conn)
 	if !ok {
-		return nil, status.Error(codes.FailedPrecondition, "connection cannot execute statements")
+		return 0, p.transactional, adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED, "connection cannot execute statements")
 	}
 	sctx, finish, err := p.sess.Begin(ctx)
 	if err != nil {
-		resp.Error = toAdminError(err)
-		return resp, nil
+		return 0, p.transactional, toAdminError(err)
 	}
 	defer finish()
 
-	ref := req.GetTableRef()
+	var executed uint32
+	var aerr *queravuev1.AdminError
 	if p.transactional {
-		resp.ExecutedStatements, resp.Error = s.runInTransaction(sctx, ex, p)
+		executed, aerr = s.runInTransaction(sctx, ex, p)
 	} else {
-		resp.ExecutedStatements, resp.Error = s.runOneByOne(sctx, ex, p)
+		executed, aerr = s.runOneByOne(sctx, ex, p)
 	}
-	if resp.ExecutedStatements > 0 && s.cache != nil {
-		s.cache.Invalidate(p.sess.ID, ref)
+	if executed > 0 && s.cache != nil {
+		for _, ref := range p.refs {
+			s.cache.Invalidate(p.sess.ID, ref)
+		}
 	}
-	return resp, nil
+	return executed, p.transactional, aerr
+}
+
+// PreviewDiagramDDL returns the ordered DDL for changes to several tables.
+func (s *SchemaDesignService) PreviewDiagramDDL(ctx context.Context, req *queravuev1.PreviewDiagramDDLRequest) (*queravuev1.PreviewDiagramDDLResponse, error) {
+	p, aerr, err := s.planTables(ctx, req.GetSessionId(), req.GetTables())
+	if err != nil {
+		return nil, err
+	}
+	if aerr != nil {
+		return &queravuev1.PreviewDiagramDDLResponse{Error: aerr}, nil
+	}
+	return &queravuev1.PreviewDiagramDDLResponse{Statements: statementsToProto(p.script.Statements), Warnings: p.script.Warnings, Transactional: p.transactional}, nil
+}
+
+// ApplyDiagramDDL runs the ordered DDL for changes to several tables.
+func (s *SchemaDesignService) ApplyDiagramDDL(ctx context.Context, req *queravuev1.ApplyDiagramDDLRequest) (*queravuev1.ApplyDiagramDDLResponse, error) {
+	p, aerr, err := s.planTables(ctx, req.GetSessionId(), req.GetTables())
+	if err != nil {
+		return nil, err
+	}
+	if aerr != nil {
+		return &queravuev1.ApplyDiagramDDLResponse{Error: aerr}, nil
+	}
+	executed, transactional, aerr := s.run(ctx, p, req.GetConfirmed())
+	return &queravuev1.ApplyDiagramDDLResponse{Statements: statementsToProto(p.script.Statements), ExecutedStatements: executed, Transactional: transactional, Error: aerr}, nil
 }
 
 func (s *SchemaDesignService) runInTransaction(ctx context.Context, ex engine.Executor, p *designPlan) (uint32, *queravuev1.AdminError) {

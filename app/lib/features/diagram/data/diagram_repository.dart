@@ -5,7 +5,11 @@ import '../../../core_client/core_connection.dart';
 import '../../../core_client/core_providers.dart';
 import '../../../core_client/gen/queravue/v1/diagram.pbgrpc.dart' as pb;
 import '../../../core_client/gen/queravue/v1/schema.pb.dart' as spb;
+import '../../admin/domain/admin_models.dart';
+import '../../designer/data/design_repository.dart';
+import '../../designer/domain/design_models.dart';
 import '../../schema/domain/schema_models.dart';
+import '../domain/diagram_draft.dart';
 import '../domain/diagram_models.dart';
 
 /// Schema graphs through the core.
@@ -18,6 +22,18 @@ abstract interface class DiagramRepository {
     String schema,
     bool refresh,
   });
+
+  /// The statements the core would run for [tables], in its order.
+  Future<AdminResult<DdlPreview>> previewDdl(
+    String sessionId,
+    List<TableChangesModel> tables,
+  );
+
+  Future<AdminResult<DdlApplied>> applyDdl(
+    String sessionId,
+    List<TableChangesModel> tables, {
+    bool confirmed = false,
+  });
 }
 
 final diagramRepositoryProvider = Provider<DiagramRepository>((ref) {
@@ -29,6 +45,84 @@ class GrpcDiagramRepository implements DiagramRepository {
   GrpcDiagramRepository(this._connection);
 
   final CoreConnection? Function() _connection;
+
+  static final _ddlOptions = CallOptions(timeout: const Duration(minutes: 5));
+
+  CoreConnection get _conn {
+    final c = _connection();
+    if (c == null) throw StateError('Core is not connected');
+    return c;
+  }
+
+  List<pb.TableChanges> _tables(List<TableChangesModel> tables) => [
+    for (final t in tables)
+      pb.TableChanges(
+        tableRef: spb.TableRef(
+          database: t.table.database,
+          schema: t.table.schema,
+          table: t.table.table,
+        ),
+        changes: t.changes.map(schemaChangeToProto).toList(),
+      ),
+  ];
+
+  @override
+  Future<AdminResult<DdlPreview>> previewDdl(
+    String sessionId,
+    List<TableChangesModel> tables,
+  ) async {
+    final resp = await _conn.diagramService.previewDiagramDDL(
+      pb.PreviewDiagramDDLRequest(
+        sessionId: sessionId,
+        tables: _tables(tables),
+      ),
+      options: _ddlOptions,
+    );
+    if (resp.hasError()) {
+      return AdminResult.failed(adminErrorFromProto(resp.error));
+    }
+    return AdminResult.ok(
+      DdlPreview(
+        statements: resp.statements.map(ddlStatementFromProto).toList(),
+        warnings: resp.warnings,
+        transactional: resp.transactional,
+      ),
+    );
+  }
+
+  @override
+  Future<AdminResult<DdlApplied>> applyDdl(
+    String sessionId,
+    List<TableChangesModel> tables, {
+    bool confirmed = false,
+  }) async {
+    final resp = await _conn.diagramService.applyDiagramDDL(
+      pb.ApplyDiagramDDLRequest(
+        sessionId: sessionId,
+        tables: _tables(tables),
+        confirmed: confirmed,
+      ),
+      options: _ddlOptions,
+    );
+    if (resp.hasError()) {
+      final error = adminErrorFromProto(resp.error);
+      if (resp.executedStatements == 0) return AdminResult.failed(error);
+      return AdminResult.failed(
+        AdminError(
+          kind: error.kind,
+          message:
+              '${error.message} (${resp.executedStatements} of ${resp.statements.length} statements were applied and stay applied.)',
+        ),
+      );
+    }
+    return AdminResult.ok(
+      DdlApplied(
+        statements: resp.statements.map(ddlStatementFromProto).toList(),
+        executed: resp.executedStatements,
+        transactional: resp.transactional,
+      ),
+    );
+  }
 
   @override
   Stream<GraphBatch> loadGraph({

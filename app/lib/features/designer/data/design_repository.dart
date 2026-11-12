@@ -56,14 +56,16 @@ class GrpcDesignRepository implements DesignRepository {
       dpb.PreviewDDLRequest(
         sessionId: sessionId,
         tableRef: _ref(ref),
-        changes: changes.map(_change).toList(),
+        changes: changes.map(schemaChangeToProto).toList(),
       ),
       options: _options,
     );
-    if (resp.hasError()) return AdminResult.failed(_error(resp.error));
+    if (resp.hasError()) {
+      return AdminResult.failed(adminErrorFromProto(resp.error));
+    }
     return AdminResult.ok(
       DdlPreview(
-        statements: resp.statements.map(_statement).toList(),
+        statements: resp.statements.map(ddlStatementFromProto).toList(),
         warnings: resp.warnings,
         transactional: resp.transactional,
       ),
@@ -81,13 +83,13 @@ class GrpcDesignRepository implements DesignRepository {
       dpb.ApplyDDLRequest(
         sessionId: sessionId,
         tableRef: _ref(ref),
-        changes: changes.map(_change).toList(),
+        changes: changes.map(schemaChangeToProto).toList(),
         confirmed: confirmed,
       ),
       options: _options,
     );
     if (resp.hasError()) {
-      final error = _error(resp.error);
+      final error = adminErrorFromProto(resp.error);
       if (resp.executedStatements == 0) return AdminResult.failed(error);
       return AdminResult.failed(
         AdminError(
@@ -99,7 +101,7 @@ class GrpcDesignRepository implements DesignRepository {
     }
     return AdminResult.ok(
       DdlApplied(
-        statements: resp.statements.map(_statement).toList(),
+        statements: resp.statements.map(ddlStatementFromProto).toList(),
         executed: resp.executedStatements,
         transactional: resp.transactional,
       ),
@@ -107,11 +109,12 @@ class GrpcDesignRepository implements DesignRepository {
   }
 }
 
-DdlStatementModel _statement(dpb.DdlStatement s) => DdlStatementModel(
-  sql: s.sql,
-  destructive: s.destructive,
-  summary: s.summary,
-);
+DdlStatementModel ddlStatementFromProto(dpb.DdlStatement s) =>
+    DdlStatementModel(
+      sql: s.sql,
+      destructive: s.destructive,
+      summary: s.summary,
+    );
 
 dpb.ColumnSpec _column(ColumnDraft c) => dpb.ColumnSpec(
   name: c.name,
@@ -153,7 +156,7 @@ spb.ReferentialAction _action(ReferentialAction a) => switch (a) {
     spb.ReferentialAction.REFERENTIAL_ACTION_UNSPECIFIED,
 };
 
-dpb.SchemaChange _change(SchemaChangeModel c) => switch (c) {
+dpb.SchemaChange schemaChangeToProto(SchemaChangeModel c) => switch (c) {
   CreateTableChange() => dpb.SchemaChange(
     createTable: dpb.CreateTable(
       design: dpb.TableDesign(
@@ -197,7 +200,7 @@ dpb.SchemaChange _change(SchemaChangeModel c) => switch (c) {
   ),
 };
 
-AdminError _error(apb.AdminError e) => AdminError(
+AdminError adminErrorFromProto(apb.AdminError e) => AdminError(
   kind: switch (e.kind) {
     apb.AdminErrorKind.ADMIN_ERROR_KIND_CONFIRMATION_REQUIRED =>
       AdminErrorKind.confirmationRequired,

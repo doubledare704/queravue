@@ -78,7 +78,7 @@ func diagramEnv(t *testing.T, conn engine.Conn) (*api.DiagramService, *session.S
 	if err != nil {
 		t.Fatal(err)
 	}
-	return api.NewDiagramService(mgr, nil), sess
+	return api.NewDiagramService(mgr, nil, nil), sess
 }
 
 func TestGetSchemaGraphStreamsBatchesThenDone(t *testing.T) {
@@ -161,16 +161,12 @@ func TestGetSchemaGraphReportsFailuresInBand(t *testing.T) {
 	}
 }
 
-func TestDiagramDDLReportsUnsupportedUntilImplemented(t *testing.T) {
+func TestDiagramDDLWithoutADesignServiceIsUnsupported(t *testing.T) {
 	svc, sess := diagramEnv(t, &fakeValidatingConn{})
 	want := queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED
 	preview, err := svc.PreviewDiagramDDL(context.Background(), &queravuev1.PreviewDiagramDDLRequest{SessionId: sess.ID})
 	if err != nil || preview.GetError().GetKind() != want {
 		t.Errorf("PreviewDiagramDDL = %v, %v; want in-band UNSUPPORTED", preview, err)
-	}
-	apply, err := svc.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{SessionId: sess.ID})
-	if err != nil || apply.GetError().GetKind() != want {
-		t.Errorf("ApplyDiagramDDL = %v, %v; want in-band UNSUPPORTED", apply, err)
 	}
 	if _, err := svc.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{SessionId: "missing"}); status.Code(err) != codes.NotFound {
 		t.Errorf("unknown session code = %v, want NotFound", status.Code(err))

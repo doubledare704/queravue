@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 
+import 'diagram_draft.dart';
 import 'diagram_layout.dart';
 import 'diagram_models.dart';
 
@@ -19,6 +20,7 @@ class SavedDiagram {
     this.schema = '',
     this.positions = const {},
     this.hidden = const {},
+    this.draft = const DiagramDraft(),
   });
 
   final String connectionId;
@@ -31,6 +33,9 @@ class SavedDiagram {
   /// Top-left corner of each table's box.
   final Map<String, Offset> positions;
   final Set<String> hidden;
+
+  /// Tables and relations designed and not applied yet.
+  final DiagramDraft draft;
 
   /// One table per line, sorted, so a diagram in Git diffs table by table.
   String toJson() {
@@ -58,8 +63,20 @@ class SavedDiagram {
       }
       out.writeln('  },');
     }
+    out.write('  "hidden": ${jsonEncode(hiddenNames)}');
+    if (!draft.isEmpty) {
+      final json = draft.toJson();
+      out
+        ..writeln(',')
+        ..writeln('  "draft": {')
+        ..write(_lines('tables', json['tables']! as List))
+        ..writeln(',')
+        ..write(_lines('relations', json['relations']! as List))
+        ..writeln()
+        ..write('  }');
+    }
     out
-      ..writeln('  "hidden": ${jsonEncode(hiddenNames)}')
+      ..writeln()
       ..writeln('}');
     return out.toString();
   }
@@ -81,6 +98,8 @@ class SavedDiagram {
     final hidden = json['hidden'] ?? const <Object?>[];
     if (connection is! String || tables is! Map<String, Object?>) return null;
     if (hidden is! List) return null;
+    final draft = DiagramDraft.fromJson(json['draft']);
+    if (draft == null) return null;
     final positions = <String, Offset>{};
     for (final e in tables.entries) {
       final p = e.value;
@@ -103,8 +122,18 @@ class SavedDiagram {
         for (final h in hidden)
           if (h is String) h,
       },
+      draft: draft,
     );
   }
+}
+
+String _lines(String key, List<Object?> items) {
+  if (items.isEmpty) return '    "$key": []';
+  return [
+    '    "$key": [',
+    [for (final i in items) '      ${jsonEncode(i)}'].join(',\n'),
+    '    ]',
+  ].join('\n');
 }
 
 /// Boxes for [graph]: the saved spot for tables the file knows, and the

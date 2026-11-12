@@ -126,13 +126,14 @@ func Serve(ctx context.Context, cfg Config) error {
 		queravuev1.RegisterShellServiceServer(srv, shellSvc)
 		queravuev1.RegisterTableServiceServer(srv, api.NewTableService(cfg.Sessions, cfg.Results, cfg.Connections, cfg.History, log))
 		queravuev1.RegisterIndexServiceServer(srv, api.NewIndexService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log))
-		queravuev1.RegisterSchemaDesignServiceServer(srv, api.NewSchemaDesignService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log))
+		design := api.NewSchemaDesignService(cfg.Sessions, cfg.Connections, cfg.History, schemaCache, log)
+		queravuev1.RegisterSchemaDesignServiceServer(srv, design)
 		queravuev1.RegisterValidationServiceServer(srv, api.NewValidationService(cfg.Sessions, cfg.Connections, cfg.History))
 		queravuev1.RegisterStatsServiceServer(srv, api.NewStatsService(cfg.Sessions))
 		queravuev1.RegisterCompletionServiceServer(srv, api.NewCompletionService(cfg.Sessions, catalogs))
 		graphs := diagram.NewStore()
 		schemaCache.OnInvalidate(graphs.Invalidate)
-		queravuev1.RegisterDiagramServiceServer(srv, api.NewDiagramService(cfg.Sessions, graphs))
+		queravuev1.RegisterDiagramServiceServer(srv, api.NewDiagramService(cfg.Sessions, graphs, design))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

@@ -1,0 +1,74 @@
+package enginetest
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/sqldialect"
+)
+
+const (
+	diagramParent = "qv_diagram_parent"
+	diagramChild  = "qv_diagram_child"
+)
+
+// diagramDDL lists the child before the table it references, and the parent
+// references itself, so the script only works if foreign keys come last.
+func diagramDDL(t *testing.T, tg Target) {
+	c := tg.connect(t)
+	d, ok := sqldialect.Of(c)
+	if !ok {
+		t.Fatal("connection has no dialect")
+	}
+	inspector, ok := engine.As[engine.SchemaInspector](c)
+	if !ok {
+		t.Fatal("connection is not a SchemaInspector")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cleanup := func() {
+		for _, name := range []string{diagramChild, diagramParent} {
+			exec(t, c, "DROP TABLE IF EXISTS "+d.QualifyTableIn(tg.Database, tg.Schema, name))
+		}
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	reference := func(name, column, table string) sqldialect.ForeignKeySpec {
+		return sqldialect.ForeignKeySpec{Name: name, Columns: []string{column}, RefSchema: tg.Schema, RefTable: table, RefColumns: []string{"id"}}
+	}
+	table := func(name string, fk sqldialect.ForeignKeySpec) sqldialect.TableChanges {
+		return sqldialect.TableChanges{
+			Target: sqldialect.Target{Database: tg.Database, Schema: tg.Schema, Table: name},
+			Changes: []sqldialect.Change{sqldialect.CreateTable{Design: sqldialect.TableDesign{
+				Columns: []sqldialect.ColumnSpec{
+					{Name: "id", TypeName: "integer"},
+					{Name: fk.Columns[0], TypeName: "integer", Nullable: true},
+				},
+				PrimaryKey:  []string{"id"},
+				ForeignKeys: []sqldialect.ForeignKeySpec{fk},
+			}}},
+		}
+	}
+	script, err := sqldialect.BuildDiagramDDL(d, []sqldialect.TableChanges{
+		table(diagramChild, reference("fk_qv_diagram_child_parent", "parent_id", diagramParent)),
+		table(diagramParent, reference("fk_qv_diagram_parent_up", "up_id", diagramParent)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range script.Statements {
+		exec(t, c, st.SQL)
+	}
+	for name, want := range map[string]string{diagramChild: diagramParent, diagramParent: diagramParent} {
+		got, err := inspector.DescribeTable(ctx, tg.Database, tg.Schema, name)
+		if err != nil {
+			t.Fatalf("describe %s: %v", name, err)
+		}
+		if len(got.ForeignKeys) != 1 || got.ForeignKeys[0].ReferencedTable != want {
+			t.Errorf("%s foreign keys = %+v, want one to %s", name, got.ForeignKeys, want)
+		}
+	}
+}

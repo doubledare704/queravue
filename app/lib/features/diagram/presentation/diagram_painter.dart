@@ -125,7 +125,8 @@ class DiagramPainter extends CustomPainter {
     }
   }
 
-  void _paintRelation(Canvas canvas, DrawnRelation r, Paint paint) {
+  void _paintRelation(Canvas canvas, DrawnRelation r, Paint relationPaint) {
+    var paint = relationPaint;
     final curve = relationCurve(
       r,
       target: tablesByName[r.relation.referencedTable],
@@ -145,7 +146,13 @@ class DiagramPainter extends CustomPainter {
         curve.end.dx,
         curve.end.dy,
       );
-    if (r.relation.inferred) {
+    if (r.relation.draft) {
+      paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = paint.strokeWidth
+        ..color = colors.primary;
+    }
+    if (r.relation.inferred || r.relation.draft) {
       _paintDashed(canvas, path, paint);
     } else {
       canvas.drawPath(path, paint);
@@ -171,10 +178,14 @@ class DiagramPainter extends CustomPainter {
     final isSelected = table.name == selected;
     final box = RRect.fromRectAndRadius(rect, const Radius.circular(6));
     final isView = table.type != SchemaObjectType.table;
-    final headerColor = isView
+    final headerColor = table.draft
+        ? colors.secondaryContainer
+        : isView
         ? colors.tertiaryContainer
         : colors.primaryContainer;
-    final onHeader = isView
+    final onHeader = table.draft
+        ? colors.onSecondaryContainer
+        : isView
         ? colors.onTertiaryContainer
         : colors.onPrimaryContainer;
     canvas.drawRRect(box, Paint()..color = colors.surfaceContainerLow);
@@ -190,13 +201,17 @@ class DiagramPainter extends CustomPainter {
         )
         ..restore();
     }
-    canvas.drawRRect(
-      box,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = (isSelected ? 2.4 : 1) / math.min(scale, 1)
-        ..color = isSelected ? colors.primary : colors.outlineVariant,
-    );
+    final outline = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (isSelected ? 2.4 : 1) / math.min(scale, 1)
+      ..color = isSelected || table.draft
+          ? colors.primary
+          : colors.outlineVariant;
+    if (table.draft && !isSelected) {
+      _paintDashed(canvas, Path()..addRRect(box), outline);
+    } else {
+      canvas.drawRRect(box, outline);
+    }
     if (!_showsTitles) return;
     if (!_showsColumns) {
       _paintLargeTitle(canvas, table, rect, onHeader);
@@ -313,10 +328,10 @@ class DiagramPainter extends CustomPainter {
       TextStyle(
         fontSize: 12,
         fontWeight: column.isPrimaryKey ? FontWeight.w600 : FontWeight.w400,
-        color: colors.onSurface,
+        color: column.draft ? colors.primary : colors.onSurface,
       ),
       width - _gutter - _rightPadding - type.width - 8,
-      column.isPrimaryKey ? 'key-name' : 'name',
+      '${column.isPrimaryKey ? 'key-name' : 'name'}${column.draft ? '-draft' : ''}',
     );
     name.paint(
       canvas,
