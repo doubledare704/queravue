@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: test-perf-completion help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-designtest-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
+.PHONY: test-perf-completion help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-design test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
