@@ -36,38 +36,38 @@ test-integration: db-up ## Run core integration tests against the docker DBs (QU
 	cd core && go test -count=1 -tags=integration ./...
 
 test-e2e: core ## Run the macOS integration test (real app + core, kill -9 recovery)
-	cd app && flutter test integration_test/core_lifecycle_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 flutter test integration_test/core_lifecycle_test.dart -d macos
 
 test-e2e-mongo: core ## Mongo UI flow against the seeded docker replica set (make db-up; --profile seed up mongo-seed)
-	cd app && flutter test integration_test/documents_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 flutter test integration_test/documents_test.dart -d macos
 
 test-e2e-designer: core ## Table designer flow on a SQLite file: design, review the DDL, apply, edit
-	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/designer_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/designer_test.dart -d macos
 
 test-e2e-designer-postgres: db-up core ## Table designer against the docker PostgreSQL: constraints, then edits
-	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/designer_postgres_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/designer_postgres_test.dart -d macos
 
 test-e2e-diagram-design: db-up core ## Diagram design mode on SQLite and the docker PostgreSQL: draft tables and a relation, apply
-	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/diagram_design_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/diagram_design_test.dart -d macos
 
 test-e2e-panels: db-up core ## Indexes, Stats and Validation sections on SQLite and the docker Mongo
-	cd app && QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/panels_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/panels_test.dart -d macos
 
 test-e2e-shell: db-up core ## Shell + workspace flow: save a script, restart the app, reopen and run it (docker Mongo)
-	cd app && QUERAVUE_WORKSPACE=$$(mktemp -d) QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/shell_workspace_test.dart -d macos
+	cd app && QUERAVUE_E2E=1 QUERAVUE_WORKSPACE=$$(mktemp -d) QUERAVUE_CONFIG_DIR=$$(mktemp -d) flutter test integration_test/shell_workspace_test.dart -d macos
 
 test-perf-completion: core ## Completion budget: keystroke to popup on the 500-table schema (profile build)
 	docker compose -f dev/docker-compose.yml --profile large-schema up -d --wait postgres
 	docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
-	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/completion_perf_test.dart
+	cd app && QUERAVUE_E2E=1 flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/completion_perf_test.dart
 
 test-perf-diagram: core ## Diagram budget: open, pan and zoom the 500-table schema (profile build)
 	docker compose -f dev/docker-compose.yml --profile large-schema up -d --wait postgres
 	docker compose -f dev/docker-compose.yml --profile large-schema up postgres-large-seed
-	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/diagram_perf_test.dart
+	cd app && QUERAVUE_E2E=1 flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/diagram_perf_test.dart
 
 test-perf: db-up core ## Grid perf budget: 1M rows through the real core and Postgres (profile build)
-	cd app && flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart
+	cd app && QUERAVUE_E2E=1 flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart
 
 lint: lint-proto lint-core lint-app ## Run all linters
 

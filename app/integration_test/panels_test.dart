@@ -26,6 +26,8 @@ import 'package:queravue/features/documents/data/document_repository.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/schema/domain/schema_models.dart';
 
+import 'support/settle.dart';
+
 String _env(String k, String d) => Platform.environment[k] ?? d;
 
 Future<void> _pumpUntil(
@@ -40,12 +42,6 @@ Future<void> _pumpUntil(
     if (done()) return;
   }
   fail('timed out waiting for $what');
-}
-
-Future<void> _settle(WidgetTester tester) async {
-  for (var i = 0; i < 40; i++) {
-    await tester.pump(const Duration(milliseconds: 50));
-  }
 }
 
 Future<void> _type(WidgetTester tester, String text) async {
@@ -94,7 +90,7 @@ Future<ConnectionProfile> _connect(
   });
   await container.read(connectionsControllerProvider.notifier).reload();
   container.read(selectedConnectionProvider.notifier).select(saved.id);
-  await tester.pumpAndSettle();
+  await settle(tester);
   return saved;
 }
 
@@ -148,7 +144,7 @@ void main() {
       expect(created!.error, isNull);
 
       container.read(editorTabsProvider.notifier).openTable(saved.id, ref);
-      await tester.pumpAndSettle();
+      await settle(tester);
       expect(_present(const Key('admin-section-indexes')), isTrue);
       expect(_present(const Key('admin-section-stats')), isTrue);
       expect(
@@ -165,7 +161,7 @@ void main() {
       );
 
       await tester.tap(find.byKey(const Key('new-index')));
-      await tester.pumpAndSettle();
+      await settle(tester);
       await tester.enterText(find.byKey(const Key('index-name')), 'ix_title');
       await tester.enterText(find.byKey(const Key('index-keys')), 'title');
       await tester.pump();
@@ -263,7 +259,7 @@ void main() {
       );
       final ref = TableRef(database: 'queravue_e2e', table: collection);
       container.read(editorTabsProvider.notifier).openCollection(saved.id, ref);
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       await _openSection(tester, 'indexes');
       await _pumpUntil(
@@ -272,7 +268,7 @@ void main() {
         () => find.text('_id_').evaluate().isNotEmpty,
       );
       await tester.tap(find.byKey(const Key('new-index')));
-      await tester.pumpAndSettle();
+      await settle(tester);
       await tester.enterText(find.byKey(const Key('index-name')), 'ix_name');
       await tester.enterText(find.byKey(const Key('index-keys')), 'name');
       await tester.pump();
@@ -338,20 +334,26 @@ void main() {
       );
       expect(_statementOnScreen(), contains('collMod'));
       await tester.tap(find.byKey(const Key('validation-apply')));
-      await _settle(tester);
-      final applied = await tester.runAsync(
-        () => admin.getValidation(session.id, ref),
+      await pumpUntilServer(
+        tester,
+        'the validator applied',
+        () async => (await admin.getValidation(
+          session.id,
+          ref,
+        )).value!.validator.contains(r'$jsonSchema'),
       );
-      expect(applied!.value!.validator, contains(r'$jsonSchema'));
 
       await _type(tester, '');
       await tester.pump();
       await tester.tap(find.byKey(const Key('validation-apply')));
-      await _settle(tester);
-      final removed = await tester.runAsync(
-        () => admin.getValidation(session.id, ref),
+      await pumpUntilServer(
+        tester,
+        'the validator removed',
+        () async => (await admin.getValidation(
+          session.id,
+          ref,
+        )).value!.validator.isEmpty,
       );
-      expect(removed!.value!.validator, isEmpty);
 
       await _type(tester, '{"a": ');
       await tester.pump();

@@ -29,6 +29,8 @@ import 'package:queravue/features/editor/domain/query_models.dart';
 import 'package:queravue/features/schema/data/schema_repository.dart';
 import 'package:queravue/features/schema/domain/schema_models.dart';
 
+import 'support/settle.dart';
+
 String _env(String k, String d) => Platform.environment[k] ?? d;
 
 const _books = 'qv_e2e_books';
@@ -50,18 +52,6 @@ Future<void> _pumpUntil(
 }
 
 bool _present(Key key) => find.byKey(key).evaluate().isNotEmpty;
-
-// pumpAndSettle never returns while the live schema tree shows a spinner.
-Future<void> _settle(WidgetTester tester) async {
-  for (var i = 0; i < 8; i++) {
-    await tester.pump(const Duration(milliseconds: 50));
-  }
-}
-
-Future<void> _tapAndSettle(WidgetTester tester, Finder finder) async {
-  await tester.tap(finder);
-  await _settle(tester);
-}
 
 Future<({ProviderContainer container, String connectionId, String sessionId})>
 _start(
@@ -92,7 +82,7 @@ _start(
   });
   await container.read(connectionsControllerProvider.notifier).reload();
   container.read(selectedConnectionProvider.notifier).select(saved.id);
-  await _settle(tester);
+  await settle(tester);
   final session = await tester.runAsync(
     () =>
         container.read(connectionSessionProvider(saved.id).notifier).connect(),
@@ -132,23 +122,23 @@ Future<void> _designAndApply(
       .id;
   DiagramState state() => container.read(diagramProvider(tabId));
   await _pumpUntil(tester, 'diagram shown', () => state() is DiagramReady);
-  await _settle(tester);
+  await settle(tester);
 
   Future<void> draft(String name, {String? extraColumn}) async {
     final button = _present(const Key('diagram-empty-new-table'))
         ? const Key('diagram-empty-new-table')
         : const Key('diagram-new-table');
-    await _tapAndSettle(tester, find.byKey(button));
+    await tapAndSettle(tester, find.byKey(button));
     await tester.enterText(find.byKey(const Key('draft-table-name')), name);
     if (extraColumn != null) {
-      await _tapAndSettle(tester, find.byKey(const Key('draft-add-column')));
+      await tapAndSettle(tester, find.byKey(const Key('draft-add-column')));
       await tester.enterText(find.byKey(const Key('col-name-1')), extraColumn);
       await tester.enterText(
         find.byKey(const Key('col-type-1')),
         'varchar(80)',
       );
     }
-    await _tapAndSettle(tester, find.byKey(const Key('draft-table-save')));
+    await tapAndSettle(tester, find.byKey(const Key('draft-table-save')));
   }
 
   await draft(_books, extraColumn: 'title');
@@ -157,22 +147,22 @@ Future<void> _designAndApply(
   final ready = state() as DiagramReady;
   final canvas = tester.state<DiagramCanvasState>(find.byType(DiagramCanvas));
   canvas.fit();
-  await _settle(tester);
+  await settle(tester);
   final center = ready.rects[_books]!.center;
   await tester.tapAt(
     tester.getTopLeft(find.byType(DiagramCanvas)) + canvas.toScreen(center),
     buttons: kSecondaryButton,
     kind: PointerDeviceKind.mouse,
   );
-  await _settle(tester);
-  await _tapAndSettle(tester, find.byKey(const Key('diagram-menu-relation')));
-  await _tapAndSettle(tester, find.byKey(const Key('draft-relation-target')));
-  await _tapAndSettle(
+  await settle(tester);
+  await tapAndSettle(tester, find.byKey(const Key('diagram-menu-relation')));
+  await tapAndSettle(tester, find.byKey(const Key('draft-relation-target')));
+  await tapAndSettle(
     tester,
     find.widgetWithText(MenuItemButton, _authors).last,
   );
   expect(find.textContaining('Adds column ${_authors}_id'), findsOneWidget);
-  await _tapAndSettle(tester, find.byKey(const Key('draft-relation-add')));
+  await tapAndSettle(tester, find.byKey(const Key('draft-relation-add')));
 
   await tester.tap(find.byKey(const Key('diagram-review-draft')));
   await _pumpUntil(
