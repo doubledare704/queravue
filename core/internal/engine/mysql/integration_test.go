@@ -37,6 +37,10 @@ func target(v Variant, prefix, port, user, password, product string) enginetest.
 		Product:  product,
 		Database: db,
 		Schema:   db,
+		OtherSchema: &enginetest.SchemaFixture{
+			Create: func(name string) []string { return []string{"CREATE DATABASE " + name} },
+			Drop:   func(name string) []string { return []string{"DROP DATABASE IF EXISTS " + name} },
+		},
 	}
 }
 

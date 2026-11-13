@@ -197,7 +197,12 @@ class DiagramController extends Notifier<DiagramState> {
           },
           onDone: () {
             if (generation == _generation && state is DiagramLoading) {
-              _show(SchemaGraph(tables), saved, previous, notice);
+              _show(
+                withExternalTables(SchemaGraph(tables)),
+                saved,
+                previous,
+                notice,
+              );
             }
             if (!done.isCompleted) done.complete();
           },

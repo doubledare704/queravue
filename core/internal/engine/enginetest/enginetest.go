@@ -33,6 +33,15 @@ type Target struct {
 	Series func(n int) string
 	// SkipEdit skips the edit test (engines without transactional DML).
 	SkipEdit bool
+	// OtherSchema makes a second schema for the cross-schema relation test;
+	// nil skips it.
+	OtherSchema *SchemaFixture
+}
+
+// SchemaFixture creates and drops a schema (a database on MySQL) by name.
+type SchemaFixture struct {
+	Create func(name string) []string
+	Drop   func(name string) []string
 }
 
 func (tg Target) connect(t *testing.T) engine.Conn {
@@ -67,6 +76,9 @@ func Run(t *testing.T, tg Target) {
 	t.Run("DiagramDDL", func(t *testing.T) { diagramDDL(t, tg) })
 	t.Run("BulkColumns", func(t *testing.T) { bulkColumns(t, tg) })
 	t.Run("SchemaGraph", func(t *testing.T) { schemaGraph(t, tg) })
+	if tg.OtherSchema != nil {
+		t.Run("SchemaGraphCrossSchema", func(t *testing.T) { crossSchemaRelations(t, tg) })
+	}
 	if !tg.SkipEdit {
 		t.Run("EditAndRollback", func(t *testing.T) { editRollback(t, tg) })
 	}

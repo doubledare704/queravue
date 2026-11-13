@@ -59,6 +59,9 @@ func schemaGraph(t *testing.T, tg Target) {
 	}
 	relationsOf := map[string][]engine.ForeignKeyDef{}
 	for _, r := range relations {
+		if r.ReferencedSchema != "" {
+			t.Errorf("%s.%s references its own schema as %q, want empty", r.Table, r.Name, r.ReferencedSchema)
+		}
 		relationsOf[r.Table] = append(relationsOf[r.Table], r.ForeignKeyDef)
 	}
 	byName := func(a, b engine.ForeignKeyDef) int {
@@ -79,6 +82,11 @@ func schemaGraph(t *testing.T, tg Target) {
 			t.Errorf("%s keyed columns = %+v\nwant %+v", table, got, want)
 		}
 		got, wantFKs := slices.Clone(relationsOf[table]), slices.Clone(d.ForeignKeys)
+		for i := range wantFKs {
+			if wantFKs[i].ReferencedSchema == schema {
+				wantFKs[i].ReferencedSchema = ""
+			}
+		}
 		slices.SortFunc(got, byName)
 		slices.SortFunc(wantFKs, byName)
 		if len(got) != 0 || len(wantFKs) != 0 {
@@ -90,5 +98,67 @@ func schemaGraph(t *testing.T, tg Target) {
 	}
 	if !sawRelation {
 		t.Error("the seed has foreign keys, but none was listed or described")
+	}
+}
+
+const (
+	crossSchemaName = "qv_it_ext"
+	// CrossSchemaParent is created in both schemas; a fixture that cannot
+	// drop a schema with its tables drops this one first.
+	CrossSchemaParent = "qv_ext_parent"
+	crossChild        = "qv_ext_child"
+)
+
+// crossSchemaRelations checks that a foreign key into another schema names
+// that schema, even when the listed schema has a table of the same name.
+func crossSchemaRelations(t *testing.T, tg Target) {
+	c := tg.connect(t)
+	lister, _ := engine.As[engine.RelationLister](c)
+	local := tg.Schema
+	dropAll := func() {
+		ex, _ := engine.As[engine.Executor](c)
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		statements := []string{
+			"DROP TABLE IF EXISTS " + local + "." + crossChild,
+			"DROP TABLE IF EXISTS " + local + "." + CrossSchemaParent,
+		}
+		for _, sql := range append(statements, tg.OtherSchema.Drop(crossSchemaName)...) {
+			_, _ = ex.Execute(ctx, engine.Statement{SQL: sql}, &collector{})
+		}
+	}
+	dropAll()
+	t.Cleanup(dropAll)
+	for _, sql := range tg.OtherSchema.Create(crossSchemaName) {
+		ex, _ := engine.As[engine.Executor](c)
+		if _, err := ex.Execute(context.Background(), engine.Statement{SQL: sql}, &collector{}); err != nil {
+			t.Fatalf("%s: %v (MySQL and MariaDB: apply the grant in dev/seed/<engine>/02_test_grants.sql)", sql, err)
+		}
+	}
+	for _, sql := range append([]string{},
+		"CREATE TABLE "+crossSchemaName+"."+CrossSchemaParent+" (id INT PRIMARY KEY)",
+		"CREATE TABLE "+local+"."+CrossSchemaParent+" (id INT PRIMARY KEY)",
+		"CREATE TABLE "+local+"."+crossChild+" (id INT PRIMARY KEY, parent_id INT, local_id INT, "+
+			"CONSTRAINT fk_qv_ext_other FOREIGN KEY (parent_id) REFERENCES "+crossSchemaName+"."+CrossSchemaParent+" (id), "+
+			"CONSTRAINT fk_qv_ext_local FOREIGN KEY (local_id) REFERENCES "+local+"."+CrossSchemaParent+" (id))",
+	) {
+		exec(t, c, sql)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	relations, err := lister.ListRelations(ctx, tg.Database, local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, r := range relations {
+		if r.Table == crossChild && r.ReferencedTable == CrossSchemaParent {
+			got[r.Columns[0]] = r.ReferencedSchema
+		}
+	}
+	want := map[string]string{"parent_id": crossSchemaName, "local_id": ""}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("referenced schemas by column = %v, want %v", got, want)
 	}
 }

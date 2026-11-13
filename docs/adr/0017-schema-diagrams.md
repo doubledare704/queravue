@@ -18,6 +18,8 @@ What exists:
 ### 1. The graph comes from core in bulk, as a stream
 A new optional Conn interface, `RelationLister`, lists the foreign keys and key columns of a whole schema with one query per kind of object. Its capability is `schema_graph`. `DiagramService.GetSchemaGraph` joins that with the object and column lists and streams `GraphTable` batches with progress counters; the last message has `done`. The UI never makes per-table calls to draw a diagram. The stream is cancellable and the result is cached under the ADR 0007 rules, with `refresh` to bypass.
 
+One diagram is one schema. A foreign key into another schema keeps its `referenced_schema` (empty means the same schema), and the UI draws the target as a stub with only the referenced columns, which opens that schema's own diagram; the other schema is never loaded.
+
 ### 2. Layout runs in the UI and is written here
 Positions are view state: the user drags tables, hides some, and saves the arrangement. A layered layout (rank by reference depth, order within a rank to reduce crossings, then assign coordinates) is written in Dart with no new dependency. It was planned to run off the UI thread for large graphs; measured at under 2 ms for 500 tables, it runs on it.
 

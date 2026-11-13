@@ -10,6 +10,7 @@ Status: the diagram, export, saved diagrams and design mode work for SQL engines
 - Drag a table to move it. Click a table to select it: its relations are highlighted and the others fade. Double-click opens the table.
 - "Arrange automatically" puts every table back where the layout places it; "Reload" reads the schema again.
 - Zoomed out below 50 % a table shows only its name, below 16 % only its box, and relations become straight lines.
+- A table of another schema that this one references appears as a small grey box with a dashed outline, titled `schema.table` and listing only the referenced columns; the rest of that table is not loaded. It is laid out, moved, hidden and saved (under `schema.table`) like the others. Double-click it, or right-click "Open the … diagram", to open that schema's diagram. The summary counts these relations ("k to other schemas"). It is never a relation target in design mode.
 - Right-click a table to open it or hide it from the diagram. "Show n hidden" in the toolbar, or the palette entry "Show hidden tables", brings them back where they were; a table whose spot was taken meanwhile goes beside the diagram.
 
 ## Saving
@@ -54,7 +55,6 @@ The core receives the changes per table and orders them (`core/internal/sqldiale
 
 ## Limits
 - In a schema where a few tables are referenced by hundreds, relations are long and cross behind other tables; selecting a table is the way to follow its relations.
-- A relation to a table in another schema is not drawn.
 
 ## Mongo: the inferred diagram
 - Right-click a database in the schema tree, "Open diagram", or use the palette and `⌘⇧D`; without a database in the active tab the connection's default database is used.
@@ -94,6 +94,7 @@ The app enables diagrams from the `schema_graph` capability. `GraphRelation.infe
 - The load waits for a running statement on the session to finish, and stops when the call is cancelled.
 - A loaded graph is kept per session, database, schema and sample size until the session's schema cache is invalidated (DDL from the editor or the designer, a refresh, the session closing). `refresh = true` reloads it.
 - Tables are streamed 50 per message. A table keeps at most 200 columns; `columns_truncated` says when more exist.
+- `ListRelations` leaves `ReferencedSchema` empty when the referenced table is in the listed schema, and names the schema otherwise. The app matches targets by schema and name, so a same-named table in another schema is never drawn as the target.
 - SQLite foreign keys have no names; they get `fk_<table>_<n>`, as in table details. A reference without a column list is resolved to the referenced table's primary key.
 
 Design and budgets: ADR 0017.

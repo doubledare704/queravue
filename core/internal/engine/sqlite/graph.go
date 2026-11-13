@@ -59,7 +59,8 @@ func (c *Conn) ListKeyedColumns(ctx context.Context, database, schema string) ([
 }
 
 // ListRelations implements engine.RelationLister. SQLite foreign keys have no
-// names; they get the ones DescribeTable gives them.
+// names; they get the ones DescribeTable gives them. They cannot point into
+// another attached database, so ReferencedSchema stays empty.
 func (c *Conn) ListRelations(ctx context.Context, database, schema string) ([]engine.TableRelation, error) {
 	target := attachedName(database, schema)
 	query := fmt.Sprintf(relationsQuery, quoteIdent(target)) //nolint:gosec // query targets quoted identifier
@@ -78,8 +79,8 @@ func (c *Conn) ListRelations(ctx context.Context, database, schema string) ([]en
 			return nil, classify("scan relation", err)
 		}
 		folded.Add(table, fmt.Sprintf("fk_%s_%d", table, id), engine.ForeignKeyDef{
-			ReferencedSchema: target, ReferencedTable: refTable,
-			OnDelete: engine.ParseReferentialAction(onDelete), OnUpdate: engine.ParseReferentialAction(onUpdate),
+			ReferencedTable: refTable,
+			OnDelete:        engine.ParseReferentialAction(onDelete), OnUpdate: engine.ParseReferentialAction(onUpdate),
 		}, from, to.String)
 	}
 	if err := rows.Err(); err != nil {

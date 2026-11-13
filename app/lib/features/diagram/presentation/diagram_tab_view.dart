@@ -40,12 +40,20 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
       return;
     }
     final table = ready.graph.tables.where((t) => t.name == name).firstOrNull;
+    final tabs = ref.read(editorTabsProvider.notifier);
+    if (table != null && table.isExternal) {
+      tabs.openDiagram(
+        widget.tab.connectionId,
+        database: widget.tab.tableRef?.database ?? '',
+        schema: table.externalSchema,
+      );
+      return;
+    }
     final target = TableRef(
       database: widget.tab.tableRef?.database ?? '',
       schema: widget.tab.tableRef?.schema ?? '',
       table: name,
     );
-    final tabs = ref.read(editorTabsProvider.notifier);
     if (table != null && table.type.isCollection) {
       tabs.openCollection(widget.tab.connectionId, target);
     } else {
@@ -58,6 +66,7 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
 
   Future<void> _tableMenu(DiagramReady ready, String table, Offset at) async {
     final drafted = ready.draft.table(table) != null;
+    final external = ready.table(table)?.externalSchema ?? '';
     final design = _canDesign
         ? draftMenuItems(ready, table)
         : const <(String, String)>[];
@@ -66,7 +75,13 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
       position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
       items: [
         if (!drafted)
-          const PopupMenuItem(value: 'open', child: Text('Open table')),
+          PopupMenuItem(
+            key: const Key('diagram-menu-open'),
+            value: 'open',
+            child: Text(
+              external.isEmpty ? 'Open table' : 'Open the $external diagram',
+            ),
+          ),
         const PopupMenuItem(value: 'hide', child: Text('Hide from diagram')),
         if (design.isNotEmpty) const PopupMenuDivider(),
         for (final (value, label) in design)
@@ -211,6 +226,7 @@ class _Toolbar extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final file = tab.diagramFile;
     final inferred = ready?.graph.inferredRelationCount ?? 0;
+    final external = ready?.graph.externalRelationCount ?? 0;
     return SizedBox(
       height: 40,
       child: Padding(
@@ -221,8 +237,9 @@ class _Toolbar extends StatelessWidget {
               Flexible(
                 child: Text(
                   [
-                    '${ready.graph.tables.length} tables',
+                    '${ready.graph.localTableCount} tables',
                     '${ready.graph.relationCount} relations',
+                    if (external > 0) '$external to other schemas',
                     if (inferred > 0) '$inferred inferred',
                   ].join(' · '),
                   key: const Key('diagram-summary'),
