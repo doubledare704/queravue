@@ -22,18 +22,16 @@ type DiagramService struct {
 
 	sessions *session.Manager
 	graphs   *diagram.Store
+	design   *SchemaDesignService
 }
 
-// NewDiagramService returns a DiagramService handler. A nil store gets a private one.
-func NewDiagramService(s *session.Manager, graphs *diagram.Store) *DiagramService {
+// NewDiagramService returns a DiagramService handler. A nil store gets a
+// private one; design builds and runs the DDL of a designed diagram.
+func NewDiagramService(s *session.Manager, graphs *diagram.Store, design *SchemaDesignService) *DiagramService {
 	if graphs == nil {
 		graphs = diagram.NewStore()
 	}
-	return &DiagramService{sessions: s, graphs: graphs}
-}
-
-func designModeNotImplementedYet() *queravuev1.AdminError {
-	return unsupported("applying a diagram is not available yet")
+	return &DiagramService{sessions: s, graphs: graphs, design: design}
 }
 
 func (d *DiagramService) session(id string) (*session.Session, error) {
@@ -149,17 +147,23 @@ func graphTablesToProto(tables []diagram.Table) []*queravuev1.GraphTable {
 }
 
 // PreviewDiagramDDL implements the RPC.
-func (d *DiagramService) PreviewDiagramDDL(_ context.Context, req *queravuev1.PreviewDiagramDDLRequest) (*queravuev1.PreviewDiagramDDLResponse, error) {
+func (d *DiagramService) PreviewDiagramDDL(ctx context.Context, req *queravuev1.PreviewDiagramDDLRequest) (*queravuev1.PreviewDiagramDDLResponse, error) {
 	if _, err := d.session(req.GetSessionId()); err != nil {
 		return nil, err
 	}
-	return &queravuev1.PreviewDiagramDDLResponse{Error: designModeNotImplementedYet()}, nil
+	if d.design == nil {
+		return &queravuev1.PreviewDiagramDDLResponse{Error: unsupported("designing diagrams is not available")}, nil
+	}
+	return d.design.PreviewDiagramDDL(ctx, req)
 }
 
 // ApplyDiagramDDL implements the RPC.
-func (d *DiagramService) ApplyDiagramDDL(_ context.Context, req *queravuev1.ApplyDiagramDDLRequest) (*queravuev1.ApplyDiagramDDLResponse, error) {
+func (d *DiagramService) ApplyDiagramDDL(ctx context.Context, req *queravuev1.ApplyDiagramDDLRequest) (*queravuev1.ApplyDiagramDDLResponse, error) {
 	if _, err := d.session(req.GetSessionId()); err != nil {
 		return nil, err
 	}
-	return &queravuev1.ApplyDiagramDDLResponse{Error: designModeNotImplementedYet()}, nil
+	if d.design == nil {
+		return &queravuev1.ApplyDiagramDDLResponse{Error: unsupported("designing diagrams is not available")}, nil
+	}
+	return d.design.ApplyDiagramDDL(ctx, req)
 }

@@ -9,11 +9,15 @@ class DiagramColumn {
     this.typeName = '',
     this.nullable = true,
     this.primaryKeyOrder = 0,
+    this.draft = false,
   });
 
   final String name;
   final String typeName;
   final bool nullable;
+
+  /// Designed on the diagram and not in the database yet.
+  final bool draft;
 
   /// 1-based position in the primary key; 0 when not part of it.
   final int primaryKeyOrder;
@@ -30,6 +34,7 @@ class DiagramRelation {
     this.referencedSchema = '',
     this.referencedColumns = const [],
     this.inferred = false,
+    this.draft = false,
   });
 
   final String name;
@@ -38,6 +43,7 @@ class DiagramRelation {
   final String referencedTable;
   final List<String> referencedColumns;
   final bool inferred;
+  final bool draft;
 }
 
 @immutable
@@ -49,6 +55,7 @@ class DiagramTable {
     this.columns = const [],
     this.relations = const [],
     this.columnsTruncated = false,
+    this.draft = false,
   });
 
   final String name;
@@ -57,6 +64,14 @@ class DiagramTable {
   final List<DiagramColumn> columns;
   final List<DiagramRelation> relations;
   final bool columnsTruncated;
+  final bool draft;
+
+  DiagramColumn? column(String name) =>
+      columns.where((c) => c.name == name).firstOrNull;
+
+  List<DiagramColumn> get primaryKey =>
+      columns.where((c) => c.isPrimaryKey).toList()
+        ..sort((a, b) => a.primaryKeyOrder.compareTo(b.primaryKeyOrder));
 
   bool isForeignKeyColumn(String column) =>
       relations.any((r) => r.columns.contains(column));

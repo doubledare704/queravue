@@ -24,6 +24,7 @@ type indexEnv struct {
 	indexes *api.IndexService
 	stats   *api.StatsService
 	design  *api.SchemaDesignService
+	diagram *api.DiagramService
 	schema  *api.SchemaService
 	sess    *session.Session
 	history *history.Store
@@ -60,9 +61,11 @@ func setupIndexEnv(t *testing.T, production bool) indexEnv {
 	store := connections.NewFileStore(dir)
 	_ = store.Save([]connections.Connection{{ID: "test-conn", Name: "T", EngineID: "sqlite", Production: production}})
 	connSvc := connections.NewService(reg, store, secrets.NewMemory())
+	design := api.NewSchemaDesignService(mgr, connSvc, hist, cache, nil)
 	return indexEnv{
 		indexes: api.NewIndexService(mgr, connSvc, hist, nil, nil),
-		design:  api.NewSchemaDesignService(mgr, connSvc, hist, cache, nil),
+		design:  design,
+		diagram: api.NewDiagramService(mgr, nil, design),
 		schema:  api.NewSchemaService(mgr, cache),
 		stats:   api.NewStatsService(mgr),
 		sess:    sess,

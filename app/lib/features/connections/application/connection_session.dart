@@ -126,6 +126,18 @@ final connectionHasSchemaGraphProvider = Provider.family<bool, String>(
       false,
 );
 
+/// True when tables can be designed on the connection's diagram: it draws
+/// diagrams and runs SQL.
+final connectionCanDesignDiagramProvider = Provider.family<bool, String>((
+  ref,
+  connectionId,
+) {
+  final capabilities = ref.watch(connectionCapabilitiesProvider(connectionId));
+  return capabilities != null &&
+      capabilities.contains('schema_graph') &&
+      capabilities.contains('execute');
+});
+
 /// True for connections to document engines that cannot run SQL: they have
 /// the `document_store` capability and not `execute`; unknown means false, so
 /// SQL entry points stay available.

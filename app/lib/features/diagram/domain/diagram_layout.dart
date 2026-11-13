@@ -201,3 +201,22 @@ List<int> _ranks(List<Set<int>> references) {
   }
   return rank;
 }
+
+/// [wanted] moved to the nearest spot, in rings of grid steps, where it
+/// keeps a gap to every box in [taken].
+Rect freeSpot(Rect wanted, Iterable<Rect> taken) {
+  const step = 40.0;
+  const gap = 24.0;
+  final boxes = [for (final r in taken) r.inflate(gap)];
+  bool free(Rect r) => !boxes.any(r.overlaps);
+  for (var ring = 0; ring < 60; ring++) {
+    for (var dy = -ring; dy <= ring; dy++) {
+      for (var dx = -ring; dx <= ring; dx++) {
+        if (dx.abs() != ring && dy.abs() != ring) continue;
+        final candidate = wanted.shift(Offset(dx * step, dy * step));
+        if (free(candidate)) return candidate;
+      }
+    }
+  }
+  return wanted;
+}

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/shortcuts.dart';
+import '../../connections/application/connection_session.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../../schema/domain/schema_models.dart';
 import '../application/diagram_controller.dart';
@@ -34,6 +35,10 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
   }
 
   void _openTable(DiagramReady ready, String name) {
+    if (ready.draft.table(name) != null) {
+      unawaited(editDraftTableFlow(context, ref, widget.tab.id, name));
+      return;
+    }
     final table = ready.graph.tables.where((t) => t.name == name).firstOrNull;
     final target = TableRef(
       database: widget.tab.tableRef?.database ?? '',
@@ -48,29 +53,58 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
     }
   }
 
+  bool get _canDesign =>
+      ref.read(connectionCanDesignDiagramProvider(widget.tab.connectionId));
+
   Future<void> _tableMenu(DiagramReady ready, String table, Offset at) async {
+    final drafted = ready.draft.table(table) != null;
+    final design = _canDesign
+        ? draftMenuItems(ready, table)
+        : const <(String, String)>[];
     final choice = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(at.dx, at.dy, at.dx, at.dy),
-      items: const [
-        PopupMenuItem(value: 'open', child: Text('Open table')),
-        PopupMenuItem(value: 'hide', child: Text('Hide from diagram')),
+      items: [
+        if (!drafted)
+          const PopupMenuItem(value: 'open', child: Text('Open table')),
+        const PopupMenuItem(value: 'hide', child: Text('Hide from diagram')),
+        if (design.isNotEmpty) const PopupMenuDivider(),
+        for (final (value, label) in design)
+          PopupMenuItem(
+            key: Key('diagram-menu-$value'),
+            value: value,
+            child: Text(label),
+          ),
       ],
     );
-    if (!mounted) return;
+    if (!mounted || choice == null) return;
     switch (choice) {
       case 'open':
         _openTable(ready, table);
       case 'hide':
         ref.read(diagramProvider(widget.tab.id).notifier).hide(table);
+      default:
+        await draftMenuAction(context, ref, widget.tab.id, table, choice);
     }
   }
+
+  void _newTable() => unawaited(
+    newDraftTableFlow(
+      context,
+      ref,
+      widget.tab.id,
+      at: _canvas.currentState?.viewCenter,
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(diagramProvider(widget.tab.id));
     final controller = ref.read(diagramProvider(widget.tab.id).notifier);
     final tabId = widget.tab.id;
+    final canDesign = ref.watch(
+      connectionCanDesignDiagramProvider(widget.tab.connectionId),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -86,6 +120,10 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
           onSave: () => unawaited(saveDiagramFlow(context, ref, tabId)),
           onExport: (format) =>
               unawaited(exportDiagramFlow(context, ref, tabId, format)),
+          canDesign: canDesign,
+          onNewTable: _newTable,
+          onReview: () => unawaited(reviewDraftFlow(context, ref, tabId)),
+          onDiscard: () => unawaited(discardDraftFlow(context, ref, tabId)),
         ),
         const Divider(height: 1),
         Expanded(
@@ -101,10 +139,13 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
               action: 'Retry',
               onAction: () => unawaited(controller.load(refresh: true)),
             ),
-            DiagramReady() when state.isEmpty => const _Message(
-              key: Key('diagram-empty'),
+            DiagramReady() when state.isEmpty => _Message(
+              key: const Key('diagram-empty'),
               icon: Icons.account_tree_outlined,
               text: 'This schema has no tables.',
+              action: canDesign ? 'New table' : null,
+              onAction: canDesign ? _newTable : null,
+              actionKey: 'diagram-empty-new-table',
             ),
             DiagramReady() => DiagramCanvas(
               key: _canvas,
@@ -137,6 +178,10 @@ class _Toolbar extends StatelessWidget {
     required this.onShowHidden,
     required this.onSave,
     required this.onExport,
+    required this.canDesign,
+    required this.onNewTable,
+    required this.onReview,
+    required this.onDiscard,
   });
 
   final EditorTab tab;
@@ -149,6 +194,10 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback onShowHidden;
   final VoidCallback onSave;
   final ValueChanged<ExportFormat> onExport;
+  final bool canDesign;
+  final VoidCallback onNewTable;
+  final VoidCallback onReview;
+  final VoidCallback onDiscard;
 
   @override
   Widget build(BuildContext context) {
@@ -165,21 +214,27 @@ class _Toolbar extends StatelessWidget {
         child: Row(
           children: [
             if (ready != null) ...[
-              Text(
-                '${ready.graph.tables.length} tables · '
-                '${ready.graph.relationCount} relations',
-                key: const Key('diagram-summary'),
-                style: text.labelLarge,
+              Flexible(
+                child: Text(
+                  '${ready.graph.tables.length} tables · '
+                  '${ready.graph.relationCount} relations',
+                  key: const Key('diagram-summary'),
+                  overflow: TextOverflow.ellipsis,
+                  style: text.labelLarge,
+                ),
               ),
               const SizedBox(width: 12),
-              Text(
-                [
-                  if (file != null) diagramNameOf(file),
-                  if (ready.dirty) file == null ? 'not saved' : 'changed',
-                ].join(' · '),
-                key: const Key('diagram-saved-state'),
-                style: text.labelMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
+              Flexible(
+                child: Text(
+                  [
+                    if (file != null) diagramNameOf(file),
+                    if (ready.dirty) file == null ? 'not saved' : 'changed',
+                  ].join(' · '),
+                  key: const Key('diagram-saved-state'),
+                  overflow: TextOverflow.ellipsis,
+                  style: text.labelMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
                 ),
               ),
               if (ready.notice != null) ...[
@@ -195,6 +250,30 @@ class _Toolbar extends StatelessWidget {
               ],
             ],
             const Spacer(),
+            if (ready != null && !ready.draft.isEmpty) ...[
+              FilledButton.tonalIcon(
+                key: const Key('diagram-review-draft'),
+                onPressed: onReview,
+                icon: const Icon(Icons.playlist_add_check, size: 18),
+                label: Text(
+                  'Review ${ready.draft.size} '
+                  '${ready.draft.size == 1 ? 'change' : 'changes'}',
+                ),
+              ),
+              IconButton(
+                key: const Key('diagram-discard-draft'),
+                tooltip: 'Discard the draft',
+                icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                onPressed: onDiscard,
+              ),
+            ],
+            if (canDesign)
+              IconButton(
+                key: const Key('diagram-new-table'),
+                tooltip: 'New table ($primaryLabel⌥T)',
+                icon: const Icon(Icons.add_box_outlined, size: 18),
+                onPressed: ready != null ? onNewTable : null,
+              ),
             if (ready != null && ready.hidden.isNotEmpty)
               TextButton.icon(
                 key: const Key('diagram-show-hidden'),
@@ -321,12 +400,14 @@ class _Message extends StatelessWidget {
     required this.text,
     this.action,
     this.onAction,
+    this.actionKey = 'diagram-retry',
   });
 
   final IconData icon;
   final String text;
   final String? action;
   final VoidCallback? onAction;
+  final String actionKey;
 
   @override
   Widget build(BuildContext context) {
@@ -341,7 +422,7 @@ class _Message extends StatelessWidget {
           if (action != null) ...[
             const SizedBox(height: 8),
             FilledButton.tonal(
-              key: const Key('diagram-retry'),
+              key: Key(actionKey),
               onPressed: onAction,
               child: Text(action!),
             ),
