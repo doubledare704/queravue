@@ -34,6 +34,8 @@ import 'package:queravue/features/diagram/presentation/diagram_export.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/shared/theme.dart';
 
+import 'support/settle.dart';
+
 String _env(String k, String d) => Platform.environment[k] ?? d;
 
 Future<void> _pumpUntil(
@@ -133,9 +135,7 @@ void main() {
       addTearDown(() => repo.delete(saved.id));
       await container.read(connectionsControllerProvider.notifier).reload();
       container.read(selectedConnectionProvider.notifier).select(saved.id);
-      // Not pumpAndSettle: a spinner in the live schema tree can keep it from
-      // ever settling.
-      await tester.pump(const Duration(milliseconds: 100));
+      await settle(tester);
       final session = await container
           .read(connectionSessionProvider(saved.id).notifier)
           .connect();

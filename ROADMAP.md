@@ -96,7 +96,6 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Relations drawn in design mode reference a one-column primary key; composite references stay with the table designer. On SQLite a relation from an existing table is refused.
 - Relations to tables in another schema are not drawn.
 - Mongo relations are name-and-type guesses: they miss references named unlike their collection, and loading shows no per-collection progress because every collection is sampled before the first table is sent.
-- The diagram end-to-end tests pump for fixed times; `pumpAndSettle` hangs in the real app while the schema tree shows a spinner.
 
 ### It. 10 — Remaining engines + connectivity
 - Oracle (go-ora), ClickHouse, DuckDB.
