@@ -182,6 +182,9 @@ Future<DraftRelation?> showDraftRelationDialog(
   ),
 );
 
+// Column names are never empty, so the empty name stands for a new column.
+const _newColumn = '';
+
 class _DraftRelationDialog extends StatefulWidget {
   const _DraftRelationDialog({
     required this.from,
@@ -199,24 +202,75 @@ class _DraftRelationDialog extends StatefulWidget {
 
 class _DraftRelationDialogState extends State<_DraftRelationDialog> {
   DiagramTable? _target;
+  List<String?> _through = const [];
   ReferentialAction _onDelete = ReferentialAction.unspecified;
 
-  String? get _problem => _target == null ? null : referenceProblem(_target!);
+  String? get _problem => _target == null
+      ? null
+      : referenceProblem(_target!) ?? throughProblem(_through);
 
   DraftRelation? get _relation => _target == null || _problem != null
       ? null
-      : suggestRelation(
+      : relationThrough(
           widget.from,
           _target!,
+          _through,
           takenNames: widget.takenNames,
           onDelete: _onDelete,
         );
+
+  void _pickTarget(String? name) {
+    final target = widget.targets.where((t) => t.name == name).firstOrNull;
+    _target = target;
+    _through = target == null
+        ? const []
+        : suggestedThrough(widget.from, target);
+  }
+
+  Widget _throughRow(int index, DiagramColumn key, DraftRelation? relation) {
+    final suggestedNew = relation != null && _through[index] == null
+        ? relation.columns[index]
+        : '${_target!.name}_${key.name}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${_target!.name}.${key.name} through',
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          DropdownMenu<String>(
+            key: ValueKey('draft-relation-through-$index'),
+            width: 240,
+            initialSelection: _through[index] ?? _newColumn,
+            onSelected: (c) => setState(
+              () => _through = [
+                for (final (i, t) in _through.indexed)
+                  i == index ? (c == _newColumn ? null : c) : t,
+              ],
+            ),
+            dropdownMenuEntries: [
+              DropdownMenuEntry(
+                value: _newColumn,
+                label: 'New column $suggestedNew',
+              ),
+              for (final c in widget.from.columns)
+                DropdownMenuEntry(value: c.name, label: c.name),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final relation = _relation;
-    final added = relation?.newColumn;
+    final key = _target?.primaryKey ?? const <DiagramColumn>[];
     return AlertDialog(
       title: Text('Relation from ${widget.from.name}'),
       content: SizedBox(
@@ -232,16 +286,18 @@ class _DraftRelationDialogState extends State<_DraftRelationDialog> {
               enableFilter: true,
               requestFocusOnTap: true,
               menuHeight: 320,
-              onSelected: (name) => setState(
-                () => _target = widget.targets
-                    .where((t) => t.name == name)
-                    .firstOrNull,
-              ),
+              onSelected: (name) => setState(() => _pickTarget(name)),
               dropdownMenuEntries: [
                 for (final t in widget.targets)
                   DropdownMenuEntry(value: t.name, label: t.name),
               ],
             ),
+            if (_target != null && referenceProblem(_target!) == null)
+              for (final (i, k) in key.indexed)
+                KeyedSubtree(
+                  key: ValueKey('${_target!.name}.${k.name}'),
+                  child: _throughRow(i, k, relation),
+                ),
             const SizedBox(height: 12),
             DropdownMenu<ReferentialAction>(
               key: const Key('draft-relation-on-delete'),
@@ -270,11 +326,7 @@ class _DraftRelationDialogState extends State<_DraftRelationDialog> {
               )
             else if (relation != null)
               Text(
-                added != null
-                    ? 'Adds column ${added.name} ${added.typeName} to ${widget.from.name}, '
-                          'referencing ${relation.toTable}.${relation.toColumn}.'
-                    : 'Uses column ${relation.column} of ${widget.from.name}, '
-                          'referencing ${relation.toTable}.${relation.toColumn}.',
+                describeRelation(relation, widget.from.name),
                 key: const Key('draft-relation-summary'),
                 style: const TextStyle(fontSize: 12),
               ),

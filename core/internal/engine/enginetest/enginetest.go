@@ -74,6 +74,7 @@ func Run(t *testing.T, tg Target) {
 	t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
 	t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })
 	t.Run("DiagramDDL", func(t *testing.T) { diagramDDL(t, tg) })
+	t.Run("DiagramCompositeDDL", func(t *testing.T) { diagramCompositeDDL(t, tg) })
 	t.Run("BulkColumns", func(t *testing.T) { bulkColumns(t, tg) })
 	t.Run("SchemaGraph", func(t *testing.T) { schemaGraph(t, tg) })
 	if tg.OtherSchema != nil {

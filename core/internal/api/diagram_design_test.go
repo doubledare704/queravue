@@ -235,3 +235,47 @@ func (s *countSink) Batch(rows [][]engine.Value) error {
 	s.n += len(rows)
 	return nil
 }
+
+func TestDiagramReferencesACompositeKeyFromAnExistingSQLiteTable(t *testing.T) {
+	e := setupIndexEnv(t, false)
+	lines := &queravuev1.TableChanges{
+		TableRef: &queravuev1.TableRef{Table: "lines"},
+		Changes: []*queravuev1.SchemaChange{{Change: &queravuev1.SchemaChange_CreateTable{CreateTable: &queravuev1.CreateTable{Design: &queravuev1.TableDesign{
+			Columns:           []*queravuev1.ColumnSpec{{Name: "order_no", TypeName: "INTEGER"}, {Name: "line_no", TypeName: "INTEGER"}},
+			PrimaryKeyColumns: []string{"order_no", "line_no"},
+		}}}}},
+	}
+	addColumn := func(name string) *queravuev1.SchemaChange {
+		return &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AddColumn{AddColumn: &queravuev1.AddColumn{
+			Column: &queravuev1.ColumnSpec{Name: name, TypeName: "INTEGER", Nullable: true},
+		}}}
+	}
+	reference := &queravuev1.TableChanges{TableRef: orders(), Changes: []*queravuev1.SchemaChange{
+		addColumn("lines_line_no"),
+		{Change: &queravuev1.SchemaChange_AddForeignKey{AddForeignKey: &queravuev1.AddForeignKey{ForeignKey: &queravuev1.ForeignKeySpec{
+			Name: "fk_orders_lines", Columns: []string{"customer", "lines_line_no"},
+			ReferencedTable: &queravuev1.TableRef{Table: "lines"}, ReferencedColumns: []string{"order_no", "line_no"},
+		}}}},
+	}}
+	resp, err := e.diagram.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{
+		SessionId: e.sess.ID, Tables: []*queravuev1.TableChanges{reference, lines},
+	})
+	if err != nil || resp.GetError() != nil {
+		t.Fatalf("ApplyDiagramDDL: %v %+v", err, resp)
+	}
+	if got := ordersForeignKeys(t, e); strings.Join(got, " ") != "customer,lines_line_no->lines" {
+		t.Errorf("orders foreign keys = %v", got)
+	}
+	if err := execSQL(t, e, "PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatal(err)
+	}
+	if err := execSQL(t, e, "INSERT INTO lines VALUES (7, 1)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := execSQL(t, e, "INSERT INTO orders (id, customer, lines_line_no) VALUES (1, 7, 1)"); err != nil {
+		t.Errorf("an order pointing at an existing line was refused: %v", err)
+	}
+	if err := execSQL(t, e, "INSERT INTO orders (id, customer, lines_line_no) VALUES (2, 7, 2)"); err == nil {
+		t.Error("an order pointing at a missing line was accepted")
+	}
+}

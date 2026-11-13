@@ -85,9 +85,11 @@ class _DdlPreviewDialogState extends State<DdlPreviewDialog> {
                         children: [
                           Row(
                             children: [
-                              Text(
-                                s.summary,
-                                style: const TextStyle(fontSize: 12),
+                              Flexible(
+                                child: Text(
+                                  s.summary,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
                               ),
                               if (s.destructive) ...[
                                 const SizedBox(width: 8),
