@@ -34,6 +34,7 @@ class DiagramRelation {
     this.referencedSchema = '',
     this.referencedColumns = const [],
     this.inferred = false,
+    this.confidence = 0,
     this.draft = false,
   });
 
@@ -42,7 +43,12 @@ class DiagramRelation {
   final String referencedSchema;
   final String referencedTable;
   final List<String> referencedColumns;
+
+  /// Guessed by core from sampled documents; no constraint backs it.
   final bool inferred;
+
+  /// How sure the guess of an [inferred] relation is, in (0, 1].
+  final double confidence;
   final bool draft;
 }
 
@@ -66,6 +72,10 @@ class DiagramTable {
   final bool columnsTruncated;
   final bool draft;
 
+  bool get isView =>
+      type == SchemaObjectType.view ||
+      type == SchemaObjectType.materializedView;
+
   DiagramColumn? column(String name) =>
       columns.where((c) => c.name == name).firstOrNull;
 
@@ -85,6 +95,29 @@ class SchemaGraph {
 
   int get relationCount =>
       tables.fold(0, (sum, table) => sum + table.relations.length);
+
+  int get inferredRelationCount => tables.fold(
+    0,
+    (sum, table) => sum + table.relations.where((r) => r.inferred).length,
+  );
+
+  SchemaGraph withoutInferredRelations() => SchemaGraph([
+    for (final t in tables)
+      t.relations.any((r) => r.inferred)
+          ? DiagramTable(
+              name: t.name,
+              type: t.type,
+              rowEstimate: t.rowEstimate,
+              columns: t.columns,
+              relations: [
+                for (final r in t.relations)
+                  if (!r.inferred) r,
+              ],
+              columnsTruncated: t.columnsTruncated,
+              draft: t.draft,
+            )
+          : t,
+  ]);
 }
 
 /// One message of a graph being loaded.

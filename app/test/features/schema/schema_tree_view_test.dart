@@ -1,7 +1,9 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/connections/application/connection_session.dart';
+import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/editor/domain/query_models.dart';
 import 'package:queravue/features/schema/data/schema_repository.dart';
 import 'package:queravue/features/schema/domain/schema_models.dart';
@@ -87,6 +89,20 @@ class _TestConnectionSessionController extends ConnectionSessionController {
   }
 }
 
+class _MongoSessionController extends ConnectionSessionController {
+  _MongoSessionController() : super('conn1');
+
+  @override
+  ConnectionSessionState build() => const ConnectionSessionState(
+    session: SessionInfo(
+      id: 'sess-mongo',
+      product: 'MongoDB',
+      version: '8.0',
+      capabilities: {'document_store', 'schema_graph'},
+    ),
+  );
+}
+
 void main() {
   group('SchemaTreeView widget tests', () {
     testWidgets('renders schema nodes, expands objects, and filters items', (
@@ -145,6 +161,43 @@ void main() {
 
       expect(find.text('customers'), findsOneWidget);
       expect(find.text('orders'), findsNothing);
+    });
+
+    testWidgets('a Mongo database offers its inferred diagram', (tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          schemaRepositoryProvider.overrideWithValue(_FakeSchemaRepository()),
+          connectionSessionProvider('conn1')
+              .overrideWith(_MongoSessionController.new),
+          connectionHasSchemaGraphProvider('conn1').overrideWithValue(true),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 260,
+                child: SchemaTreeView(connectionId: 'conn1'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(find.text('postgres'), buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open diagram'));
+      await tester.pumpAndSettle();
+
+      final tab = container.read(editorTabsProvider).tabs.single;
+      expect(tab.isDiagram, isTrue);
+      expect(tab.tableRef?.database, 'postgres');
+      expect(tab.tableRef?.schema, '');
     });
   });
 }

@@ -431,7 +431,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           const PopupMenuItem(value: 'new-table', child: Text('New table')),
         );
       }
-      if (node is SchemaNamespaceNode &&
+      if ((node is SchemaNamespaceNode || docs && node is DatabaseNode) &&
           ref.read(connectionHasSchemaGraphProvider(widget.connectionId))) {
         items.add(
           const PopupMenuItem(value: 'diagram', child: Text('Open diagram')),
@@ -483,6 +483,10 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
                 database: node.database,
                 schema: node.label,
               );
+        } else if (node is DatabaseNode) {
+          ref
+              .read(editorTabsProvider.notifier)
+              .openDiagram(widget.connectionId, database: node.label);
         }
       case 'new-table':
         if (node is SchemaNamespaceNode) {

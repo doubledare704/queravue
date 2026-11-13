@@ -107,7 +107,7 @@ func New(v Variant) *Engine {
 			{Key: ParamDirect, Label: "Direct connection", Kind: engine.FieldBoolean, Default: "false"},
 			{Key: ParamReadPreference, Label: "Read preference", Kind: engine.FieldSelect, Default: "primary", Options: ReadPreferences},
 		},
-		Capabilities: []engine.Capability{engine.CapConnect, engine.CapSchemaInspector, engine.CapDocumentStore, engine.CapShell, engine.CapIndexManager, engine.CapStats, engine.CapValidation},
+		Capabilities: []engine.Capability{engine.CapConnect, engine.CapSchemaInspector, engine.CapDocumentStore, engine.CapShell, engine.CapIndexManager, engine.CapStats, engine.CapValidation, engine.CapSchemaGraph},
 	}}
 }
 

@@ -1,6 +1,6 @@
 # Schema diagrams
 
-Status: the diagram, export, saved diagrams and design mode work for SQL engines. The Mongo diagram is not built yet. This page fills in as the Iteration 9 PRs land.
+Status: the diagram, export, saved diagrams and design mode work for SQL engines; MongoDB, DocumentDB and Cosmos DB get a diagram inferred from sampled documents (Iteration 9).
 
 ## Using the diagram
 - Open it from the schema tree (right-click a schema, "Open diagram"), from the palette ("Open schema diagram") or with `⌘⇧D`. The palette and the shortcut use the schema of the active tab, or the connection's default schema. One diagram tab per schema.
@@ -56,21 +56,43 @@ The core receives the changes per table and orders them (`core/internal/sqldiale
 - In a schema where a few tables are referenced by hundreds, relations are long and cross behind other tables; selecting a table is the way to follow its relations.
 - A relation to a table in another schema is not drawn.
 
-## What is still to come
-- **Mongo:** collections with their sampled fields; references between collections are guesses and are drawn as such.
+## Mongo: the inferred diagram
+- Right-click a database in the schema tree, "Open diagram", or use the palette and `⌘⇧D`; without a database in the active tab the connection's default database is used.
+- Each collection is a box with the field paths of a sample: `_id` first (marked `PK`), then by how many sampled documents have the field. A field missing from some documents, or holding `null`, is nullable (`?`). The type shown is the most frequent one other than `null`. Array elements use the segment `[]`, as in the field list (`items.[].sku`).
+- There is no schema to read, so the relations are guesses, drawn dashed and fainter the less sure they are. The summary counts them ("n inferred"). "Hide inferred" in the toolbar, or the palette entry "Show or hide inferred relations", removes them from the view; the choice is saved with the diagram (`"hideInferred": true`).
+- Design mode is not offered: Mongo connections have no `execute` capability.
+- Each collection is sampled with `$sample` (100 documents by default, `sample_size` up to 1000), four at a time. Loading shows an indeterminate bar until every collection is sampled, because a relation needs the `_id` type of the collection it points at; the tables then stream as on SQL engines. Cancel stops the sampling. The seeded dev database (6 collections, one of 1M documents) loads in about 3 ms p50, 29 ms p95.
+
+### How a relation is guessed
+`core/internal/diagram/infer.go`. For every sampled field other than `_id`:
+1. **The name it refers by.** An id suffix is cut: `customerId`, `customer_id`, `customerID`, `tagIds.[]` and `customer._id` refer by `customer`, `tag`. A field without such a suffix refers by its own name (`author`).
+2. **The collection that name points at.** Case, `_` and `-` are ignored. The same name wins (`person` → `person`), then the one collection whose singular it is (`customer` → `customers`, `category` → `categories`, `box` → `boxes`); two collections with that singular match neither. Views are never targets. When nothing matches and the field had an id suffix, its last words are tried (`parent_category_id` → `categories`, `createdByUserId` → `users`).
+3. **The types.** The field's type must equal the target's `_id` type when the target was sampled.
+
+| Field | Target `_id` | Confidence |
+|---|---|---|
+| `objectId`, id suffix | `objectId` | 0.9 |
+| `objectId`, no suffix (`author`) | `objectId` | 0.7 |
+| another type, id suffix (`book_id` string) | same type | 0.6 |
+| `objectId`, id suffix | unknown (empty collection) | 0.5 |
+| matched only by its last words | | 0.2 less |
+| type differs, or no suffix and not `objectId` | | no relation |
+
+The guesses will include wrong edges (a `userId` that holds an external id) and miss references named unlike their collection. They are never offered as constraints.
 
 ## Contract
 `proto/queravue/v1/diagram.proto`:
 - `GetSchemaGraph` streams the tables of a schema in batches, each with columns and relations, and progress counters.
 - `PreviewDiagramDDL` and `ApplyDiagramDDL` take `SchemaChange` steps for several tables, one entry per table; the core orders the statements as above. A table listed twice, an entry without changes and a change the engine cannot express are refused in band (INVALID or UNSUPPORTED). They share the planning, confirmation, history and cache invalidation of `SchemaDesignService`.
 
-The app enables diagrams from the `schema_graph` capability.
+The app enables diagrams from the `schema_graph` capability. `GraphRelation.inferred` and `confidence` mark the guessed relations; `GetSchemaGraphRequest.sample_size` sets the sample on document stores.
 
 ## How the graph is loaded
 - Three queries per schema, whatever its size: the object list (`ListObjects`), every column with nullability and primary-key position (`ListKeyedColumns`), and every foreign key (`ListRelations`). The last two are the `RelationLister` interface in `core/internal/engine/graph.go`.
-- PostgreSQL, CockroachDB, MySQL, MariaDB, TiDB, SQL Server and SQLite implement it and report `schema_graph`. MongoDB does not yet.
+- PostgreSQL, CockroachDB, MySQL, MariaDB, TiDB, SQL Server and SQLite implement it and report `schema_graph`.
+- Document stores report `schema_graph` through `DocumentStore` instead: core lists the collections and samples them (see Mongo above). `engine.CapabilityAlternatives` records that a capability can come from either interface, and the registry tests check it with `engine.Provides`.
 - The load waits for a running statement on the session to finish, and stops when the call is cancelled.
-- A loaded graph is kept per session, database and schema until the session's schema cache is invalidated (DDL from the editor or the designer, a refresh, the session closing). `refresh = true` reloads it.
+- A loaded graph is kept per session, database, schema and sample size until the session's schema cache is invalidated (DDL from the editor or the designer, a refresh, the session closing). `refresh = true` reloads it.
 - Tables are streamed 50 per message. A table keeps at most 200 columns; `columns_truncated` says when more exist.
 - SQLite foreign keys have no names; they get `fk_<table>_<n>`, as in table details. A reference without a column list is resolved to the referenced table's primary key.
 

@@ -43,12 +43,16 @@ class DiagramReady extends DiagramState {
     this.dirty = false,
     this.notice,
     this.draft = const DiagramDraft(),
+    this.showInferred = true,
     SchemaGraph? drawn,
   }) : drawnGraph = drawn ?? graphWithDraft(graph, draft) {
-    visibleGraph = hidden.isEmpty
+    final related = showInferred
         ? drawnGraph
+        : drawnGraph.withoutInferredRelations();
+    visibleGraph = hidden.isEmpty
+        ? related
         : SchemaGraph([
-            for (final t in drawnGraph.tables)
+            for (final t in related.tables)
               if (!hidden.contains(t.name)) t,
           ]);
     visibleRects = hidden.isEmpty
@@ -79,6 +83,9 @@ class DiagramReady extends DiagramState {
 
   final DiagramDraft draft;
 
+  /// Draws the relations core guessed from sampled documents.
+  final bool showInferred;
+
   /// [graph] with the draft drawn in.
   final SchemaGraph drawnGraph;
 
@@ -99,6 +106,7 @@ class DiagramReady extends DiagramState {
     int? layoutRevision,
     bool? dirty,
     DiagramDraft? draft,
+    bool? showInferred,
   }) => DiagramReady(
     graph: graph,
     rects: rects ?? this.rects,
@@ -108,6 +116,7 @@ class DiagramReady extends DiagramState {
     dirty: dirty ?? this.dirty,
     notice: notice,
     draft: draft ?? this.draft,
+    showInferred: showInferred ?? this.showInferred,
     drawn: draft == null ? drawnGraph : null,
   );
 }
@@ -247,6 +256,7 @@ class DiagramController extends Notifier<DiagramState> {
       dirty: previous?.dirty ?? false,
       notice: notice,
       draft: draft,
+      showInferred: previous?.showInferred ?? !(saved?.hideInferred ?? false),
       drawn: drawn,
     );
   }
@@ -302,6 +312,12 @@ class DiagramController extends Notifier<DiagramState> {
     );
   }
 
+  void showInferredRelations(bool show) {
+    final current = _ready;
+    if (current == null || current.showInferred == show) return;
+    state = current.copyWith(showInferred: show, dirty: true);
+  }
+
   void hide(String table) {
     final current = _ready;
     if (current == null || current.hidden.contains(table)) return;
@@ -351,6 +367,7 @@ class DiagramController extends Notifier<DiagramState> {
       },
       hidden: current.hidden,
       draft: current.draft,
+      hideInferred: !current.showInferred,
     );
   }
 
@@ -470,6 +487,7 @@ class DiagramController extends Notifier<DiagramState> {
       dirty: true,
       notice: current.notice,
       draft: draft,
+      showInferred: current.showInferred,
       drawn: drawn,
     );
   }

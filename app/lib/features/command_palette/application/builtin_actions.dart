@@ -352,6 +352,23 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       },
     ),
     AppAction(
+      id: 'diagram.toggleInferred',
+      title: 'Show or hide inferred relations',
+      subtitle: 'Relations guessed from sampled documents',
+      category: ActionCategory.view,
+      enabledWhen: (watch) =>
+          _diagramShows(watch, (s) => s.drawnGraph.inferredRelationCount > 0),
+      run: (context, ref) async {
+        final diagram = activeDiagramTab(ref);
+        if (diagram == null) return;
+        final controller = ref.read(diagramProvider(diagram.id).notifier);
+        final shown = ref.read(diagramProvider(diagram.id));
+        if (shown is DiagramReady) {
+          controller.showInferredRelations(!shown.showInferred);
+        }
+      },
+    ),
+    AppAction(
       id: 'diagram.newTable',
       title: 'New table on the diagram',
       subtitle: 'Design mode: drafted until you apply it',

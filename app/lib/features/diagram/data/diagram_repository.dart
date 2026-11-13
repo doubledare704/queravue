@@ -187,6 +187,7 @@ class GrpcDiagramRepository implements DiagramRepository {
           referencedTable: r.referencedTable,
           referencedColumns: r.referencedColumns,
           inferred: r.inferred,
+          confidence: r.confidence,
         ),
     ],
     columnsTruncated: t.columnsTruncated,
