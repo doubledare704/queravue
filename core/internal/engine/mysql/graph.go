@@ -48,6 +48,7 @@ func (c *Conn) ListRelations(ctx context.Context, database, schema string) ([]en
 	if err != nil {
 		return nil, err
 	}
+	listed := dbOf(database, schema)
 	rows, err := conn.QueryContext(ctx,
 		`SELECT k.table_name, k.constraint_name, k.column_name,
        k.referenced_table_schema, k.referenced_table_name, k.referenced_column_name,
@@ -56,7 +57,7 @@ FROM information_schema.key_column_usage k
 JOIN information_schema.referential_constraints r
   ON r.constraint_schema = k.constraint_schema AND r.constraint_name = k.constraint_name AND r.table_name = k.table_name
 WHERE k.table_schema = ? AND k.referenced_table_name IS NOT NULL
-ORDER BY k.table_name, k.constraint_name, k.ordinal_position`, dbOf(database, schema))
+ORDER BY k.table_name, k.constraint_name, k.ordinal_position`, listed)
 	if err != nil {
 		return nil, c.execError(ctx, err)
 	}
@@ -66,6 +67,9 @@ ORDER BY k.table_name, k.constraint_name, k.ordinal_position`, dbOf(database, sc
 		var table, name, col, refSchema, refTable, refCol, onDelete, onUpdate string
 		if err := rows.Scan(&table, &name, &col, &refSchema, &refTable, &refCol, &onDelete, &onUpdate); err != nil {
 			return nil, c.execError(ctx, err)
+		}
+		if refSchema == listed {
+			refSchema = ""
 		}
 		folded.Add(table, name, engine.ForeignKeyDef{
 			ReferencedSchema: refSchema, ReferencedTable: refTable,

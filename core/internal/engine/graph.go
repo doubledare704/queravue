@@ -24,6 +24,8 @@ type RelationLister interface {
 	// ListKeyedColumns returns all columns ordered by table, then position.
 	ListKeyedColumns(ctx context.Context, database, schema string) ([]KeyedColumn, error)
 	// ListRelations returns all foreign keys ordered by table, then name.
+	// ReferencedSchema is empty when the referenced table is in the listed
+	// schema, so a same-named table elsewhere is never mistaken for it.
 	ListRelations(ctx context.Context, database, schema string) ([]TableRelation, error)
 }
 

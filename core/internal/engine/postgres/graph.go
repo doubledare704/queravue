@@ -115,6 +115,9 @@ func (c *Conn) ListRelations(ctx context.Context, _, schema string) ([]engine.Ta
 			return nil, c.execError(ctx, err)
 		}
 		rel.OnDelete, rel.OnUpdate = pgReferentialAction(onDelete), pgReferentialAction(onUpdate)
+		if rel.ReferencedSchema == schema {
+			rel.ReferencedSchema = ""
+		}
 		out = append(out, rel)
 	}
 	if err := rows.Err(); err != nil {

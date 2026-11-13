@@ -82,8 +82,8 @@ func TestListRelationsFoldsCompositeKeysResolvesImplicitKeysAndKeepsActions(t *t
 	}
 	var got []summary
 	for _, r := range rels {
-		if r.Name == "" || r.ReferencedSchema != "main" {
-			t.Errorf("relation %+v needs a name and the schema main", r)
+		if r.Name == "" || r.ReferencedSchema != "" {
+			t.Errorf("relation %+v needs a name and no schema, as it stays in main", r)
 		}
 		got = append(got, summary{r.Table, r.ReferencedTable, r.Columns, r.ReferencedColumns, r.OnDelete, r.OnUpdate})
 	}

@@ -93,6 +93,9 @@ ORDER BY pt.name, fk.name, fkc.constraint_column_id`, schema)
 		if err := rows.Scan(&table, &name, &col, &refSchema, &refTable, &refCol, &onDelete, &onUpdate); err != nil {
 			return nil, c.execError(ctx, err)
 		}
+		if refSchema == schema {
+			refSchema = ""
+		}
 		folded.Add(table, name, engine.ForeignKeyDef{
 			ReferencedSchema: refSchema, ReferencedTable: refTable,
 			OnDelete: engine.ParseReferentialAction(onDelete), OnUpdate: engine.ParseReferentialAction(onUpdate),

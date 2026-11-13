@@ -271,7 +271,7 @@ Future<void> addRelationFlow(
     from: table,
     targets: [
       for (final t in ready.drawnGraph.tables)
-        if (t.type == SchemaObjectType.table) t,
+        if (t.type == SchemaObjectType.table && !t.isExternal) t,
     ],
     takenNames: {
       for (final t in ready.drawnGraph.tables)
@@ -341,7 +341,9 @@ Future<void> discardDraftFlow(
 List<(String, String)> draftMenuItems(DiagramReady ready, String table) {
   final drawn = ready.table(table);
   return [
-    if (drawn != null && drawn.type == SchemaObjectType.table)
+    if (drawn != null &&
+        drawn.type == SchemaObjectType.table &&
+        !drawn.isExternal)
       ('relation', 'Add relation…'),
     if (ready.draft.table(table) != null) ...[
       ('edit', 'Edit table…'),

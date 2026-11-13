@@ -100,10 +100,19 @@ void _writeTable(
   ColorScheme colors,
 ) {
   final isView = table.isView;
-  final header = isView ? colors.tertiaryContainer : colors.primaryContainer;
-  final onHeader = isView
+  final header = table.isExternal
+      ? colors.surfaceContainerHighest
+      : isView
+      ? colors.tertiaryContainer
+      : colors.primaryContainer;
+  final onHeader = table.isExternal
+      ? colors.onSurfaceVariant
+      : isView
       ? colors.onTertiaryContainer
       : colors.onPrimaryContainer;
+  final outline = table.isExternal
+      ? '${_hex(colors.outline)}" stroke-dasharray="5 4'
+      : _hex(colors.outlineVariant);
   final x = rect.left, y = rect.top, w = rect.width, h = rect.height;
   out
     ..writeln('<g>')
@@ -119,7 +128,7 @@ void _writeTable(
     )
     ..writeln(
       '<rect x="${_n(x)}" y="${_n(y)}" width="${_n(w)}" height="${_n(h)}" '
-      'rx="$_radius" fill="none" stroke="${_hex(colors.outlineVariant)}"/>',
+      'rx="$_radius" fill="none" stroke="$outline"/>',
     );
   _writeText(
     out,

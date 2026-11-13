@@ -186,11 +186,15 @@ class DiagramPainter extends CustomPainter {
     final isView = table.isView;
     final headerColor = table.draft
         ? colors.secondaryContainer
+        : table.isExternal
+        ? colors.surfaceContainerHighest
         : isView
         ? colors.tertiaryContainer
         : colors.primaryContainer;
     final onHeader = table.draft
         ? colors.onSecondaryContainer
+        : table.isExternal
+        ? colors.onSurfaceVariant
         : isView
         ? colors.onTertiaryContainer
         : colors.onPrimaryContainer;
@@ -212,8 +216,10 @@ class DiagramPainter extends CustomPainter {
       ..strokeWidth = (isSelected ? 2.4 : 1) / math.min(scale, 1)
       ..color = isSelected || table.draft
           ? colors.primary
+          : table.isExternal
+          ? colors.outline
           : colors.outlineVariant;
-    if (table.draft && !isSelected) {
+    if ((table.draft || table.isExternal) && !isSelected) {
       _paintDashed(canvas, Path()..addRRect(box), outline);
     } else {
       canvas.drawRRect(box, outline);
@@ -227,7 +233,11 @@ class DiagramPainter extends CustomPainter {
       table.name,
       TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: onHeader),
       rect.width - 20,
-      isView ? 'view-title' : 'title',
+      table.isExternal
+          ? 'external-title'
+          : isView
+          ? 'view-title'
+          : 'title',
     );
     title.paint(
       canvas,

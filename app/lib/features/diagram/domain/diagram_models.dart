@@ -62,8 +62,10 @@ class DiagramTable {
     this.relations = const [],
     this.columnsTruncated = false,
     this.draft = false,
+    this.externalSchema = '',
   });
 
+  /// The table's name; `schema.table` for a table in another schema.
   final String name;
   final SchemaObjectType type;
   final int rowEstimate;
@@ -71,6 +73,16 @@ class DiagramTable {
   final List<DiagramRelation> relations;
   final bool columnsTruncated;
   final bool draft;
+
+  /// Set for a table of another schema that this schema references. Only
+  /// the referenced columns are known.
+  final String externalSchema;
+
+  bool get isExternal => externalSchema.isNotEmpty;
+
+  /// The name inside its own schema.
+  String get localName =>
+      isExternal ? name.substring(externalSchema.length + 1) : name;
 
   bool get isView =>
       type == SchemaObjectType.view ||
@@ -96,6 +108,15 @@ class SchemaGraph {
   int get relationCount =>
       tables.fold(0, (sum, table) => sum + table.relations.length);
 
+  int get localTableCount => tables.where((t) => !t.isExternal).length;
+
+  int get externalRelationCount => tables.fold(
+    0,
+    (sum, table) =>
+        sum +
+        table.relations.where((r) => r.referencedSchema.isNotEmpty).length,
+  );
+
   int get inferredRelationCount => tables.fold(
     0,
     (sum, table) => sum + table.relations.where((r) => r.inferred).length,
@@ -115,8 +136,72 @@ class SchemaGraph {
               ],
               columnsTruncated: t.columnsTruncated,
               draft: t.draft,
+              externalSchema: t.externalSchema,
             )
           : t,
+  ]);
+}
+
+/// [graph] with a box for every table of another schema it references, named
+/// `schema.table`, and its relations pointing at those boxes. Core leaves
+/// `referencedSchema` empty for the diagram's own schema.
+SchemaGraph withExternalTables(SchemaGraph graph) {
+  final referenced = <String, (String, Set<String>)>{};
+  String keyOf(DiagramRelation r) =>
+      '${r.referencedSchema}.${r.referencedTable}';
+  final tables = [
+    for (final t in graph.tables)
+      t.relations.every((r) => r.referencedSchema.isEmpty)
+          ? t
+          : DiagramTable(
+              name: t.name,
+              type: t.type,
+              rowEstimate: t.rowEstimate,
+              columns: t.columns,
+              relations: [
+                for (final r in t.relations)
+                  if (r.referencedSchema.isEmpty)
+                    r
+                  else
+                    DiagramRelation(
+                      name: r.name,
+                      columns: r.columns,
+                      referencedSchema: r.referencedSchema,
+                      referencedTable: keyOf(r),
+                      referencedColumns: r.referencedColumns,
+                      inferred: r.inferred,
+                      confidence: r.confidence,
+                    ),
+              ],
+              columnsTruncated: t.columnsTruncated,
+              draft: t.draft,
+            ),
+  ];
+  for (final t in graph.tables) {
+    for (final r in t.relations) {
+      if (r.referencedSchema.isEmpty) continue;
+      final (_, columns) = referenced.putIfAbsent(
+        keyOf(r),
+        () => (r.referencedSchema, <String>{}),
+      );
+      columns.addAll(r.referencedColumns);
+    }
+  }
+  if (referenced.isEmpty) return graph;
+  final local = {for (final t in graph.tables) t.name};
+  final keys = referenced.keys.where((k) => !local.contains(k)).toList()
+    ..sort();
+  return SchemaGraph([
+    ...tables,
+    for (final key in keys)
+      DiagramTable(
+        name: key,
+        externalSchema: referenced[key]!.$1,
+        columns: [
+          for (final c in referenced[key]!.$2)
+            DiagramColumn(name: c, nullable: false),
+        ],
+      ),
   ]);
 }
 

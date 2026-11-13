@@ -38,6 +38,12 @@ func target() enginetest.Target {
 		Product:  "SQL Server",
 		Database: db,
 		Schema:   "dbo",
+		OtherSchema: &enginetest.SchemaFixture{
+			Create: func(name string) []string { return []string{"CREATE SCHEMA " + name} },
+			Drop: func(name string) []string {
+				return []string{"DROP TABLE IF EXISTS " + name + "." + enginetest.CrossSchemaParent, "DROP SCHEMA IF EXISTS " + name}
+			},
+		},
 	}
 }
 

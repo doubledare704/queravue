@@ -14,12 +14,13 @@ func TestIntegrationSuitePostgres(t *testing.T) {
 	params, secret := pgParams()
 	e := New(VariantPostgres)
 	enginetest.Run(t, enginetest.Target{
-		Engine:   e,
-		Config:   engine.Config{EngineID: IDPostgres, Params: params},
-		Secret:   secret,
-		Product:  "PostgreSQL",
-		Database: params[ParamDatabase],
-		Schema:   "public",
+		Engine:      e,
+		Config:      engine.Config{EngineID: IDPostgres, Params: params},
+		Secret:      secret,
+		Product:     "PostgreSQL",
+		Database:    params[ParamDatabase],
+		Schema:      "public",
+		OtherSchema: postgresSchemas,
 	})
 }
 
@@ -44,11 +45,17 @@ func TestIntegrationSuiteCockroach(t *testing.T) {
 			ParamDatabase: db,
 			ParamSSLMode:  "disable",
 		}},
-		Secret:   engine.NewSecret(get("CRDB_PASSWORD", "")),
-		Product:  "CockroachDB",
-		Database: db,
-		Schema:   "public",
+		Secret:      engine.NewSecret(get("CRDB_PASSWORD", "")),
+		Product:     "CockroachDB",
+		Database:    db,
+		Schema:      "public",
+		OtherSchema: postgresSchemas,
 	})
 }
 
 func envOr(k string) string { return os.Getenv(k) }
+
+var postgresSchemas = &enginetest.SchemaFixture{
+	Create: func(name string) []string { return []string{"CREATE SCHEMA " + name} },
+	Drop:   func(name string) []string { return []string{"DROP SCHEMA IF EXISTS " + name + " CASCADE"} },
+}
