@@ -45,6 +45,9 @@ func (c *Conn) ListObjects(ctx context.Context, database, _ string) ([]engine.Sc
 	if err != nil {
 		return nil, err
 	}
+	if database == "" {
+		database = c.defaultDB
+	}
 	db := cl.Database(database)
 	specs, err := db.ListCollectionSpecifications(ctx, bson.D{})
 	if err != nil {

@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -170,5 +171,56 @@ func TestDiagramDDLWithoutADesignServiceIsUnsupported(t *testing.T) {
 	}
 	if _, err := svc.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{SessionId: "missing"}); status.Code(err) != codes.NotFound {
 		t.Errorf("unknown session code = %v, want NotFound", status.Code(err))
+	}
+}
+
+type fakeSampledConn struct {
+	fakeValidatingConn
+	engine.DocumentStore
+	sampleSize atomic.Uint32
+}
+
+func (*fakeSampledConn) ListDatabases(context.Context) ([]string, error)       { return nil, nil }
+func (*fakeSampledConn) ListSchemas(context.Context, string) ([]string, error) { return nil, nil }
+func (*fakeSampledConn) DescribeTable(context.Context, string, string, string) (engine.TableDetails, error) {
+	return engine.TableDetails{}, nil
+}
+func (*fakeSampledConn) ListObjects(context.Context, string, string) ([]engine.SchemaObject, error) {
+	return []engine.SchemaObject{{Name: "authors", Type: engine.ObjectTypeCollection}, {Name: "books", Type: engine.ObjectTypeCollection}}, nil
+}
+
+func (f *fakeSampledConn) SampleFieldPaths(_ context.Context, _, collection string, opts engine.PathSampleOptions) (engine.FieldPathSample, error) {
+	f.sampleSize.Store(opts.SampleSize)
+	paths := []engine.FieldPathStat{{Path: "_id", Frequency: 1, Types: []engine.FieldType{{Type: "objectId", Count: 2}}}}
+	if collection == "books" {
+		paths = append(paths, engine.FieldPathStat{Path: "author_id", Frequency: 0.5, Types: []engine.FieldType{{Type: "objectId", Count: 1}}})
+	}
+	return engine.FieldPathSample{Paths: paths, Sampled: 2}, nil
+}
+
+func TestGetSchemaGraphOfADocumentStoreSendsInferredRelations(t *testing.T) {
+	conn := &fakeSampledConn{}
+	svc, sess := diagramEnv(t, conn)
+	rec := &schemaGraphRecorder{}
+	if err := svc.GetSchemaGraph(&queravuev1.GetSchemaGraphRequest{SessionId: sess.ID, Database: "library", SampleSize: 20}, rec); err != nil {
+		t.Fatal(err)
+	}
+	if len(rec.sent) != 2 || rec.sent[1].GetError() != nil {
+		t.Fatalf("sent = %v", rec.sent)
+	}
+	books := rec.sent[0].GetTables()[1]
+	if books.GetType() != queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_COLLECTION {
+		t.Errorf("type = %v", books.GetType())
+	}
+	if cols := books.GetColumns(); len(cols) != 2 || cols[0].GetPrimaryKeyOrder() != 1 || !cols[1].GetNullable() || cols[1].GetTypeName() != "objectId" {
+		t.Errorf("columns = %v", cols)
+	}
+	rels := books.GetRelations()
+	if len(rels) != 1 || !rels[0].GetInferred() || rels[0].GetConfidence() != 0.9 || rels[0].GetName() != "" ||
+		rels[0].GetReferencedTable() != "authors" || rels[0].GetReferencedColumns()[0] != "_id" {
+		t.Errorf("relations = %v", rels)
+	}
+	if got := conn.sampleSize.Load(); got != 20 {
+		t.Errorf("sample size = %d, want 20", got)
 	}
 }

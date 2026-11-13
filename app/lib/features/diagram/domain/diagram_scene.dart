@@ -9,6 +9,10 @@ import 'diagram_models.dart';
 const forkLength = 9.0;
 const forkSpread = 5.0;
 const endDotRadius = 3.0;
+
+/// Less sure guesses are drawn fainter.
+double inferredOpacity(double confidence) =>
+    (0.3 + 0.7 * confidence).clamp(0.3, 1.0);
 const _sideClearance = 24.0;
 const _minReach = 36.0;
 

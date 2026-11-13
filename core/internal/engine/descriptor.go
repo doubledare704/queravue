@@ -35,7 +35,8 @@ const (
 	// CapFormat: SQL formatting (Iteration 8, ADR 0015). It needs no Conn
 	// interface; see CapabilitiesWithoutInterface.
 	CapFormat Capability = "format"
-	// CapSchemaGraph: RelationLister (Iteration 9, ADR 0017).
+	// CapSchemaGraph: RelationLister, or DocumentStore whose samples core
+	// infers the graph from (Iteration 9, ADR 0017).
 	CapSchemaGraph Capability = "schema_graph"
 )
 
@@ -56,6 +57,26 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapValidation:      reflect.TypeFor[ValidationManager](),
 	CapCompletion:      reflect.TypeFor[ColumnLister](),
 	CapSchemaGraph:     reflect.TypeFor[RelationLister](),
+}
+
+// CapabilityAlternatives lists further Conn interfaces that provide a
+// capability on their own.
+var CapabilityAlternatives = map[Capability][]reflect.Type{
+	CapSchemaGraph: {reflect.TypeFor[DocumentStore]()},
+}
+
+// Provides reports whether conn implements an interface that backs capability.
+// Capabilities without an interface are always provided.
+func Provides(conn any, capability Capability) bool {
+	primary, ok := CapabilityInterfaces[capability]
+	if !ok {
+		return true
+	}
+	t := reflect.TypeOf(conn)
+	if t.Implements(primary) {
+		return true
+	}
+	return slices.ContainsFunc(CapabilityAlternatives[capability], t.Implements)
 }
 
 // FieldKind tells the UI which input widget to render.

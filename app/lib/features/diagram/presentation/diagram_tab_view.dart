@@ -117,6 +117,7 @@ class _DiagramTabViewState extends ConsumerState<DiagramTabView> {
           onRelayout: controller.relayout,
           onRefresh: () => unawaited(controller.load(refresh: true)),
           onShowHidden: controller.showAll,
+          onShowInferred: controller.showInferredRelations,
           onSave: () => unawaited(saveDiagramFlow(context, ref, tabId)),
           onExport: (format) =>
               unawaited(exportDiagramFlow(context, ref, tabId, format)),
@@ -176,6 +177,7 @@ class _Toolbar extends StatelessWidget {
     required this.onRelayout,
     required this.onRefresh,
     required this.onShowHidden,
+    required this.onShowInferred,
     required this.onSave,
     required this.onExport,
     required this.canDesign,
@@ -192,6 +194,7 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback onRelayout;
   final VoidCallback onRefresh;
   final VoidCallback onShowHidden;
+  final ValueChanged<bool> onShowInferred;
   final VoidCallback onSave;
   final ValueChanged<ExportFormat> onExport;
   final bool canDesign;
@@ -207,6 +210,7 @@ class _Toolbar extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final colors = Theme.of(context).colorScheme;
     final file = tab.diagramFile;
+    final inferred = ready?.graph.inferredRelationCount ?? 0;
     return SizedBox(
       height: 40,
       child: Padding(
@@ -216,8 +220,11 @@ class _Toolbar extends StatelessWidget {
             if (ready != null) ...[
               Flexible(
                 child: Text(
-                  '${ready.graph.tables.length} tables · '
-                  '${ready.graph.relationCount} relations',
+                  [
+                    '${ready.graph.tables.length} tables',
+                    '${ready.graph.relationCount} relations',
+                    if (inferred > 0) '$inferred inferred',
+                  ].join(' · '),
                   key: const Key('diagram-summary'),
                   overflow: TextOverflow.ellipsis,
                   style: text.labelLarge,
@@ -273,6 +280,20 @@ class _Toolbar extends StatelessWidget {
                 tooltip: 'New table ($primaryLabel⌥T)',
                 icon: const Icon(Icons.add_box_outlined, size: 18),
                 onPressed: ready != null ? onNewTable : null,
+              ),
+            if (ready != null && inferred > 0)
+              TextButton.icon(
+                key: const Key('diagram-toggle-inferred'),
+                onPressed: () => onShowInferred(!ready.showInferred),
+                icon: Icon(
+                  ready.showInferred
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  ready.showInferred ? 'Hide inferred' : 'Show inferred',
+                ),
               ),
             if (ready != null && ready.hidden.isNotEmpty)
               TextButton.icon(

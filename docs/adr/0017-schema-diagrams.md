@@ -44,6 +44,8 @@ SQLite cannot add a foreign key to an existing table but does not check the refe
 ### 7. Mongo relations are inferred and say so
 On document stores `GetSchemaGraph` samples each collection (bounded by `sample_size`, cancellable, with progress) and reports field paths as columns. A relation is suggested when a field's name and sampled type point at another collection's `_id`. Such a relation has `inferred = true` and a confidence, and the UI draws it differently and can hide it. No constraint is claimed.
 
+As built (PR 6): the inference runs in core (`internal/diagram`), not in the Mongo engine, from `ListObjects` and `DocumentStore.SampleFieldPaths`; the engine stays a data source. `schema_graph` is therefore backed by `RelationLister` or by `DocumentStore`, recorded in `engine.CapabilityAlternatives`. Progress is coarser than first planned: a relation needs the `_id` type of the collection it points at, so every collection is sampled before the first table is sent, and the UI shows an indeterminate bar until then. Keeping `tables_done` meaning "tables sent" avoided a contract change. The naming and type rules and their confidences are in `docs/diagrams.md`.
+
 ### 8. Contract
 `proto/queravue/v1/diagram.proto` adds `DiagramService` with `GetSchemaGraph` (server stream), `PreviewDiagramDDL` and `ApplyDiagramDDL`. It is additive; protocol version 9.
 

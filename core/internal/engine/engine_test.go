@@ -124,3 +124,26 @@ func TestBuiltinRegistry(t *testing.T) {
 		t.Error("duplicate id must fail")
 	}
 }
+
+type documentOnlyConn struct{ engine.DocumentStore }
+
+type relationOnlyConn struct{ engine.RelationLister }
+
+func TestProvidesAcceptsAlternativeInterfaces(t *testing.T) {
+	tests := []struct {
+		conn       any
+		capability engine.Capability
+		want       bool
+	}{
+		{relationOnlyConn{}, engine.CapSchemaGraph, true},
+		{documentOnlyConn{}, engine.CapSchemaGraph, true},
+		{struct{}{}, engine.CapSchemaGraph, false},
+		{documentOnlyConn{}, engine.CapExecute, false},
+		{struct{}{}, engine.CapFormat, true},
+	}
+	for _, tt := range tests {
+		if got := engine.Provides(tt.conn, tt.capability); got != tt.want {
+			t.Errorf("Provides(%T, %s) = %v, want %v", tt.conn, tt.capability, got, tt.want)
+		}
+	}
+}

@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../schema/domain/schema_models.dart';
 import '../domain/diagram_layout.dart';
 import '../domain/diagram_models.dart';
 import '../domain/diagram_scene.dart';
@@ -151,6 +150,13 @@ class DiagramPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = paint.strokeWidth
         ..color = colors.primary;
+    } else if (r.relation.inferred) {
+      paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = paint.strokeWidth
+        ..color = paint.color.withValues(
+          alpha: paint.color.a * inferredOpacity(r.relation.confidence),
+        );
     }
     if (r.relation.inferred || r.relation.draft) {
       _paintDashed(canvas, path, paint);
@@ -177,7 +183,7 @@ class DiagramPainter extends CustomPainter {
   void _paintTable(Canvas canvas, DiagramTable table, Rect rect) {
     final isSelected = table.name == selected;
     final box = RRect.fromRectAndRadius(rect, const Radius.circular(6));
-    final isView = table.type != SchemaObjectType.table;
+    final isView = table.isView;
     final headerColor = table.draft
         ? colors.secondaryContainer
         : isView

@@ -6,7 +6,6 @@ package enginetest
 
 import (
 	"context"
-	"reflect"
 	"runtime"
 	"testing"
 	"time"
@@ -135,8 +134,8 @@ func connectPing(t *testing.T, tg Target) {
 		t.Error("connection provides no SQL dialect")
 	}
 	for _, capability := range tg.Engine.Descriptor().Capabilities {
-		if iface, ok := engine.CapabilityInterfaces[capability]; ok && !implements(c, iface) {
-			t.Errorf("declares %s but Conn does not implement %v", capability, iface)
+		if !engine.Provides(c, capability) {
+			t.Errorf("declares %s but Conn does not implement %v", capability, engine.CapabilityInterfaces[capability])
 		}
 	}
 }
@@ -467,8 +466,4 @@ func itoa(n int) string {
 		b[i] = byte('0' + n%10)
 	}
 	return string(b[i:])
-}
-
-func implements(c engine.Conn, iface reflect.Type) bool {
-	return reflect.TypeOf(c).Implements(iface)
 }

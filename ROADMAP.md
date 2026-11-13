@@ -84,13 +84,19 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Table, collection and designer tabs are not restored after a restart.
 - Bulk introspection on a 500-table schema was measured on PostgreSQL only.
 
-### It. 9 — ER diagrams + materialize 🚧 in progress
+### It. 9 — ER diagrams + materialize ✅ done
 - Auto-generated ER diagram from schema (auto-layout, zoom, export SVG/PNG).
 - Design mode: draw tables/relations → generate DDL → apply.
 - Mongo: inferred schema diagram from sampling.
 - **Done when:** a 100-table schema renders readably, and a designed diagram creates real tables.
 
-**Status:** PR 1 (ADR 0017, `DiagramService` contract, protocol version 9), PR 2 (bulk schema graph in core for the SQL engines: 500 tables in 27 ms p95), PR 3 (read-only diagram with auto-layout, pan and zoom: 500 tables open in 0.14 s, pan frames under 4 ms) and PR 4 (SVG and PNG export, saved diagrams in the workspace, hidden tables, diagram tabs restored after a restart) are merged; PR 5 of 6 (design mode: draft tables and relations on the diagram, review the ordered DDL, apply; end-to-end on SQLite and PostgreSQL) is in review. Then: Mongo inferred diagram.
+**Status:** done in six PRs (#40 to #45): ADR 0017 and the `DiagramService` contract (protocol version 9); the schema graph loaded in bulk for the SQL engines (500 tables in 27 ms p95 on PostgreSQL); a read-only diagram with automatic layout, pan and zoom (500 tables open in 0.14 s, pan frames under 4 ms); SVG and PNG export and saved diagrams in the workspace; design mode, where drafted tables and relations become ordered DDL that is reviewed and applied (end-to-end on SQLite and PostgreSQL, integration-tested on every docker SQL engine); and a Mongo diagram inferred from sampled documents, with guessed relations marked, faded by confidence and hideable (the seeded database loads in 3 ms p50).
+
+**Known gaps (carry forward):**
+- Relations drawn in design mode reference a one-column primary key; composite references stay with the table designer. On SQLite a relation from an existing table is refused.
+- Relations to tables in another schema are not drawn.
+- Mongo relations are name-and-type guesses: they miss references named unlike their collection, and loading shows no per-collection progress because every collection is sampled before the first table is sent.
+- The diagram end-to-end tests pump for fixed times; `pumpAndSettle` hangs in the real app while the schema tree shows a spinner.
 
 ### It. 10 — Remaining engines + connectivity
 - Oracle (go-ora), ClickHouse, DuckDB.

@@ -4,7 +4,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
-import '../../schema/domain/schema_models.dart';
 import '../domain/diagram_layout.dart';
 import '../domain/diagram_models.dart';
 import '../domain/diagram_scene.dart';
@@ -72,6 +71,11 @@ void _writeRelation(
   final c = relationCurve(r, target: target, rowsDrawn: true);
   final stroke = _hex(colors.outline);
   final dash = r.relation.inferred ? ' stroke-dasharray="6 4"' : '';
+  final inferred = r.relation.inferred;
+  if (inferred) {
+    final opacity = inferredOpacity(r.relation.confidence).toStringAsFixed(2);
+    out.writeln('<g opacity="$opacity">');
+  }
   out
     ..writeln(
       '<path d="M${_p(c.start)} C${_p(c.control1)} ${_p(c.control2)} '
@@ -86,6 +90,7 @@ void _writeRelation(
       '<circle cx="${_n(c.end.dx)}" cy="${_n(c.end.dy)}" '
       'r="${_n(endDotRadius)}" fill="$stroke"/>',
     );
+  if (inferred) out.writeln('</g>');
 }
 
 void _writeTable(
@@ -94,7 +99,7 @@ void _writeTable(
   Rect rect,
   ColorScheme colors,
 ) {
-  final isView = table.type != SchemaObjectType.table;
+  final isView = table.isView;
   final header = isView ? colors.tertiaryContainer : colors.primaryContainer;
   final onHeader = isView
       ? colors.onTertiaryContainer

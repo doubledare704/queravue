@@ -45,7 +45,7 @@ func (d *DiagramService) session(id string) (*session.Session, error) {
 func graphError(ctx context.Context, err error) *queravuev1.AdminError {
 	switch {
 	case errors.Is(err, diagram.ErrNotSupported):
-		return unsupported("this connection cannot list schema relations")
+		return unsupported("this connection cannot draw a schema diagram")
 	case ctx.Err() != nil || errors.Is(err, context.Canceled):
 		return adminErr(queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_CANCELED, "loading the schema graph was cancelled")
 	}
@@ -65,7 +65,7 @@ func (d *DiagramService) GetSchemaGraph(req *queravuev1.GetSchemaGraphRequest, s
 		}
 		return nil
 	}
-	graph, err := d.graphs.Get(ctx, sess, req.GetDatabase(), req.GetSchema(), req.GetRefresh())
+	graph, err := d.graphs.Get(ctx, sess, diagram.Scope{Database: req.GetDatabase(), Schema: req.GetSchema(), SampleSize: req.GetSampleSize()}, req.GetRefresh())
 	if err != nil {
 		return send(&queravuev1.GetSchemaGraphResponse{Done: true, Error: graphError(ctx, err)})
 	}
@@ -132,6 +132,8 @@ func graphTablesToProto(tables []diagram.Table) []*queravuev1.GraphTable {
 				ReferencedColumns: r.ReferencedColumns,
 				OnDelete:          referentialActionToProto(r.OnDelete),
 				OnUpdate:          referentialActionToProto(r.OnUpdate),
+				Inferred:          r.Inferred,
+				Confidence:        r.Confidence,
 			}
 		}
 		out[i] = &queravuev1.GraphTable{

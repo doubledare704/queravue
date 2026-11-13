@@ -53,7 +53,7 @@ func TestIntegrationLargeSchemaGraphLoadsWithinBudget(t *testing.T) {
 	var graph *diagram.Graph
 	for i := range durations {
 		start := time.Now()
-		if graph, err = diagram.Load(ctx, sess, "", "large"); err != nil {
+		if graph, err = diagram.Load(ctx, sess, diagram.Scope{Schema: "large"}); err != nil {
 			t.Fatal(err)
 		}
 		durations[i] = time.Since(start)

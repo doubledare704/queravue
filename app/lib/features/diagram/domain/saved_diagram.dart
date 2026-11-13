@@ -21,6 +21,7 @@ class SavedDiagram {
     this.positions = const {},
     this.hidden = const {},
     this.draft = const DiagramDraft(),
+    this.hideInferred = false,
   });
 
   final String connectionId;
@@ -36,6 +37,9 @@ class SavedDiagram {
 
   /// Tables and relations designed and not applied yet.
   final DiagramDraft draft;
+
+  /// Relations guessed from sampled documents are not drawn.
+  final bool hideInferred;
 
   /// One table per line, sorted, so a diagram in Git diffs table by table.
   String toJson() {
@@ -64,6 +68,11 @@ class SavedDiagram {
       out.writeln('  },');
     }
     out.write('  "hidden": ${jsonEncode(hiddenNames)}');
+    if (hideInferred) {
+      out
+        ..writeln(',')
+        ..write('  "hideInferred": true');
+    }
     if (!draft.isEmpty) {
       final json = draft.toJson();
       out
@@ -123,6 +132,7 @@ class SavedDiagram {
           if (h is String) h,
       },
       draft: draft,
+      hideInferred: json['hideInferred'] == true,
     );
   }
 }
