@@ -109,12 +109,6 @@ func TestDiagramApplyOnProductionNeedsConfirmation(t *testing.T) {
 
 func TestDiagramDDLReportsInvalidAndUnsupportedChangesInBand(t *testing.T) {
 	e := setupIndexEnv(t, false)
-	addForeignKey := &queravuev1.TableChanges{
-		TableRef: orders(),
-		Changes: []*queravuev1.SchemaChange{{Change: &queravuev1.SchemaChange_AddForeignKey{AddForeignKey: &queravuev1.AddForeignKey{
-			ForeignKey: &queravuev1.ForeignKeySpec{Columns: []string{"customer"}, ReferencedTable: &queravuev1.TableRef{Table: "invoices"}, ReferencedColumns: []string{"id"}},
-		}}}},
-	}
 	cases := []struct {
 		name   string
 		tables []*queravuev1.TableChanges
@@ -123,7 +117,6 @@ func TestDiagramDDLReportsInvalidAndUnsupportedChangesInBand(t *testing.T) {
 		{"nothing", nil, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID},
 		{"twice", []*queravuev1.TableChanges{draftTable("a"), draftTable("a")}, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID},
 		{"empty step", []*queravuev1.TableChanges{{TableRef: &queravuev1.TableRef{Table: "a"}, Changes: []*queravuev1.SchemaChange{{}}}}, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_INVALID},
-		{"sqlite foreign key on an existing table", []*queravuev1.TableChanges{draftTable("invoices"), addForeignKey}, queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -133,4 +126,112 @@ func TestDiagramDDLReportsInvalidAndUnsupportedChangesInBand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func referenceFromOrders(column string, addColumn bool) *queravuev1.TableChanges {
+	var changes []*queravuev1.SchemaChange
+	if addColumn {
+		changes = append(changes, &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AddColumn{AddColumn: &queravuev1.AddColumn{
+			Column: &queravuev1.ColumnSpec{Name: column, TypeName: "INTEGER", Nullable: true},
+		}}})
+	}
+	changes = append(changes, &queravuev1.SchemaChange{Change: &queravuev1.SchemaChange_AddForeignKey{AddForeignKey: &queravuev1.AddForeignKey{
+		ForeignKey: &queravuev1.ForeignKeySpec{
+			Name: "fk_orders_invoices", Columns: []string{column},
+			ReferencedTable: &queravuev1.TableRef{Table: "invoices"}, ReferencedColumns: []string{"id"},
+		},
+	}}})
+	return &queravuev1.TableChanges{TableRef: orders(), Changes: changes}
+}
+
+func ordersForeignKeys(t *testing.T, e indexEnv) []string {
+	t.Helper()
+	details, err := e.schema.GetTableDetails(context.Background(), &queravuev1.GetTableDetailsRequest{SessionId: e.sess.ID, TableRef: orders(), Refresh: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, fk := range details.GetForeignKeys() {
+		out = append(out, strings.Join(fk.GetColumns(), ",")+"->"+fk.GetReferencedTable())
+	}
+	return out
+}
+
+func TestDiagramAddsAReferencingColumnToAnExistingSQLiteTable(t *testing.T) {
+	e := setupIndexEnv(t, false)
+	resp, err := e.diagram.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{
+		SessionId: e.sess.ID,
+		Tables:    []*queravuev1.TableChanges{referenceFromOrders("invoices_id", true), draftTable("invoices")},
+	})
+	if err != nil || resp.GetError() != nil || resp.GetExecutedStatements() != 2 {
+		t.Fatalf("ApplyDiagramDDL: %v %+v", err, resp)
+	}
+	if got := resp.GetStatements()[1].GetSql(); !strings.Contains(got, `ADD COLUMN "invoices_id" INTEGER CONSTRAINT "fk_orders_invoices" REFERENCES "invoices"`) {
+		t.Errorf("second statement = %s", got)
+	}
+	if got := ordersForeignKeys(t, e); strings.Join(got, " ") != "invoices_id->invoices" {
+		t.Errorf("orders foreign keys = %v", got)
+	}
+	if err := execSQL(t, e, "PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatal(err)
+	}
+	if err := execSQL(t, e, "INSERT INTO orders (id, invoices_id) VALUES (99, 42)"); err == nil {
+		t.Error("an order pointing at a missing invoice was accepted")
+	}
+}
+
+func TestDiagramRebuildsAnExistingSQLiteColumnIntoAForeignKey(t *testing.T) {
+	e := setupIndexEnv(t, false)
+	if err := execSQL(t, e, "INSERT INTO orders (id, customer, note) VALUES (1, 7, 'kept'), (2, 8, 'also kept')"); err != nil {
+		t.Fatal(err)
+	}
+	tables := []*queravuev1.TableChanges{draftTable("invoices"), referenceFromOrders("customer", false)}
+	preview, err := e.diagram.PreviewDiagramDDL(context.Background(), &queravuev1.PreviewDiagramDDLRequest{SessionId: e.sess.ID, Tables: tables})
+	if err != nil || preview.GetError() != nil {
+		t.Fatalf("PreviewDiagramDDL: %v %v", err, preview.GetError())
+	}
+	if warnings := strings.Join(preview.GetWarnings(), " "); !strings.Contains(warnings, "not checked against the new foreign key") {
+		t.Errorf("warnings = %q", warnings)
+	}
+	resp, err := e.diagram.ApplyDiagramDDL(context.Background(), &queravuev1.ApplyDiagramDDLRequest{SessionId: e.sess.ID, Tables: tables})
+	if err != nil || resp.GetError() != nil || int(resp.GetExecutedStatements()) != len(preview.GetStatements()) {
+		t.Fatalf("ApplyDiagramDDL: %v %+v", err, resp)
+	}
+	if got := ordersForeignKeys(t, e); strings.Join(got, " ") != "customer->invoices" {
+		t.Errorf("orders foreign keys = %v", got)
+	}
+	if got := columnNames(t, e, "orders"); strings.Join(got, ",") != "id,customer,note" {
+		t.Errorf("orders columns = %v", got)
+	}
+	ex, _ := engine.As[engine.Executor](e.sess.Conn)
+	var rows countSink
+	if _, err := ex.Execute(context.Background(), engine.Statement{SQL: "SELECT note FROM orders ORDER BY id"}, &rows); err != nil || rows.n != 2 {
+		t.Errorf("rows after the rebuild = %d, %v", rows.n, err)
+	}
+	if err := execSQL(t, e, "DROP INDEX orders_customer"); err != nil {
+		t.Errorf("the index was not recreated: %v", err)
+	}
+}
+
+func TestDiagramRefusesASQLiteRebuildWhileForeignKeysAreEnforced(t *testing.T) {
+	e := setupIndexEnv(t, false)
+	if err := execSQL(t, e, "PRAGMA foreign_keys = ON"); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := e.diagram.PreviewDiagramDDL(context.Background(), &queravuev1.PreviewDiagramDDLRequest{
+		SessionId: e.sess.ID,
+		Tables:    []*queravuev1.TableChanges{draftTable("invoices"), referenceFromOrders("customer", false)},
+	})
+	if err != nil || resp.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED ||
+		!strings.Contains(resp.GetError().GetMessage(), "foreign keys are enforced") {
+		t.Errorf("got %v %v, want UNSUPPORTED naming enforced foreign keys", resp.GetError(), err)
+	}
+}
+
+type countSink struct{ n int }
+
+func (*countSink) Columns([]engine.Column) error { return nil }
+func (s *countSink) Batch(rows [][]engine.Value) error {
+	s.n += len(rows)
+	return nil
 }

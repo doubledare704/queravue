@@ -116,7 +116,7 @@ func TestDiagramDDLRejectsInvalidRequests(t *testing.T) {
 		{"twice", sqldialect.Postgres, []sqldialect.TableChanges{simpleTable("a"), simpleTable("a")}, false, "more than once"},
 		{"unnamed", sqldialect.Postgres, []sqldialect.TableChanges{{Changes: simpleTable("a").Changes}}, false, "needs a name"},
 		{"empty", sqldialect.Postgres, []sqldialect.TableChanges{{Target: sqldialect.Target{Table: "a"}}}, false, "a: no changes"},
-		{"sqlite fk on existing", sqldialect.SQLite, []sqldialect.TableChanges{existing}, true, "orders: change 1: SQLite cannot add a foreign key"},
+		{"sqlite fk on an existing column without its definition", sqldialect.SQLite, []sqldialect.TableChanges{existing}, true, "orders: SQLite cannot change this table in place, and the table's definition is not available"},
 		{"no columns", sqldialect.Postgres, []sqldialect.TableChanges{{Target: sqldialect.Target{Table: "a"}, Changes: []sqldialect.Change{sqldialect.CreateTable{}}}}, false, "a: change 1: a table needs at least one column"},
 	}
 	for _, tc := range cases {

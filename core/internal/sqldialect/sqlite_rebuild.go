@@ -6,16 +6,23 @@ import (
 	"strings"
 )
 
-// rebuildSQLite alters columns the only way SQLite allows: the table's own
-// CREATE TABLE text is rewritten for the altered columns, the rows are copied
+// rebuildParts are the changes a SQLite table rebuild carries out at once.
+type rebuildParts struct {
+	alters      []AlterColumn
+	added       []ColumnSpec
+	foreignKeys []ForeignKeySpec
+}
+
+// rebuildSQLite alters columns and adds foreign keys the only way SQLite
+// allows: the table's own CREATE TABLE text is rewritten, the rows are copied
 // into it, and it replaces the old table. See ADR 0014.
-func (b *ddlBuilder) rebuildSQLite(alters []AlterColumn) error {
+func (b *ddlBuilder) rebuildSQLite(parts rebuildParts) error {
 	if b.current == nil || b.current.Rebuild == nil {
-		return unsupported("SQLite cannot alter a column in place, and the table's definition is not available to rebuild it")
+		return unsupported("SQLite cannot change this table in place, and the table's definition is not available to rebuild it")
 	}
 	rebuild := b.current.Rebuild
 	if len(rebuild.Blockers) > 0 {
-		return unsupported("SQLite cannot alter a column in place and the table cannot be rebuilt safely: %s", strings.Join(rebuild.Blockers, "; "))
+		return unsupported("SQLite cannot change this table in place and the table cannot be rebuilt safely: %s", strings.Join(rebuild.Blockers, "; "))
 	}
 	_, items, tail, err := splitCreateTable(rebuild.CreateSQL)
 	if err != nil {
@@ -24,7 +31,7 @@ func (b *ddlBuilder) rebuildSQLite(alters []AlterColumn) error {
 
 	typeChanged := false
 	var altered []string
-	for _, a := range alters {
+	for _, a := range parts.alters {
 		if a.Before.Identity != a.After.Identity {
 			return unsupported("changing whether a column is auto-generated is not supported")
 		}
@@ -43,6 +50,24 @@ func (b *ddlBuilder) rebuildSQLite(alters []AlterColumn) error {
 		}
 		altered = append(altered, a.After.Name)
 	}
+	columnCount := firstTableConstraint(items)
+	for _, col := range parts.added {
+		def, err := b.columnDefinition(col)
+		if err != nil {
+			return err
+		}
+		items = append(items[:columnCount], append([]string{def}, items[columnCount:]...)...)
+		columnCount++
+	}
+	var keys []string
+	for _, fk := range parts.foreignKeys {
+		def, err := b.foreignKey(fk)
+		if err != nil {
+			return err
+		}
+		items = append(items, def)
+		keys = append(keys, foreignKeyLabel(fk))
+	}
 
 	temp := "qv_rebuild_" + b.target.Table
 	columns := make([]string, len(b.current.Columns))
@@ -56,12 +81,48 @@ func (b *ddlBuilder) rebuildSQLite(alters []AlterColumn) error {
 	b.emit(definition, "Create the rebuilt table", typeChanged)
 	b.emit("INSERT INTO "+created+" ("+list+") SELECT "+list+" FROM "+old, "Copy the rows", typeChanged)
 	b.emit("DROP TABLE "+old, "Drop the old table", typeChanged)
-	b.emit("ALTER TABLE "+created+" RENAME TO "+b.q(b.target.Table), "Swap in the rebuilt table (altering "+strings.Join(altered, ", ")+")", typeChanged)
+	b.emit("ALTER TABLE "+created+" RENAME TO "+b.q(b.target.Table), "Swap in the rebuilt table ("+rebuildSummary(altered, parts.added, keys)+")", typeChanged)
 	for _, dependent := range rebuild.DependentSQL {
 		b.emit(dependent, "Recreate an index or trigger", false)
 	}
-	b.warn("SQLite rebuilds the table to alter a column: every row is copied into a new table, which is slow and holds a write lock on a large table.")
+	b.warn("SQLite rebuilds the table: every row is copied into a new table, which is slow and holds a write lock on a large table.")
+	if len(keys) > 0 {
+		b.warn("Existing rows are not checked against the new foreign key: the rebuild runs with foreign keys not enforced, and SQLite checks them only when they are.")
+	}
 	return nil
+}
+
+// firstTableConstraint is where the column items of a CREATE TABLE end.
+func firstTableConstraint(items []string) int {
+	for i, item := range items {
+		word, _, _ := strings.Cut(strings.TrimSpace(item), " ")
+		switch strings.ToUpper(strings.TrimRight(word, "(")) {
+		case "CONSTRAINT", "PRIMARY", "UNIQUE", "CHECK", "FOREIGN":
+			return i
+		}
+	}
+	return len(items)
+}
+
+func foreignKeyLabel(fk ForeignKeySpec) string {
+	if fk.Name != "" {
+		return "foreign key " + fk.Name
+	}
+	return "a foreign key to " + fk.RefTable
+}
+
+func rebuildSummary(altered []string, added []ColumnSpec, keys []string) string {
+	var parts []string
+	if len(altered) > 0 {
+		parts = append(parts, "altering "+strings.Join(altered, ", "))
+	}
+	for _, c := range added {
+		parts = append(parts, "adding column "+c.Name)
+	}
+	for _, k := range keys {
+		parts = append(parts, "adding "+k)
+	}
+	return strings.Join(parts, "; ")
 }
 
 // splitCreateTable cuts CREATE TABLE text into what precedes the column

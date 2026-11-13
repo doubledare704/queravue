@@ -35,7 +35,8 @@ Draw new tables and relations on the diagram, review the DDL, apply it. Availabl
 ### How the statements are ordered
 The core receives the changes per table and orders them (`core/internal/sqldialect/diagram_ddl.go`):
 - New tables are created first, then the other changes, then every foreign key as `ALTER TABLE … ADD CONSTRAINT`. A table can reference one drafted after it, and two tables can reference each other.
-- SQLite cannot add a foreign key to an existing table, but does not check the referenced table when one is created. There, foreign keys stay inside `CREATE TABLE`, and created tables are ordered so a table follows those it references. A relation from an existing SQLite table is refused at review with the reason.
+- SQLite does not check the referenced table when a table is created, so there foreign keys stay inside `CREATE TABLE`, and created tables are ordered so a table follows those it references.
+- A relation from an existing SQLite table usually adds its column: that is one `ALTER TABLE … ADD COLUMN … REFERENCES …`, which SQLite accepts when the column starts out NULL (a non-null or defaulted column is refused with the reason). A key on a column the table already has, or on several columns, rebuilds the table as for column alters (ADR 0014): it needs foreign keys not enforced on the connection, and existing rows are not checked against the new key; the review warns about both. The same applies in the table designer.
 - PostgreSQL, SQL Server and SQLite run the script in one transaction. MySQL, MariaDB, TiDB and CockroachDB run the statements one at a time; the review says so, and after a failure the error says how many statements stay applied.
 
 ## Export

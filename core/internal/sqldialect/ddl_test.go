@@ -51,7 +51,7 @@ func TestCreateTableGolden(t *testing.T) {
 			"CREATE INDEX [ix_orders_customer] ON [app].[orders] ([customer_id]);",
 		}},
 		{"sqlite", sqldialect.SQLite, "nocase", []string{
-			"CREATE TABLE \"app\".\"orders\" (\n  \"id\" INTEGER PRIMARY KEY AUTOINCREMENT,\n  \"customer_id\" integer NOT NULL,\n  \"note\" varchar(100) COLLATE nocase DEFAULT 'none',\n  CONSTRAINT \"uq_note\" UNIQUE (\"note\"),\n  CONSTRAINT \"ck_customer\" CHECK (customer_id > 0),\n  CONSTRAINT \"fk_customer\" FOREIGN KEY (\"customer_id\") REFERENCES \"app\".\"customers\" (\"id\") ON DELETE CASCADE ON UPDATE NO ACTION\n);",
+			"CREATE TABLE \"app\".\"orders\" (\n  \"id\" INTEGER PRIMARY KEY AUTOINCREMENT,\n  \"customer_id\" integer NOT NULL,\n  \"note\" varchar(100) COLLATE nocase DEFAULT 'none',\n  CONSTRAINT \"uq_note\" UNIQUE (\"note\"),\n  CONSTRAINT \"ck_customer\" CHECK (customer_id > 0),\n  CONSTRAINT \"fk_customer\" FOREIGN KEY (\"customer_id\") REFERENCES \"customers\" (\"id\") ON DELETE CASCADE ON UPDATE NO ACTION\n);",
 			"CREATE INDEX \"app\".\"ix_orders_customer\" ON \"orders\" (\"customer_id\");",
 		}},
 	}
