@@ -15,35 +15,36 @@ class DraftTable {
   DraftTable renamed(String to) => DraftTable(name: to, columns: columns);
 }
 
-/// A one-column reference drawn on the diagram. [newColumn] is added to
-/// [fromTable] for it; null when the reference uses a column it has.
+/// A reference drawn on the diagram: [columns] of [fromTable] point at
+/// [toColumns] of [toTable], in key order. [newColumns] are added to
+/// [fromTable] for it, in the same order.
 @immutable
 class DraftRelation {
   const DraftRelation({
     required this.name,
     required this.fromTable,
-    required this.column,
+    required this.columns,
     required this.toTable,
-    required this.toColumn,
-    this.newColumn,
+    required this.toColumns,
+    this.newColumns = const [],
     this.onDelete = ReferentialAction.unspecified,
   });
 
   final String name;
   final String fromTable;
-  final String column;
+  final List<String> columns;
   final String toTable;
-  final String toColumn;
-  final ColumnDraft? newColumn;
+  final List<String> toColumns;
+  final List<ColumnDraft> newColumns;
   final ReferentialAction onDelete;
 
   DraftRelation _renaming(String from, String to) => DraftRelation(
     name: name,
     fromTable: fromTable == from ? to : fromTable,
-    column: column,
+    columns: columns,
     toTable: toTable == from ? to : toTable,
-    toColumn: toColumn,
-    newColumn: newColumn,
+    toColumns: toColumns,
+    newColumns: newColumns,
     onDelete: onDelete,
   );
 }
@@ -186,32 +187,56 @@ DraftTable? _tableFromJson(Object? json) {
 Map<String, Object?> _relationJson(DraftRelation r) => {
   'name': r.name,
   'from': r.fromTable,
-  'column': r.column,
+  'columns': r.columns,
   'to': r.toTable,
-  'toColumn': r.toColumn,
-  if (r.newColumn != null) 'newColumn': _columnJson(r.newColumn!),
+  'toColumns': r.toColumns,
+  if (r.newColumns.isNotEmpty)
+    'newColumns': [for (final c in r.newColumns) _columnJson(c)],
   if (r.onDelete != ReferentialAction.unspecified) 'onDelete': r.onDelete.name,
 };
 
+List<String>? _names(Object? list, Object? single) => switch ((list, single)) {
+  (final List<Object?> l, _) when l.isNotEmpty && l.every((n) => n is String) =>
+    l.cast<String>(),
+  (null, final String s) => [s],
+  _ => null,
+};
+
+// Diagrams saved before composite keys hold one column, in the singular fields.
+List<ColumnDraft>? _newColumnsFromJson(Map<String, Object?> json) {
+  final list = json['newColumns'] ?? [?json['newColumn']];
+  if (list is! List) return null;
+  final parsed = <ColumnDraft>[];
+  for (final c in list) {
+    final column = _columnFromJson(c);
+    if (column == null) return null;
+    parsed.add(column);
+  }
+  return parsed;
+}
+
 DraftRelation? _relationFromJson(Object? json) {
   if (json is! Map<String, Object?>) return null;
-  final name = json['name'], from = json['from'], column = json['column'];
-  final to = json['to'], toColumn = json['toColumn'];
+  final name = json['name'], from = json['from'], to = json['to'];
+  final columns = _names(json['columns'], json['column']);
+  final toColumns = _names(json['toColumns'], json['toColumn']);
+  final newColumns = _newColumnsFromJson(json);
   if (name is! String ||
       from is! String ||
-      column is! String ||
       to is! String ||
-      toColumn is! String) {
+      columns == null ||
+      toColumns == null ||
+      columns.length != toColumns.length ||
+      newColumns == null) {
     return null;
   }
-  final newColumn = json['newColumn'];
   return DraftRelation(
     name: name,
     fromTable: from,
-    column: column,
+    columns: columns,
     toTable: to,
-    toColumn: toColumn,
-    newColumn: newColumn == null ? null : _columnFromJson(newColumn),
+    toColumns: toColumns,
+    newColumns: newColumns,
     onDelete:
         ReferentialAction.values
             .where((a) => a.name == json['onDelete'])
@@ -230,9 +255,9 @@ DiagramColumn _drawn(ColumnDraft c, int primaryKeyOrder) => DiagramColumn(
 
 DiagramRelation _drawnRelation(DraftRelation r) => DiagramRelation(
   name: r.name,
-  columns: [r.column],
+  columns: r.columns,
   referencedTable: r.toTable,
-  referencedColumns: [r.toColumn],
+  referencedColumns: r.toColumns,
   draft: true,
 );
 
@@ -242,7 +267,7 @@ SchemaGraph graphWithDraft(SchemaGraph graph, DiagramDraft draft) {
   if (draft.isEmpty) return graph;
   List<DiagramColumn> addedColumns(String table) => [
     for (final r in draft.relationsFrom(table))
-      if (r.newColumn != null) _drawn(r.newColumn!, 0),
+      for (final c in r.newColumns) _drawn(c, 0),
   ];
   List<DiagramRelation> addedRelations(String table) => [
     for (final r in draft.relationsFrom(table)) _drawnRelation(r),
@@ -282,10 +307,10 @@ Iterable<(int, ColumnDraft)> _withKeyOrder(List<ColumnDraft> columns) sync* {
 
 ForeignKeyDraft _foreignKey(DraftRelation r, String schema) => ForeignKeyDraft(
   name: r.name,
-  columns: [r.column],
+  columns: r.columns,
   referencedSchema: schema,
   referencedTable: r.toTable,
-  referencedColumns: [r.toColumn],
+  referencedColumns: r.toColumns,
   onDelete: r.onDelete,
 );
 
@@ -310,8 +335,7 @@ List<TableChangesModel> draftChanges(
         CreateTableChange(
           [
             ...t.columns,
-            for (final r in draft.relationsFrom(t.name))
-              if (r.newColumn != null) r.newColumn!,
+            for (final r in draft.relationsFrom(t.name)) ...r.newColumns,
           ],
           constraints: ConstraintDrafts(
             foreignKeys: [
@@ -324,7 +348,7 @@ List<TableChangesModel> draftChanges(
     for (final table in existing)
       TableChangesModel(ref(table), [
         for (final r in draft.relationsFrom(table))
-          if (r.newColumn != null) AddColumnChange(r.newColumn!),
+          for (final c in r.newColumns) AddColumnChange(c),
         for (final r in draft.relationsFrom(table))
           AddForeignKeyChange(_foreignKey(r, schema)),
       ]),
@@ -351,27 +375,81 @@ String? draftTableProblem(DraftTable table, Set<String> taken) {
 }
 
 /// Why [to] cannot be referenced from the diagram, or null.
-String? referenceProblem(DiagramTable to) {
-  final key = to.primaryKey;
-  if (key.isEmpty) return '${to.name} has no primary key to reference.';
-  if (key.length > 1) {
-    return '${to.name} has a primary key of ${key.length} columns; reference it from the table designer.';
+String? referenceProblem(DiagramTable to) => to.primaryKey.isEmpty
+    ? '${to.name} has no primary key to reference.'
+    : null;
+
+/// Why the columns in [through] cannot carry one reference, or null.
+String? throughProblem(List<String?> through) {
+  final seen = <String>{};
+  for (final column in through.nonNulls) {
+    if (!seen.add(column)) {
+      return 'Column $column is picked for two key columns.';
+    }
   }
   return null;
 }
 
-/// A reference from [from] to [to]'s primary key, through a column named
-/// after [to] that is reused when [from] has it and added otherwise.
-/// [takenNames] holds the constraint names already drawn.
+/// Per key column of [to], the column of [from] named `<to>_<key>`, or null
+/// when [from] has none and a new one is to be added.
+List<String?> suggestedThrough(DiagramTable from, DiagramTable to) => [
+  for (final k in to.primaryKey)
+    from.column(_referencingName(to, k)) != null
+        ? _referencingName(to, k)
+        : null,
+];
+
+/// A reference from [from] to [to]'s primary key, through the columns
+/// [suggestedThrough] picks.
 DraftRelation suggestRelation(
   DiagramTable from,
   DiagramTable to, {
   Set<String> takenNames = const {},
   ReferentialAction onDelete = ReferentialAction.unspecified,
+}) => relationThrough(
+  from,
+  to,
+  suggestedThrough(from, to),
+  takenNames: takenNames,
+  onDelete: onDelete,
+);
+
+/// A reference from [from] to [to]'s primary key. [through] holds, per key
+/// column, the column of [from] that carries it, or null for a new column
+/// named after the key. [takenNames] holds the constraint names already drawn.
+DraftRelation relationThrough(
+  DiagramTable from,
+  DiagramTable to,
+  List<String?> through, {
+  Set<String> takenNames = const {},
+  ReferentialAction onDelete = ReferentialAction.unspecified,
 }) {
-  final key = to.primaryKey.single;
-  final column = '${to.name}_${key.name}';
-  final reused = from.column(column) != null;
+  final key = to.primaryKey;
+  final used = {for (final c in from.columns) c.name, ...through.nonNulls};
+  String freeName(String base) {
+    var name = base;
+    for (var n = 2; used.contains(name); n++) {
+      name = '${base}_$n';
+    }
+    used.add(name);
+    return name;
+  }
+
+  final columns = <String>[];
+  final newColumns = <ColumnDraft>[];
+  for (final (i, k) in key.indexed) {
+    final existing = i < through.length ? through[i] : null;
+    if (existing != null) {
+      columns.add(existing);
+      continue;
+    }
+    final column = ColumnDraft(
+      name: freeName(_referencingName(to, k)),
+      typeName: _referencingType(k.typeName),
+    );
+    columns.add(column.name);
+    newColumns.add(column);
+  }
   var name = 'fk_${from.name}_${to.name}';
   for (var n = 2; takenNames.contains(name); n++) {
     name = 'fk_${from.name}_${to.name}_$n';
@@ -379,15 +457,35 @@ DraftRelation suggestRelation(
   return DraftRelation(
     name: name,
     fromTable: from.name,
-    column: column,
+    columns: columns,
     toTable: to.name,
-    toColumn: key.name,
-    newColumn: reused
-        ? null
-        : ColumnDraft(name: column, typeName: _referencingType(key.typeName)),
+    toColumns: [for (final k in key) k.name],
+    newColumns: newColumns,
     onDelete: onDelete,
   );
 }
+
+/// One sentence on what [relation] adds to [from] or reuses there.
+String describeRelation(DraftRelation relation, String from) {
+  final steps = [
+    for (final c in relation.columns)
+      if (relation.newColumns.where((n) => n.name == c).firstOrNull
+          case final added?)
+        'adds column ${added.name} ${added.typeName}'
+      else
+        'uses column $c',
+  ];
+  final first = steps.join(', ');
+  final target = relation.toColumns.length == 1
+      ? '${relation.toTable}.${relation.toColumns.single}'
+      : '${relation.toTable} (${relation.toColumns.join(', ')})';
+  final where = relation.newColumns.isEmpty ? 'of' : 'to';
+  return '${first[0].toUpperCase()}${first.substring(1)} $where $from, '
+      'referencing $target.';
+}
+
+String _referencingName(DiagramTable to, DiagramColumn key) =>
+    '${to.name}_${key.name}';
 
 // A serial or identity key is referenced by a plain integer of the same width.
 String _referencingType(String keyType) => switch (keyType.toLowerCase()) {

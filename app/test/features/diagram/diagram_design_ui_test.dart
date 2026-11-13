@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/admin/domain/admin_models.dart';
 import 'package:queravue/features/designer/domain/design_models.dart';
+import 'package:queravue/features/diagram/domain/diagram_models.dart';
 import 'package:queravue/features/diagram/domain/saved_diagram.dart';
 
 import '../../support/diagram_harness.dart';
@@ -67,7 +68,95 @@ String reviewLabel(WidgetTester tester) => tester
     )
     .data!;
 
+final _lineShop = SchemaGraph([
+  ...shop.tables,
+  const DiagramTable(
+    name: 'order_lines',
+    columns: [
+      DiagramColumn(name: 'order_id', typeName: 'int', primaryKeyOrder: 1),
+      DiagramColumn(name: 'line_no', typeName: 'int', primaryKeyOrder: 2),
+    ],
+  ),
+  table('returns', columns: ['id', 'order_ref']),
+]);
+
 void main() {
+  testWidgets('a composite key is mapped onto an existing and a new column', (
+    tester,
+  ) async {
+    final repo = FakeDiagramRepository(_lineShop);
+    final env = await openDiagram(tester, repo);
+    await openTableMenu(tester, env, 'returns');
+    await tester.tap(find.byKey(const Key('diagram-menu-relation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('draft-relation-target')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(MenuItemButton, 'order_lines').last);
+    await tester.pumpAndSettle();
+    expect(find.text('order_lines.order_id through'), findsOneWidget);
+    expect(find.text('order_lines.line_no through'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('draft-relation-through-0')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(MenuItemButton, 'order_ref').hitTestable().last,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Uses column order_ref, adds column order_lines_line_no int to '
+        'returns, referencing order_lines (order_id, line_no).',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('draft-relation-add')));
+    await tester.pumpAndSettle();
+
+    final drawn = ready(env).table('returns')!;
+    expect(drawn.relations.single.columns, [
+      'order_ref',
+      'order_lines_line_no',
+    ]);
+    expect(drawn.isForeignKeyColumn('order_ref'), isTrue);
+
+    await tester.tap(find.byKey(const Key('diagram-review-draft')));
+    await tester.pumpAndSettle();
+    final changes = repo.ddl.single.tables.single.changes;
+    expect(
+      (changes.first as AddColumnChange).column.name,
+      'order_lines_line_no',
+    );
+    final fk = (changes.last as AddForeignKeyChange).foreignKey;
+    expect(fk.columns, ['order_ref', 'order_lines_line_no']);
+    expect(fk.referencedColumns, ['order_id', 'line_no']);
+  });
+
+  testWidgets('one column picked for two key columns is refused', (
+    tester,
+  ) async {
+    final env = await openDiagram(tester, FakeDiagramRepository(_lineShop));
+    await openTableMenu(tester, env, 'returns');
+    await tester.tap(find.byKey(const Key('diagram-menu-relation')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('draft-relation-target')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(MenuItemButton, 'order_lines').last);
+    await tester.pumpAndSettle();
+    for (final i in [0, 1]) {
+      await tester.tap(find.byKey(Key('draft-relation-through-$i')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.widgetWithText(MenuItemButton, 'order_ref').hitTestable().last,
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(find.textContaining('picked for two key columns'), findsOneWidget);
+    final add = tester.widget<FilledButton>(
+      find.byKey(const Key('draft-relation-add')),
+    );
+    expect(add.onPressed, isNull);
+  });
+
   testWidgets('a drafted table and relation are reviewed and applied', (
     tester,
   ) async {
