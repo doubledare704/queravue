@@ -28,6 +28,9 @@ func BuildDDL(d Dialect, target Target, current *engine.TableDetails, changes []
 	if d.ID() == "mysql" {
 		b.warn("This server commits each DDL statement as it runs. If a statement fails, the earlier ones stay applied.")
 	}
+	if b.is("sqlite") {
+		changes = foldSQLiteReferences(changes)
+	}
 	if err := b.rebuildIfNeeded(changes); err != nil {
 		return Script{}, err
 	}
@@ -57,26 +60,38 @@ type ddlBuilder struct {
 	rebuilt bool
 }
 
-// rebuildIfNeeded handles SQLite column alters, which are done by rebuilding
-// the table. They must be the only changes in the script: anything else
-// would be lost or reordered by the rebuild (ADR 0014).
+// rebuildIfNeeded handles SQLite column alters and foreign keys on existing
+// columns, which are done by rebuilding the table. Only added columns may
+// come with them: anything else would be lost or reordered by the rebuild
+// (ADR 0014).
 func (b *ddlBuilder) rebuildIfNeeded(changes []Change) error {
 	if !b.is("sqlite") {
 		return nil
 	}
-	var alters []AlterColumn
+	var parts rebuildParts
+	others := 0
 	for _, ch := range changes {
-		if a, ok := ch.(AlterColumn); ok {
-			alters = append(alters, a)
+		switch c := ch.(type) {
+		case AlterColumn:
+			parts.alters = append(parts.alters, c)
+		case AddForeignKey:
+			parts.foreignKeys = append(parts.foreignKeys, c.ForeignKey)
+		case AddColumn:
+			parts.added = append(parts.added, c.Column)
+		case referencingColumn:
+			parts.added = append(parts.added, c.Column)
+			parts.foreignKeys = append(parts.foreignKeys, c.ForeignKey)
+		default:
+			others++
 		}
 	}
-	if len(alters) == 0 {
+	if len(parts.alters) == 0 && !hasTableLevelForeignKey(changes) {
 		return nil
 	}
-	if len(alters) != len(changes) {
-		return &UnsupportedError{Reason: "SQLite alters a column by rebuilding the table, so it cannot be combined with other changes: apply the column alters on their own, then the rest"}
+	if others > 0 {
+		return &UnsupportedError{Reason: "SQLite rebuilds the table to alter a column or add a foreign key to an existing column, so only added columns can go with it: apply those changes on their own, then the rest"}
 	}
-	if err := b.rebuildSQLite(alters); err != nil {
+	if err := b.rebuildSQLite(parts); err != nil {
 		var u *UnsupportedError
 		if errors.As(err, &u) {
 			return err
@@ -121,6 +136,8 @@ func (b *ddlBuilder) apply(ch Change) error {
 		return b.renameTable(c.NewName)
 	case AddColumn:
 		return b.addColumn(c.Column)
+	case referencingColumn:
+		return b.addReferencingColumn(c)
 	case DropColumn:
 		b.emit("ALTER TABLE "+b.table()+" DROP COLUMN "+b.q(c.Name), "Drop column "+c.Name, true)
 	case RenameColumn:
@@ -419,7 +436,24 @@ func (b *ddlBuilder) foreignKey(fk ForeignKeySpec) (string, error) {
 	if refSchema == "" {
 		refSchema = b.target.Schema
 	}
-	def := "FOREIGN KEY (" + b.columnList(fk.Columns) + ") REFERENCES " + b.d.QualifyTable(refSchema, fk.RefTable) + " (" + b.columnList(fk.RefColumns) + ")"
+	def := "FOREIGN KEY (" + b.columnList(fk.Columns) + ") " + b.references(fk, refSchema)
+	rules, err := b.referentialRules(fk)
+	if err != nil {
+		return "", err
+	}
+	return b.named(fk.Name, def+rules), nil
+}
+
+func (b *ddlBuilder) references(fk ForeignKeySpec, refSchema string) string {
+	// SQLite resolves REFERENCES in the table's own database and rejects a qualified name.
+	if b.is("sqlite") {
+		return "REFERENCES " + b.q(fk.RefTable) + " (" + b.columnList(fk.RefColumns) + ")"
+	}
+	return "REFERENCES " + b.d.QualifyTable(refSchema, fk.RefTable) + " (" + b.columnList(fk.RefColumns) + ")"
+}
+
+func (b *ddlBuilder) referentialRules(fk ForeignKeySpec) (string, error) {
+	def := ""
 	for _, rule := range []struct {
 		event  string
 		action engine.ReferentialAction
@@ -436,7 +470,7 @@ func (b *ddlBuilder) foreignKey(fk ForeignKeySpec) (string, error) {
 		}
 		def += " ON " + rule.event + " " + text
 	}
-	return b.named(fk.Name, def), nil
+	return def, nil
 }
 
 func (b *ddlBuilder) unique(u UniqueSpec) (string, error) {

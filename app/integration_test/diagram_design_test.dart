@@ -3,7 +3,8 @@
 //   make test-e2e-diagram-design      (SQLite file; PostgreSQL when the docker one is up)
 //
 // Drafts two tables on the diagram, the referencing one first, draws a
-// relation between them, applies the DDL and checks the server's own
+// relation between them, applies the DDL, then relates one of them, now
+// existing, to a third drafted table, and checks the server's own
 // description of the tables. PostgreSQL uses its own schema, dropped after;
 // it is skipped when QV_E2E_SKIP_POSTGRES is set. Connection settings:
 // PG_HOST, PG_PORT, PG_DB, PG_USER, PG_PASSWORD.
@@ -35,6 +36,7 @@ String _env(String k, String d) => Platform.environment[k] ?? d;
 
 const _books = 'qv_e2e_books';
 const _authors = 'qv_e2e_authors';
+const _publishers = 'qv_e2e_publishers';
 const _pgSchema = 'qv_e2e_diagram';
 
 Future<void> _pumpUntil(
@@ -108,7 +110,8 @@ Future<void> _exec(
 }
 
 /// Drafts books (referencing) before authors (referenced), relates them and
-/// applies; then the core reports both tables and the foreign key.
+/// applies; then relates the now existing authors to a drafted publishers
+/// table. The core reports every table and foreign key.
 Future<void> _designAndApply(
   WidgetTester tester,
   ProviderContainer container, {
@@ -144,25 +147,43 @@ Future<void> _designAndApply(
   await draft(_books, extraColumn: 'title');
   await draft(_authors, extraColumn: 'name');
 
+  Future<void> relate(String from, String to) async {
+    final canvas = tester.state<DiagramCanvasState>(find.byType(DiagramCanvas));
+    canvas.fit();
+    await settle(tester);
+    final at = (state() as DiagramReady).rects[from]!.center;
+    await tester.tapAt(
+      tester.getTopLeft(find.byType(DiagramCanvas)) + canvas.toScreen(at),
+      buttons: kSecondaryButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await settle(tester);
+    await tapAndSettle(tester, find.byKey(const Key('diagram-menu-relation')));
+    await tapAndSettle(tester, find.byKey(const Key('draft-relation-target')));
+    await tapAndSettle(tester, find.widgetWithText(MenuItemButton, to).last);
+    expect(find.textContaining('Adds column ${to}_id'), findsOneWidget);
+    await tapAndSettle(tester, find.byKey(const Key('draft-relation-add')));
+  }
+
+  Future<void> reviewAndApply(String expectTable) async {
+    await tester.tap(find.byKey(const Key('diagram-review-draft')));
+    await _pumpUntil(
+      tester,
+      'DDL preview',
+      () => find.byKey(const Key('statement-preview')).evaluate().isNotEmpty,
+    );
+    await tester.tap(find.byKey(const Key('ddl-apply')));
+    await _pumpUntil(tester, 'applied and reloaded', () {
+      final s = state();
+      return !_present(const Key('ddl-apply')) &&
+          s is DiagramReady &&
+          s.draft.isEmpty &&
+          s.graph.tables.any((t) => t.name == expectTable);
+    });
+  }
+
+  await relate(_books, _authors);
   final ready = state() as DiagramReady;
-  final canvas = tester.state<DiagramCanvasState>(find.byType(DiagramCanvas));
-  canvas.fit();
-  await settle(tester);
-  final center = ready.rects[_books]!.center;
-  await tester.tapAt(
-    tester.getTopLeft(find.byType(DiagramCanvas)) + canvas.toScreen(center),
-    buttons: kSecondaryButton,
-    kind: PointerDeviceKind.mouse,
-  );
-  await settle(tester);
-  await tapAndSettle(tester, find.byKey(const Key('diagram-menu-relation')));
-  await tapAndSettle(tester, find.byKey(const Key('draft-relation-target')));
-  await tapAndSettle(
-    tester,
-    find.widgetWithText(MenuItemButton, _authors).last,
-  );
-  expect(find.textContaining('Adds column ${_authors}_id'), findsOneWidget);
-  await tapAndSettle(tester, find.byKey(const Key('draft-relation-add')));
 
   await tester.tap(find.byKey(const Key('diagram-review-draft')));
   await _pumpUntil(
@@ -217,6 +238,25 @@ Future<void> _designAndApply(
   final fk = details.foreignKeys.single;
   expect(fk.referencedTable, _authors);
   expect(fk.columns, ['${_authors}_id']);
+
+  await draft(_publishers);
+  await relate(_authors, _publishers);
+  await reviewAndApply(_publishers);
+  final authors = await tester.runAsync(
+    () => container
+        .read(schemaRepositoryProvider)
+        .getTableDetails(
+          sessionId,
+          TableRef(schema: schema, table: _authors),
+          refresh: true,
+        ),
+  );
+  expect(
+    [for (final c in authors!.columns) c.name],
+    ['id', 'name', '${_publishers}_id'],
+    reason: 'an existing table gained the referencing column',
+  );
+  expect(authors.foreignKeys.single.referencedTable, _publishers);
 }
 
 void main() {

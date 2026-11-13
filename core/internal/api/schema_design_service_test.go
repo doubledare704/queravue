@@ -145,7 +145,7 @@ func alterNote(from, to string) *queravuev1.SchemaChange {
 func TestSchemaDesignReportsUnsupportedAndInvalidChanges(t *testing.T) {
 	e, ref := designEnv(t, false)
 	mixed, _ := e.design.PreviewDDL(context.Background(), &queravuev1.PreviewDDLRequest{
-		SessionId: e.sess.ID, TableRef: ref, Changes: []*queravuev1.SchemaChange{alterNote("TEXT", "VARCHAR(10)"), addColumn("x", "TEXT")},
+		SessionId: e.sess.ID, TableRef: ref, Changes: []*queravuev1.SchemaChange{alterNote("TEXT", "VARCHAR(10)"), {Change: &queravuev1.SchemaChange_DropColumn{DropColumn: &queravuev1.DropColumn{Name: "customer"}}}},
 	})
 	if mixed.GetError().GetKind() != queravuev1.AdminErrorKind_ADMIN_ERROR_KIND_UNSUPPORTED || len(mixed.GetStatements()) != 0 {
 		t.Errorf("alter combined with another change: %+v", mixed)
