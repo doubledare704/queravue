@@ -176,6 +176,8 @@ func TestDirectTLSAndSSHCells(t *testing.T) {
 		{name: "clickhouse direct", engine: "clickhouse", params: ch, pw: "queravue", probe: "127.0.0.1:9000"},
 		{name: "clickhouse tls", engine: "clickhouse", params: chTLS, pw: "queravue", probe: "127.0.0.1:9441", tls: tlsFiles(netpath.TLSVerifyFull)},
 		{name: "clickhouse ssh", engine: "clickhouse", params: chSSH, pw: "queravue", probe: "127.0.0.1:9000", ssh: bastion(netpath.SSHAuthPassword), sec: pass},
+		{name: "mssql direct tls require", engine: "mssql", params: map[string]string{"host": "localhost", "port": "1433", "user": "sa"}, pw: "Queravue_dev1", probe: "127.0.0.1:1433", tls: &connections.TLSSettings{Mode: netpath.TLSRequire}},
+		{name: "oracle direct", engine: "oracle", params: map[string]string{"host": "localhost", "port": "1521", "service_name": "FREEPDB1", "user": "queravue"}, pw: "queravue", probe: "127.0.0.1:1521"},
 		{name: "mssql ssh", engine: "mssql", params: mssqlSSH, pw: "Queravue_dev1", probe: "127.0.0.1:1433", ssh: bastion(netpath.SSHAuthPassword), sec: pass, tls: &connections.TLSSettings{Mode: netpath.TLSRequire}},
 		{name: "oracle ssh", engine: "oracle", params: oraSSH, pw: "queravue", probe: "127.0.0.1:1521", ssh: bastion(netpath.SSHAuthPassword), sec: pass},
 	}

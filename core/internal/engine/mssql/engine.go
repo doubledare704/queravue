@@ -108,7 +108,7 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 			Msg: engine.Redact(err.Error(), secret), Err: err}
 	}
 	if cfg.Net.Tunneled() {
-		connector.Dialer = cfg.Net.Dial
+		connector.Dialer = remoteResolvingDialer{cfg.Net.Dial}
 	}
 	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(1) // one pinned connection; cancel uses the TDS attention signal
@@ -225,3 +225,10 @@ func setEncryption(q url.Values, cfg engine.Config) error {
 	}
 	return nil
 }
+
+// remoteResolvingDialer marks the dialer as a mssqldb.HostDialer, so the
+// driver leaves host name resolution to the far end of the tunnel.
+type remoteResolvingDialer struct{ netpath.DialFunc }
+
+// HostName implements mssqldb.HostDialer.
+func (remoteResolvingDialer) HostName() string { return "" }
