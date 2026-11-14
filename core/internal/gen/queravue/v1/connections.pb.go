@@ -95,6 +95,128 @@ func (ColorTag) EnumDescriptor() ([]byte, []int) {
 	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{0}
 }
 
+// SshAuthMethod selects how the tunnel authenticates.
+type SshAuthMethod int32
+
+const (
+	// Not set; treated as password.
+	SshAuthMethod_SSH_AUTH_METHOD_UNSPECIFIED SshAuthMethod = 0
+	// Password stored in the keychain.
+	SshAuthMethod_SSH_AUTH_METHOD_PASSWORD SshAuthMethod = 1
+	// Private key file, optional passphrase stored in the keychain.
+	SshAuthMethod_SSH_AUTH_METHOD_KEY_FILE SshAuthMethod = 2
+	// The running SSH agent.
+	SshAuthMethod_SSH_AUTH_METHOD_AGENT SshAuthMethod = 3
+)
+
+// Enum value maps for SshAuthMethod.
+var (
+	SshAuthMethod_name = map[int32]string{
+		0: "SSH_AUTH_METHOD_UNSPECIFIED",
+		1: "SSH_AUTH_METHOD_PASSWORD",
+		2: "SSH_AUTH_METHOD_KEY_FILE",
+		3: "SSH_AUTH_METHOD_AGENT",
+	}
+	SshAuthMethod_value = map[string]int32{
+		"SSH_AUTH_METHOD_UNSPECIFIED": 0,
+		"SSH_AUTH_METHOD_PASSWORD":    1,
+		"SSH_AUTH_METHOD_KEY_FILE":    2,
+		"SSH_AUTH_METHOD_AGENT":       3,
+	}
+)
+
+func (x SshAuthMethod) Enum() *SshAuthMethod {
+	p := new(SshAuthMethod)
+	*p = x
+	return p
+}
+
+func (x SshAuthMethod) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SshAuthMethod) Descriptor() protoreflect.EnumDescriptor {
+	return file_queravue_v1_connections_proto_enumTypes[1].Descriptor()
+}
+
+func (SshAuthMethod) Type() protoreflect.EnumType {
+	return &file_queravue_v1_connections_proto_enumTypes[1]
+}
+
+func (x SshAuthMethod) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SshAuthMethod.Descriptor instead.
+func (SshAuthMethod) EnumDescriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{1}
+}
+
+// TlsMode selects how strictly TLS is enforced.
+type TlsMode int32
+
+const (
+	// Not set; the engine default applies.
+	TlsMode_TLS_MODE_UNSPECIFIED TlsMode = 0
+	// No TLS.
+	TlsMode_TLS_MODE_DISABLE TlsMode = 1
+	// Use TLS if the server offers it.
+	TlsMode_TLS_MODE_PREFER TlsMode = 2
+	// TLS required, certificate not verified.
+	TlsMode_TLS_MODE_REQUIRE TlsMode = 3
+	// TLS required, certificate chain verified.
+	TlsMode_TLS_MODE_VERIFY_CA TlsMode = 4
+	// TLS required, chain and host name verified.
+	TlsMode_TLS_MODE_VERIFY_FULL TlsMode = 5
+)
+
+// Enum value maps for TlsMode.
+var (
+	TlsMode_name = map[int32]string{
+		0: "TLS_MODE_UNSPECIFIED",
+		1: "TLS_MODE_DISABLE",
+		2: "TLS_MODE_PREFER",
+		3: "TLS_MODE_REQUIRE",
+		4: "TLS_MODE_VERIFY_CA",
+		5: "TLS_MODE_VERIFY_FULL",
+	}
+	TlsMode_value = map[string]int32{
+		"TLS_MODE_UNSPECIFIED": 0,
+		"TLS_MODE_DISABLE":     1,
+		"TLS_MODE_PREFER":      2,
+		"TLS_MODE_REQUIRE":     3,
+		"TLS_MODE_VERIFY_CA":   4,
+		"TLS_MODE_VERIFY_FULL": 5,
+	}
+)
+
+func (x TlsMode) Enum() *TlsMode {
+	p := new(TlsMode)
+	*p = x
+	return p
+}
+
+func (x TlsMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TlsMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_queravue_v1_connections_proto_enumTypes[2].Descriptor()
+}
+
+func (TlsMode) Type() protoreflect.EnumType {
+	return &file_queravue_v1_connections_proto_enumTypes[2]
+}
+
+func (x TlsMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TlsMode.Descriptor instead.
+func (TlsMode) EnumDescriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{2}
+}
+
 // FieldKind tells the UI which input widget to render.
 type FieldKind int32
 
@@ -149,11 +271,11 @@ func (x FieldKind) String() string {
 }
 
 func (FieldKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_queravue_v1_connections_proto_enumTypes[1].Descriptor()
+	return file_queravue_v1_connections_proto_enumTypes[3].Descriptor()
 }
 
 func (FieldKind) Type() protoreflect.EnumType {
-	return &file_queravue_v1_connections_proto_enumTypes[1]
+	return &file_queravue_v1_connections_proto_enumTypes[3]
 }
 
 func (x FieldKind) Number() protoreflect.EnumNumber {
@@ -162,7 +284,7 @@ func (x FieldKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FieldKind.Descriptor instead.
 func (FieldKind) EnumDescriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{1}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{3}
 }
 
 // ErrorKind classifies a connection failure.
@@ -183,27 +305,44 @@ const (
 	ErrorKind_ERROR_KIND_TIMEOUT ErrorKind = 5
 	// The settings are invalid (missing field, bad port...).
 	ErrorKind_ERROR_KIND_INVALID_CONFIG ErrorKind = 6
+	// The SSH host key is not known yet. ConnectionError carries its
+	// fingerprint; the UI asks the user and calls TrustHostKey.
+	ErrorKind_ERROR_KIND_SSH_HOST_KEY_UNKNOWN ErrorKind = 7
+	// The SSH host key differs from the trusted one. Never offered for trust.
+	ErrorKind_ERROR_KIND_SSH_HOST_KEY_CHANGED ErrorKind = 8
+	// The bastion rejected the credentials or key.
+	ErrorKind_ERROR_KIND_SSH_AUTH ErrorKind = 9
+	// The tunnel dropped after it was established.
+	ErrorKind_ERROR_KIND_TUNNEL_LOST ErrorKind = 10
 )
 
 // Enum value maps for ErrorKind.
 var (
 	ErrorKind_name = map[int32]string{
-		0: "ERROR_KIND_UNSPECIFIED",
-		1: "ERROR_KIND_AUTH",
-		2: "ERROR_KIND_NETWORK",
-		3: "ERROR_KIND_TLS",
-		4: "ERROR_KIND_NOT_FOUND",
-		5: "ERROR_KIND_TIMEOUT",
-		6: "ERROR_KIND_INVALID_CONFIG",
+		0:  "ERROR_KIND_UNSPECIFIED",
+		1:  "ERROR_KIND_AUTH",
+		2:  "ERROR_KIND_NETWORK",
+		3:  "ERROR_KIND_TLS",
+		4:  "ERROR_KIND_NOT_FOUND",
+		5:  "ERROR_KIND_TIMEOUT",
+		6:  "ERROR_KIND_INVALID_CONFIG",
+		7:  "ERROR_KIND_SSH_HOST_KEY_UNKNOWN",
+		8:  "ERROR_KIND_SSH_HOST_KEY_CHANGED",
+		9:  "ERROR_KIND_SSH_AUTH",
+		10: "ERROR_KIND_TUNNEL_LOST",
 	}
 	ErrorKind_value = map[string]int32{
-		"ERROR_KIND_UNSPECIFIED":    0,
-		"ERROR_KIND_AUTH":           1,
-		"ERROR_KIND_NETWORK":        2,
-		"ERROR_KIND_TLS":            3,
-		"ERROR_KIND_NOT_FOUND":      4,
-		"ERROR_KIND_TIMEOUT":        5,
-		"ERROR_KIND_INVALID_CONFIG": 6,
+		"ERROR_KIND_UNSPECIFIED":          0,
+		"ERROR_KIND_AUTH":                 1,
+		"ERROR_KIND_NETWORK":              2,
+		"ERROR_KIND_TLS":                  3,
+		"ERROR_KIND_NOT_FOUND":            4,
+		"ERROR_KIND_TIMEOUT":              5,
+		"ERROR_KIND_INVALID_CONFIG":       6,
+		"ERROR_KIND_SSH_HOST_KEY_UNKNOWN": 7,
+		"ERROR_KIND_SSH_HOST_KEY_CHANGED": 8,
+		"ERROR_KIND_SSH_AUTH":             9,
+		"ERROR_KIND_TUNNEL_LOST":          10,
 	}
 )
 
@@ -218,11 +357,11 @@ func (x ErrorKind) String() string {
 }
 
 func (ErrorKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_queravue_v1_connections_proto_enumTypes[2].Descriptor()
+	return file_queravue_v1_connections_proto_enumTypes[4].Descriptor()
 }
 
 func (ErrorKind) Type() protoreflect.EnumType {
-	return &file_queravue_v1_connections_proto_enumTypes[2]
+	return &file_queravue_v1_connections_proto_enumTypes[4]
 }
 
 func (x ErrorKind) Number() protoreflect.EnumNumber {
@@ -231,7 +370,68 @@ func (x ErrorKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ErrorKind.Descriptor instead.
 func (ErrorKind) EnumDescriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{2}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{4}
+}
+
+// TestStage is one step of a connection test.
+type TestStage int32
+
+const (
+	// Not set.
+	TestStage_TEST_STAGE_UNSPECIFIED TestStage = 0
+	// Opening the SSH tunnel.
+	TestStage_TEST_STAGE_SSH TestStage = 1
+	// TLS handshake.
+	TestStage_TEST_STAGE_TLS TestStage = 2
+	// Authenticating to the database.
+	TestStage_TEST_STAGE_AUTH TestStage = 3
+	// Ping.
+	TestStage_TEST_STAGE_PING TestStage = 4
+)
+
+// Enum value maps for TestStage.
+var (
+	TestStage_name = map[int32]string{
+		0: "TEST_STAGE_UNSPECIFIED",
+		1: "TEST_STAGE_SSH",
+		2: "TEST_STAGE_TLS",
+		3: "TEST_STAGE_AUTH",
+		4: "TEST_STAGE_PING",
+	}
+	TestStage_value = map[string]int32{
+		"TEST_STAGE_UNSPECIFIED": 0,
+		"TEST_STAGE_SSH":         1,
+		"TEST_STAGE_TLS":         2,
+		"TEST_STAGE_AUTH":        3,
+		"TEST_STAGE_PING":        4,
+	}
+)
+
+func (x TestStage) Enum() *TestStage {
+	p := new(TestStage)
+	*p = x
+	return p
+}
+
+func (x TestStage) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TestStage) Descriptor() protoreflect.EnumDescriptor {
+	return file_queravue_v1_connections_proto_enumTypes[5].Descriptor()
+}
+
+func (TestStage) Type() protoreflect.EnumType {
+	return &file_queravue_v1_connections_proto_enumTypes[5]
+}
+
+func (x TestStage) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TestStage.Descriptor instead.
+func (TestStage) EnumDescriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{5}
 }
 
 // Connection is a saved connection profile. It never contains a password.
@@ -257,7 +457,11 @@ type Connection struct {
 	// Output only: creation time.
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Output only: last update time.
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// SSH tunnel settings. Unset means no tunnel.
+	SshTunnel *SshTunnel `protobuf:"bytes,11,opt,name=ssh_tunnel,json=sshTunnel,proto3" json:"ssh_tunnel,omitempty"`
+	// TLS settings. Unset means the engine default.
+	Tls           *TlsSettings `protobuf:"bytes,12,opt,name=tls,proto3" json:"tls,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -362,6 +566,478 @@ func (x *Connection) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Connection) GetSshTunnel() *SshTunnel {
+	if x != nil {
+		return x.SshTunnel
+	}
+	return nil
+}
+
+func (x *Connection) GetTls() *TlsSettings {
+	if x != nil {
+		return x.Tls
+	}
+	return nil
+}
+
+// SshTunnel describes the bastion a connection goes through. Secrets are
+// never part of it; see SshSecrets.
+type SshTunnel struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Bastion host.
+	Host string `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// Bastion port. 0 means 22.
+	Port uint32 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// Login user.
+	User string `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	// Authentication method.
+	AuthMethod SshAuthMethod `protobuf:"varint,4,opt,name=auth_method,json=authMethod,proto3,enum=queravue.v1.SshAuthMethod" json:"auth_method,omitempty"`
+	// Private key path for SSH_AUTH_METHOD_KEY_FILE.
+	KeyFile string `protobuf:"bytes,5,opt,name=key_file,json=keyFile,proto3" json:"key_file,omitempty"`
+	// Keep-alive interval in seconds. 0 means the default (30).
+	KeepaliveSeconds uint32 `protobuf:"varint,6,opt,name=keepalive_seconds,json=keepaliveSeconds,proto3" json:"keepalive_seconds,omitempty"`
+	// Connect timeout in seconds. 0 means the default (10).
+	ConnectTimeoutSeconds uint32 `protobuf:"varint,7,opt,name=connect_timeout_seconds,json=connectTimeoutSeconds,proto3" json:"connect_timeout_seconds,omitempty"`
+	// Optional single jump host the bastion is reached through.
+	JumpHost *SshTunnel `protobuf:"bytes,8,opt,name=jump_host,json=jumpHost,proto3" json:"jump_host,omitempty"`
+	// Output only: whether a password is stored in the keychain.
+	HasPassword bool `protobuf:"varint,9,opt,name=has_password,json=hasPassword,proto3" json:"has_password,omitempty"`
+	// Output only: whether a key passphrase is stored in the keychain.
+	HasKeyPassphrase bool `protobuf:"varint,10,opt,name=has_key_passphrase,json=hasKeyPassphrase,proto3" json:"has_key_passphrase,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SshTunnel) Reset() {
+	*x = SshTunnel{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SshTunnel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SshTunnel) ProtoMessage() {}
+
+func (x *SshTunnel) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SshTunnel.ProtoReflect.Descriptor instead.
+func (*SshTunnel) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SshTunnel) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *SshTunnel) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *SshTunnel) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *SshTunnel) GetAuthMethod() SshAuthMethod {
+	if x != nil {
+		return x.AuthMethod
+	}
+	return SshAuthMethod_SSH_AUTH_METHOD_UNSPECIFIED
+}
+
+func (x *SshTunnel) GetKeyFile() string {
+	if x != nil {
+		return x.KeyFile
+	}
+	return ""
+}
+
+func (x *SshTunnel) GetKeepaliveSeconds() uint32 {
+	if x != nil {
+		return x.KeepaliveSeconds
+	}
+	return 0
+}
+
+func (x *SshTunnel) GetConnectTimeoutSeconds() uint32 {
+	if x != nil {
+		return x.ConnectTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *SshTunnel) GetJumpHost() *SshTunnel {
+	if x != nil {
+		return x.JumpHost
+	}
+	return nil
+}
+
+func (x *SshTunnel) GetHasPassword() bool {
+	if x != nil {
+		return x.HasPassword
+	}
+	return false
+}
+
+func (x *SshTunnel) GetHasKeyPassphrase() bool {
+	if x != nil {
+		return x.HasKeyPassphrase
+	}
+	return false
+}
+
+// SshSecrets carries tunnel secrets to the core, which stores them in the
+// keychain. They never come back.
+type SshSecrets struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Tunnel password. Unset keeps the stored one.
+	Password *string `protobuf:"bytes,1,opt,name=password,proto3,oneof" json:"password,omitempty"`
+	// Private key passphrase. Unset keeps the stored one.
+	KeyPassphrase *string `protobuf:"bytes,2,opt,name=key_passphrase,json=keyPassphrase,proto3,oneof" json:"key_passphrase,omitempty"`
+	// Same for the jump host.
+	JumpPassword *string `protobuf:"bytes,3,opt,name=jump_password,json=jumpPassword,proto3,oneof" json:"jump_password,omitempty"`
+	// Same for the jump host.
+	JumpKeyPassphrase *string `protobuf:"bytes,4,opt,name=jump_key_passphrase,json=jumpKeyPassphrase,proto3,oneof" json:"jump_key_passphrase,omitempty"`
+	// Remove every stored tunnel secret. Ignored for fields that are set.
+	Clear         bool `protobuf:"varint,5,opt,name=clear,proto3" json:"clear,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SshSecrets) Reset() {
+	*x = SshSecrets{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SshSecrets) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SshSecrets) ProtoMessage() {}
+
+func (x *SshSecrets) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SshSecrets.ProtoReflect.Descriptor instead.
+func (*SshSecrets) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SshSecrets) GetPassword() string {
+	if x != nil && x.Password != nil {
+		return *x.Password
+	}
+	return ""
+}
+
+func (x *SshSecrets) GetKeyPassphrase() string {
+	if x != nil && x.KeyPassphrase != nil {
+		return *x.KeyPassphrase
+	}
+	return ""
+}
+
+func (x *SshSecrets) GetJumpPassword() string {
+	if x != nil && x.JumpPassword != nil {
+		return *x.JumpPassword
+	}
+	return ""
+}
+
+func (x *SshSecrets) GetJumpKeyPassphrase() string {
+	if x != nil && x.JumpKeyPassphrase != nil {
+		return *x.JumpKeyPassphrase
+	}
+	return ""
+}
+
+func (x *SshSecrets) GetClear() bool {
+	if x != nil {
+		return x.Clear
+	}
+	return false
+}
+
+// TlsSettings is the engine-independent TLS configuration.
+type TlsSettings struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Strictness.
+	Mode TlsMode `protobuf:"varint,1,opt,name=mode,proto3,enum=queravue.v1.TlsMode" json:"mode,omitempty"`
+	// CA bundle path.
+	CaFile string `protobuf:"bytes,2,opt,name=ca_file,json=caFile,proto3" json:"ca_file,omitempty"`
+	// Client certificate path for mutual TLS.
+	ClientCertFile string `protobuf:"bytes,3,opt,name=client_cert_file,json=clientCertFile,proto3" json:"client_cert_file,omitempty"`
+	// Client key path for mutual TLS.
+	ClientKeyFile string `protobuf:"bytes,4,opt,name=client_key_file,json=clientKeyFile,proto3" json:"client_key_file,omitempty"`
+	// Host name to verify instead of the connect host.
+	ServerName string `protobuf:"bytes,5,opt,name=server_name,json=serverName,proto3" json:"server_name,omitempty"`
+	// Output only: whether a client key passphrase is stored in the keychain.
+	HasClientKeyPassphrase bool `protobuf:"varint,6,opt,name=has_client_key_passphrase,json=hasClientKeyPassphrase,proto3" json:"has_client_key_passphrase,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *TlsSettings) Reset() {
+	*x = TlsSettings{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TlsSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TlsSettings) ProtoMessage() {}
+
+func (x *TlsSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TlsSettings.ProtoReflect.Descriptor instead.
+func (*TlsSettings) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TlsSettings) GetMode() TlsMode {
+	if x != nil {
+		return x.Mode
+	}
+	return TlsMode_TLS_MODE_UNSPECIFIED
+}
+
+func (x *TlsSettings) GetCaFile() string {
+	if x != nil {
+		return x.CaFile
+	}
+	return ""
+}
+
+func (x *TlsSettings) GetClientCertFile() string {
+	if x != nil {
+		return x.ClientCertFile
+	}
+	return ""
+}
+
+func (x *TlsSettings) GetClientKeyFile() string {
+	if x != nil {
+		return x.ClientKeyFile
+	}
+	return ""
+}
+
+func (x *TlsSettings) GetServerName() string {
+	if x != nil {
+		return x.ServerName
+	}
+	return ""
+}
+
+func (x *TlsSettings) GetHasClientKeyPassphrase() bool {
+	if x != nil {
+		return x.HasClientKeyPassphrase
+	}
+	return false
+}
+
+// TlsSecrets carries the client key passphrase to the core.
+type TlsSecrets struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Client key passphrase. Unset keeps the stored one.
+	ClientKeyPassphrase *string `protobuf:"bytes,1,opt,name=client_key_passphrase,json=clientKeyPassphrase,proto3,oneof" json:"client_key_passphrase,omitempty"`
+	// Remove the stored passphrase. Ignored if set.
+	Clear         bool `protobuf:"varint,2,opt,name=clear,proto3" json:"clear,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TlsSecrets) Reset() {
+	*x = TlsSecrets{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TlsSecrets) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TlsSecrets) ProtoMessage() {}
+
+func (x *TlsSecrets) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TlsSecrets.ProtoReflect.Descriptor instead.
+func (*TlsSecrets) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TlsSecrets) GetClientKeyPassphrase() string {
+	if x != nil && x.ClientKeyPassphrase != nil {
+		return *x.ClientKeyPassphrase
+	}
+	return ""
+}
+
+func (x *TlsSecrets) GetClear() bool {
+	if x != nil {
+		return x.Clear
+	}
+	return false
+}
+
+// TrustHostKeyRequest accepts an unknown SSH host key.
+type TrustHostKeyRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Host as shown in the failure.
+	Host string `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	// Port as shown in the failure.
+	Port uint32 `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	// SHA256 fingerprint from the failure, e.g. "SHA256:abc...".
+	FingerprintSha256 string `protobuf:"bytes,3,opt,name=fingerprint_sha256,json=fingerprintSha256,proto3" json:"fingerprint_sha256,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *TrustHostKeyRequest) Reset() {
+	*x = TrustHostKeyRequest{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrustHostKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrustHostKeyRequest) ProtoMessage() {}
+
+func (x *TrustHostKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrustHostKeyRequest.ProtoReflect.Descriptor instead.
+func (*TrustHostKeyRequest) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TrustHostKeyRequest) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *TrustHostKeyRequest) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *TrustHostKeyRequest) GetFingerprintSha256() string {
+	if x != nil {
+		return x.FingerprintSha256
+	}
+	return ""
+}
+
+// TrustHostKeyResponse is empty.
+type TrustHostKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TrustHostKeyResponse) Reset() {
+	*x = TrustHostKeyResponse{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrustHostKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrustHostKeyResponse) ProtoMessage() {}
+
+func (x *TrustHostKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrustHostKeyResponse.ProtoReflect.Descriptor instead.
+func (*TrustHostKeyResponse) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{6}
+}
+
 // FieldSpec describes one connection form field.
 type FieldSpec struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -385,7 +1061,7 @@ type FieldSpec struct {
 
 func (x *FieldSpec) Reset() {
 	*x = FieldSpec{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[1]
+	mi := &file_queravue_v1_connections_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -397,7 +1073,7 @@ func (x *FieldSpec) String() string {
 func (*FieldSpec) ProtoMessage() {}
 
 func (x *FieldSpec) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[1]
+	mi := &file_queravue_v1_connections_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -410,7 +1086,7 @@ func (x *FieldSpec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldSpec.ProtoReflect.Descriptor instead.
 func (*FieldSpec) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{1}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *FieldSpec) GetKey() string {
@@ -479,14 +1155,18 @@ type EngineInfo struct {
 	// Engine capability names, e.g. "connect". Unknown names must be ignored.
 	Capabilities []string `protobuf:"bytes,6,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
 	// Example URI shown as a placeholder, e.g. "postgres://user@host:5432/db".
-	UriExample    string `protobuf:"bytes,7,opt,name=uri_example,json=uriExample,proto3" json:"uri_example,omitempty"`
+	UriExample string `protobuf:"bytes,7,opt,name=uri_example,json=uriExample,proto3" json:"uri_example,omitempty"`
+	// Whether the engine can be reached through an SSH tunnel.
+	SupportsSsh bool `protobuf:"varint,8,opt,name=supports_ssh,json=supportsSsh,proto3" json:"supports_ssh,omitempty"`
+	// Whether the engine honours TlsSettings.
+	SupportsTls   bool `protobuf:"varint,9,opt,name=supports_tls,json=supportsTls,proto3" json:"supports_tls,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EngineInfo) Reset() {
 	*x = EngineInfo{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[2]
+	mi := &file_queravue_v1_connections_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +1178,7 @@ func (x *EngineInfo) String() string {
 func (*EngineInfo) ProtoMessage() {}
 
 func (x *EngineInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[2]
+	mi := &file_queravue_v1_connections_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,7 +1191,7 @@ func (x *EngineInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EngineInfo.ProtoReflect.Descriptor instead.
 func (*EngineInfo) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{2}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *EngineInfo) GetId() string {
@@ -563,6 +1243,20 @@ func (x *EngineInfo) GetUriExample() string {
 	return ""
 }
 
+func (x *EngineInfo) GetSupportsSsh() bool {
+	if x != nil {
+		return x.SupportsSsh
+	}
+	return false
+}
+
+func (x *EngineInfo) GetSupportsTls() bool {
+	if x != nil {
+		return x.SupportsTls
+	}
+	return false
+}
+
 // ServerInfo is what a successful test learned about the server.
 type ServerInfo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -578,7 +1272,7 @@ type ServerInfo struct {
 
 func (x *ServerInfo) Reset() {
 	*x = ServerInfo{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[3]
+	mi := &file_queravue_v1_connections_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -590,7 +1284,7 @@ func (x *ServerInfo) String() string {
 func (*ServerInfo) ProtoMessage() {}
 
 func (x *ServerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[3]
+	mi := &file_queravue_v1_connections_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -603,7 +1297,7 @@ func (x *ServerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServerInfo.ProtoReflect.Descriptor instead.
 func (*ServerInfo) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{3}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ServerInfo) GetProduct() string {
@@ -633,14 +1327,20 @@ type ConnectionError struct {
 	// Failure class.
 	Kind ErrorKind `protobuf:"varint,1,opt,name=kind,proto3,enum=queravue.v1.ErrorKind" json:"kind,omitempty"`
 	// Human-readable detail.
-	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Message string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	// For SSH host key failures: "host:port" of the bastion.
+	SshHost string `protobuf:"bytes,3,opt,name=ssh_host,json=sshHost,proto3" json:"ssh_host,omitempty"`
+	// For SSH host key failures: SHA256 fingerprint of the presented key.
+	SshFingerprintSha256 string `protobuf:"bytes,4,opt,name=ssh_fingerprint_sha256,json=sshFingerprintSha256,proto3" json:"ssh_fingerprint_sha256,omitempty"`
+	// For ERROR_KIND_SSH_HOST_KEY_CHANGED: the fingerprint that was trusted.
+	SshTrustedFingerprintSha256 string `protobuf:"bytes,5,opt,name=ssh_trusted_fingerprint_sha256,json=sshTrustedFingerprintSha256,proto3" json:"ssh_trusted_fingerprint_sha256,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *ConnectionError) Reset() {
 	*x = ConnectionError{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[4]
+	mi := &file_queravue_v1_connections_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -652,7 +1352,7 @@ func (x *ConnectionError) String() string {
 func (*ConnectionError) ProtoMessage() {}
 
 func (x *ConnectionError) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[4]
+	mi := &file_queravue_v1_connections_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -665,7 +1365,7 @@ func (x *ConnectionError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectionError.ProtoReflect.Descriptor instead.
 func (*ConnectionError) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{4}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ConnectionError) GetKind() ErrorKind {
@@ -682,6 +1382,27 @@ func (x *ConnectionError) GetMessage() string {
 	return ""
 }
 
+func (x *ConnectionError) GetSshHost() string {
+	if x != nil {
+		return x.SshHost
+	}
+	return ""
+}
+
+func (x *ConnectionError) GetSshFingerprintSha256() string {
+	if x != nil {
+		return x.SshFingerprintSha256
+	}
+	return ""
+}
+
+func (x *ConnectionError) GetSshTrustedFingerprintSha256() string {
+	if x != nil {
+		return x.SshTrustedFingerprintSha256
+	}
+	return ""
+}
+
 // ListEnginesRequest is empty.
 type ListEnginesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -691,7 +1412,7 @@ type ListEnginesRequest struct {
 
 func (x *ListEnginesRequest) Reset() {
 	*x = ListEnginesRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[5]
+	mi := &file_queravue_v1_connections_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +1424,7 @@ func (x *ListEnginesRequest) String() string {
 func (*ListEnginesRequest) ProtoMessage() {}
 
 func (x *ListEnginesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[5]
+	mi := &file_queravue_v1_connections_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +1437,7 @@ func (x *ListEnginesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEnginesRequest.ProtoReflect.Descriptor instead.
 func (*ListEnginesRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{5}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{11}
 }
 
 // ListEnginesResponse lists supported engines.
@@ -730,7 +1451,7 @@ type ListEnginesResponse struct {
 
 func (x *ListEnginesResponse) Reset() {
 	*x = ListEnginesResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[6]
+	mi := &file_queravue_v1_connections_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -742,7 +1463,7 @@ func (x *ListEnginesResponse) String() string {
 func (*ListEnginesResponse) ProtoMessage() {}
 
 func (x *ListEnginesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[6]
+	mi := &file_queravue_v1_connections_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -755,7 +1476,7 @@ func (x *ListEnginesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEnginesResponse.ProtoReflect.Descriptor instead.
 func (*ListEnginesResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{6}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListEnginesResponse) GetEngines() []*EngineInfo {
@@ -774,7 +1495,7 @@ type ListConnectionsRequest struct {
 
 func (x *ListConnectionsRequest) Reset() {
 	*x = ListConnectionsRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[7]
+	mi := &file_queravue_v1_connections_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -786,7 +1507,7 @@ func (x *ListConnectionsRequest) String() string {
 func (*ListConnectionsRequest) ProtoMessage() {}
 
 func (x *ListConnectionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[7]
+	mi := &file_queravue_v1_connections_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -799,7 +1520,7 @@ func (x *ListConnectionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConnectionsRequest.ProtoReflect.Descriptor instead.
 func (*ListConnectionsRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{7}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{13}
 }
 
 // ListConnectionsResponse lists saved connections.
@@ -813,7 +1534,7 @@ type ListConnectionsResponse struct {
 
 func (x *ListConnectionsResponse) Reset() {
 	*x = ListConnectionsResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[8]
+	mi := &file_queravue_v1_connections_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +1546,7 @@ func (x *ListConnectionsResponse) String() string {
 func (*ListConnectionsResponse) ProtoMessage() {}
 
 func (x *ListConnectionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[8]
+	mi := &file_queravue_v1_connections_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +1559,7 @@ func (x *ListConnectionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListConnectionsResponse.ProtoReflect.Descriptor instead.
 func (*ListConnectionsResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{8}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListConnectionsResponse) GetConnections() []*Connection {
@@ -859,7 +1580,7 @@ type GetConnectionRequest struct {
 
 func (x *GetConnectionRequest) Reset() {
 	*x = GetConnectionRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[9]
+	mi := &file_queravue_v1_connections_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -871,7 +1592,7 @@ func (x *GetConnectionRequest) String() string {
 func (*GetConnectionRequest) ProtoMessage() {}
 
 func (x *GetConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[9]
+	mi := &file_queravue_v1_connections_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -884,7 +1605,7 @@ func (x *GetConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConnectionRequest.ProtoReflect.Descriptor instead.
 func (*GetConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{9}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetConnectionRequest) GetId() string {
@@ -905,7 +1626,7 @@ type GetConnectionResponse struct {
 
 func (x *GetConnectionResponse) Reset() {
 	*x = GetConnectionResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[10]
+	mi := &file_queravue_v1_connections_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -917,7 +1638,7 @@ func (x *GetConnectionResponse) String() string {
 func (*GetConnectionResponse) ProtoMessage() {}
 
 func (x *GetConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[10]
+	mi := &file_queravue_v1_connections_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -930,7 +1651,7 @@ func (x *GetConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetConnectionResponse.ProtoReflect.Descriptor instead.
 func (*GetConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{10}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetConnectionResponse) GetConnection() *Connection {
@@ -946,14 +1667,18 @@ type CreateConnectionRequest struct {
 	// Settings; id and output-only fields are ignored.
 	Connection *Connection `protobuf:"bytes,1,opt,name=connection,proto3" json:"connection,omitempty"`
 	// Password to store in the keychain. Unset or empty stores none.
-	Password      *string `protobuf:"bytes,2,opt,name=password,proto3,oneof" json:"password,omitempty"`
+	Password *string `protobuf:"bytes,2,opt,name=password,proto3,oneof" json:"password,omitempty"`
+	// Tunnel secrets to store in the keychain.
+	SshSecrets *SshSecrets `protobuf:"bytes,3,opt,name=ssh_secrets,json=sshSecrets,proto3" json:"ssh_secrets,omitempty"`
+	// TLS secrets to store in the keychain.
+	TlsSecrets    *TlsSecrets `protobuf:"bytes,4,opt,name=tls_secrets,json=tlsSecrets,proto3" json:"tls_secrets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateConnectionRequest) Reset() {
 	*x = CreateConnectionRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[11]
+	mi := &file_queravue_v1_connections_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -965,7 +1690,7 @@ func (x *CreateConnectionRequest) String() string {
 func (*CreateConnectionRequest) ProtoMessage() {}
 
 func (x *CreateConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[11]
+	mi := &file_queravue_v1_connections_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -978,7 +1703,7 @@ func (x *CreateConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConnectionRequest.ProtoReflect.Descriptor instead.
 func (*CreateConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{11}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *CreateConnectionRequest) GetConnection() *Connection {
@@ -995,6 +1720,20 @@ func (x *CreateConnectionRequest) GetPassword() string {
 	return ""
 }
 
+func (x *CreateConnectionRequest) GetSshSecrets() *SshSecrets {
+	if x != nil {
+		return x.SshSecrets
+	}
+	return nil
+}
+
+func (x *CreateConnectionRequest) GetTlsSecrets() *TlsSecrets {
+	if x != nil {
+		return x.TlsSecrets
+	}
+	return nil
+}
+
 // CreateConnectionResponse returns the saved connection.
 type CreateConnectionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1006,7 +1745,7 @@ type CreateConnectionResponse struct {
 
 func (x *CreateConnectionResponse) Reset() {
 	*x = CreateConnectionResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[12]
+	mi := &file_queravue_v1_connections_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1757,7 @@ func (x *CreateConnectionResponse) String() string {
 func (*CreateConnectionResponse) ProtoMessage() {}
 
 func (x *CreateConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[12]
+	mi := &file_queravue_v1_connections_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1770,7 @@ func (x *CreateConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConnectionResponse.ProtoReflect.Descriptor instead.
 func (*CreateConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{12}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *CreateConnectionResponse) GetConnection() *Connection {
@@ -1050,13 +1789,17 @@ type UpdateConnectionRequest struct {
 	Password *string `protobuf:"bytes,2,opt,name=password,proto3,oneof" json:"password,omitempty"`
 	// Remove the stored password. Ignored if password is set.
 	ClearPassword bool `protobuf:"varint,3,opt,name=clear_password,json=clearPassword,proto3" json:"clear_password,omitempty"`
+	// Tunnel secrets; unset fields keep the stored values.
+	SshSecrets *SshSecrets `protobuf:"bytes,4,opt,name=ssh_secrets,json=sshSecrets,proto3" json:"ssh_secrets,omitempty"`
+	// TLS secrets; unset fields keep the stored values.
+	TlsSecrets    *TlsSecrets `protobuf:"bytes,5,opt,name=tls_secrets,json=tlsSecrets,proto3" json:"tls_secrets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateConnectionRequest) Reset() {
 	*x = UpdateConnectionRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[13]
+	mi := &file_queravue_v1_connections_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1811,7 @@ func (x *UpdateConnectionRequest) String() string {
 func (*UpdateConnectionRequest) ProtoMessage() {}
 
 func (x *UpdateConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[13]
+	mi := &file_queravue_v1_connections_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1824,7 @@ func (x *UpdateConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateConnectionRequest.ProtoReflect.Descriptor instead.
 func (*UpdateConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{13}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UpdateConnectionRequest) GetConnection() *Connection {
@@ -1105,6 +1848,20 @@ func (x *UpdateConnectionRequest) GetClearPassword() bool {
 	return false
 }
 
+func (x *UpdateConnectionRequest) GetSshSecrets() *SshSecrets {
+	if x != nil {
+		return x.SshSecrets
+	}
+	return nil
+}
+
+func (x *UpdateConnectionRequest) GetTlsSecrets() *TlsSecrets {
+	if x != nil {
+		return x.TlsSecrets
+	}
+	return nil
+}
+
 // UpdateConnectionResponse returns the updated connection.
 type UpdateConnectionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1116,7 +1873,7 @@ type UpdateConnectionResponse struct {
 
 func (x *UpdateConnectionResponse) Reset() {
 	*x = UpdateConnectionResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[14]
+	mi := &file_queravue_v1_connections_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1128,7 +1885,7 @@ func (x *UpdateConnectionResponse) String() string {
 func (*UpdateConnectionResponse) ProtoMessage() {}
 
 func (x *UpdateConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[14]
+	mi := &file_queravue_v1_connections_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1141,7 +1898,7 @@ func (x *UpdateConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateConnectionResponse.ProtoReflect.Descriptor instead.
 func (*UpdateConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{14}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *UpdateConnectionResponse) GetConnection() *Connection {
@@ -1162,7 +1919,7 @@ type DeleteConnectionRequest struct {
 
 func (x *DeleteConnectionRequest) Reset() {
 	*x = DeleteConnectionRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[15]
+	mi := &file_queravue_v1_connections_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1174,7 +1931,7 @@ func (x *DeleteConnectionRequest) String() string {
 func (*DeleteConnectionRequest) ProtoMessage() {}
 
 func (x *DeleteConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[15]
+	mi := &file_queravue_v1_connections_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1187,7 +1944,7 @@ func (x *DeleteConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConnectionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{15}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DeleteConnectionRequest) GetId() string {
@@ -1206,7 +1963,7 @@ type DeleteConnectionResponse struct {
 
 func (x *DeleteConnectionResponse) Reset() {
 	*x = DeleteConnectionResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[16]
+	mi := &file_queravue_v1_connections_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1975,7 @@ func (x *DeleteConnectionResponse) String() string {
 func (*DeleteConnectionResponse) ProtoMessage() {}
 
 func (x *DeleteConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[16]
+	mi := &file_queravue_v1_connections_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1988,7 @@ func (x *DeleteConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteConnectionResponse.ProtoReflect.Descriptor instead.
 func (*DeleteConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{16}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{22}
 }
 
 // TestConnectionRequest selects what to test. Either id, draft, or both:
@@ -1247,14 +2004,18 @@ type TestConnectionRequest struct {
 	Password *string `protobuf:"bytes,3,opt,name=password,proto3,oneof" json:"password,omitempty"`
 	// Timeout in milliseconds. 0 means the default (10000). The core clamps
 	// values to [1000, 60000].
-	TimeoutMs     uint32 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	TimeoutMs uint32 `protobuf:"varint,4,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"`
+	// Tunnel secrets for a draft; unset fields fall back to the keychain.
+	SshSecrets *SshSecrets `protobuf:"bytes,5,opt,name=ssh_secrets,json=sshSecrets,proto3" json:"ssh_secrets,omitempty"`
+	// TLS secrets for a draft; unset fields fall back to the keychain.
+	TlsSecrets    *TlsSecrets `protobuf:"bytes,6,opt,name=tls_secrets,json=tlsSecrets,proto3" json:"tls_secrets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TestConnectionRequest) Reset() {
 	*x = TestConnectionRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[17]
+	mi := &file_queravue_v1_connections_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1266,7 +2027,7 @@ func (x *TestConnectionRequest) String() string {
 func (*TestConnectionRequest) ProtoMessage() {}
 
 func (x *TestConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[17]
+	mi := &file_queravue_v1_connections_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1279,7 +2040,7 @@ func (x *TestConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestConnectionRequest.ProtoReflect.Descriptor instead.
 func (*TestConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{17}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *TestConnectionRequest) GetId() string {
@@ -1310,6 +2071,20 @@ func (x *TestConnectionRequest) GetTimeoutMs() uint32 {
 	return 0
 }
 
+func (x *TestConnectionRequest) GetSshSecrets() *SshSecrets {
+	if x != nil {
+		return x.SshSecrets
+	}
+	return nil
+}
+
+func (x *TestConnectionRequest) GetTlsSecrets() *TlsSecrets {
+	if x != nil {
+		return x.TlsSecrets
+	}
+	return nil
+}
+
 // TestConnectionResponse reports the test result.
 type TestConnectionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1322,14 +2097,16 @@ type TestConnectionResponse struct {
 	// Ping round-trip latency, in milliseconds.
 	LatencyMs uint32 `protobuf:"varint,4,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
 	// Failure detail when not ok.
-	Error         *ConnectionError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	Error *ConnectionError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// Per-step outcome in the order the steps ran. Stops at the first failure.
+	Steps         []*TestStep `protobuf:"bytes,6,rep,name=steps,proto3" json:"steps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TestConnectionResponse) Reset() {
 	*x = TestConnectionResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[18]
+	mi := &file_queravue_v1_connections_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1341,7 +2118,7 @@ func (x *TestConnectionResponse) String() string {
 func (*TestConnectionResponse) ProtoMessage() {}
 
 func (x *TestConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[18]
+	mi := &file_queravue_v1_connections_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1354,7 +2131,7 @@ func (x *TestConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TestConnectionResponse.ProtoReflect.Descriptor instead.
 func (*TestConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{18}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *TestConnectionResponse) GetOk() bool {
@@ -1392,6 +2169,86 @@ func (x *TestConnectionResponse) GetError() *ConnectionError {
 	return nil
 }
 
+func (x *TestConnectionResponse) GetSteps() []*TestStep {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+// TestStep is the outcome of one stage.
+type TestStep struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Stage.
+	Stage TestStage `protobuf:"varint,1,opt,name=stage,proto3,enum=queravue.v1.TestStage" json:"stage,omitempty"`
+	// Whether it succeeded.
+	Ok bool `protobuf:"varint,2,opt,name=ok,proto3" json:"ok,omitempty"`
+	// Time the stage took, in milliseconds.
+	ElapsedMs uint32 `protobuf:"varint,3,opt,name=elapsed_ms,json=elapsedMs,proto3" json:"elapsed_ms,omitempty"`
+	// Failure detail when not ok.
+	Error         *ConnectionError `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TestStep) Reset() {
+	*x = TestStep{}
+	mi := &file_queravue_v1_connections_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TestStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TestStep) ProtoMessage() {}
+
+func (x *TestStep) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_connections_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TestStep.ProtoReflect.Descriptor instead.
+func (*TestStep) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *TestStep) GetStage() TestStage {
+	if x != nil {
+		return x.Stage
+	}
+	return TestStage_TEST_STAGE_UNSPECIFIED
+}
+
+func (x *TestStep) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *TestStep) GetElapsedMs() uint32 {
+	if x != nil {
+		return x.ElapsedMs
+	}
+	return 0
+}
+
+func (x *TestStep) GetError() *ConnectionError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 // ParseConnectionStringRequest asks the core to parse a URI or DSN.
 type ParseConnectionStringRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -1405,7 +2262,7 @@ type ParseConnectionStringRequest struct {
 
 func (x *ParseConnectionStringRequest) Reset() {
 	*x = ParseConnectionStringRequest{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[19]
+	mi := &file_queravue_v1_connections_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1417,7 +2274,7 @@ func (x *ParseConnectionStringRequest) String() string {
 func (*ParseConnectionStringRequest) ProtoMessage() {}
 
 func (x *ParseConnectionStringRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[19]
+	mi := &file_queravue_v1_connections_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1430,7 +2287,7 @@ func (x *ParseConnectionStringRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseConnectionStringRequest.ProtoReflect.Descriptor instead.
 func (*ParseConnectionStringRequest) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{19}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ParseConnectionStringRequest) GetEngineId() string {
@@ -1460,7 +2317,7 @@ type ParseConnectionStringResponse struct {
 
 func (x *ParseConnectionStringResponse) Reset() {
 	*x = ParseConnectionStringResponse{}
-	mi := &file_queravue_v1_connections_proto_msgTypes[20]
+	mi := &file_queravue_v1_connections_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1472,7 +2329,7 @@ func (x *ParseConnectionStringResponse) String() string {
 func (*ParseConnectionStringResponse) ProtoMessage() {}
 
 func (x *ParseConnectionStringResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_queravue_v1_connections_proto_msgTypes[20]
+	mi := &file_queravue_v1_connections_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1485,7 +2342,7 @@ func (x *ParseConnectionStringResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParseConnectionStringResponse.ProtoReflect.Descriptor instead.
 func (*ParseConnectionStringResponse) Descriptor() ([]byte, []int) {
-	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{20}
+	return file_queravue_v1_connections_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ParseConnectionStringResponse) GetParams() map[string]string {
@@ -1506,7 +2363,7 @@ var File_queravue_v1_connections_proto protoreflect.FileDescriptor
 
 const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\n" +
-	"\x1dqueravue/v1/connections.proto\x12\vqueravue.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc3\x03\n" +
+	"\x1dqueravue/v1/connections.proto\x12\vqueravue.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa6\x04\n" +
 	"\n" +
 	"Connection\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -1523,10 +2380,55 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x125\n" +
+	"\n" +
+	"ssh_tunnel\x18\v \x01(\v2\x16.queravue.v1.SshTunnelR\tsshTunnel\x12*\n" +
+	"\x03tls\x18\f \x01(\v2\x18.queravue.v1.TlsSettingsR\x03tls\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdc\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x8a\x03\n" +
+	"\tSshTunnel\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x12\x12\n" +
+	"\x04user\x18\x03 \x01(\tR\x04user\x12;\n" +
+	"\vauth_method\x18\x04 \x01(\x0e2\x1a.queravue.v1.SshAuthMethodR\n" +
+	"authMethod\x12\x19\n" +
+	"\bkey_file\x18\x05 \x01(\tR\akeyFile\x12+\n" +
+	"\x11keepalive_seconds\x18\x06 \x01(\rR\x10keepaliveSeconds\x126\n" +
+	"\x17connect_timeout_seconds\x18\a \x01(\rR\x15connectTimeoutSeconds\x123\n" +
+	"\tjump_host\x18\b \x01(\v2\x16.queravue.v1.SshTunnelR\bjumpHost\x12!\n" +
+	"\fhas_password\x18\t \x01(\bR\vhasPassword\x12,\n" +
+	"\x12has_key_passphrase\x18\n" +
+	" \x01(\bR\x10hasKeyPassphrase\"\x98\x02\n" +
+	"\n" +
+	"SshSecrets\x12\x1f\n" +
+	"\bpassword\x18\x01 \x01(\tH\x00R\bpassword\x88\x01\x01\x12*\n" +
+	"\x0ekey_passphrase\x18\x02 \x01(\tH\x01R\rkeyPassphrase\x88\x01\x01\x12(\n" +
+	"\rjump_password\x18\x03 \x01(\tH\x02R\fjumpPassword\x88\x01\x01\x123\n" +
+	"\x13jump_key_passphrase\x18\x04 \x01(\tH\x03R\x11jumpKeyPassphrase\x88\x01\x01\x12\x14\n" +
+	"\x05clear\x18\x05 \x01(\bR\x05clearB\v\n" +
+	"\t_passwordB\x11\n" +
+	"\x0f_key_passphraseB\x10\n" +
+	"\x0e_jump_passwordB\x16\n" +
+	"\x14_jump_key_passphrase\"\xfe\x01\n" +
+	"\vTlsSettings\x12(\n" +
+	"\x04mode\x18\x01 \x01(\x0e2\x14.queravue.v1.TlsModeR\x04mode\x12\x17\n" +
+	"\aca_file\x18\x02 \x01(\tR\x06caFile\x12(\n" +
+	"\x10client_cert_file\x18\x03 \x01(\tR\x0eclientCertFile\x12&\n" +
+	"\x0fclient_key_file\x18\x04 \x01(\tR\rclientKeyFile\x12\x1f\n" +
+	"\vserver_name\x18\x05 \x01(\tR\n" +
+	"serverName\x129\n" +
+	"\x19has_client_key_passphrase\x18\x06 \x01(\bR\x16hasClientKeyPassphrase\"u\n" +
+	"\n" +
+	"TlsSecrets\x127\n" +
+	"\x15client_key_passphrase\x18\x01 \x01(\tH\x00R\x13clientKeyPassphrase\x88\x01\x01\x12\x14\n" +
+	"\x05clear\x18\x02 \x01(\bR\x05clearB\x18\n" +
+	"\x16_client_key_passphrase\"l\n" +
+	"\x13TrustHostKeyRequest\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\rR\x04port\x12-\n" +
+	"\x12fingerprint_sha256\x18\x03 \x01(\tR\x11fingerprintSha256\"\x16\n" +
+	"\x14TrustHostKeyResponse\"\xdc\x01\n" +
 	"\tFieldSpec\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12*\n" +
@@ -1534,7 +2436,7 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\brequired\x18\x04 \x01(\bR\brequired\x12#\n" +
 	"\rdefault_value\x18\x05 \x01(\tR\fdefaultValue\x12 \n" +
 	"\vplaceholder\x18\x06 \x01(\tR\vplaceholder\x12\x18\n" +
-	"\aoptions\x18\a \x03(\tR\aoptions\"\xef\x01\n" +
+	"\aoptions\x18\a \x03(\tR\aoptions\"\xb5\x02\n" +
 	"\n" +
 	"EngineInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
@@ -1544,15 +2446,20 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\fsupports_uri\x18\x05 \x01(\bR\vsupportsUri\x12\"\n" +
 	"\fcapabilities\x18\x06 \x03(\tR\fcapabilities\x12\x1f\n" +
 	"\vuri_example\x18\a \x01(\tR\n" +
-	"uriExample\"X\n" +
+	"uriExample\x12!\n" +
+	"\fsupports_ssh\x18\b \x01(\bR\vsupportsSsh\x12!\n" +
+	"\fsupports_tls\x18\t \x01(\bR\vsupportsTls\"X\n" +
 	"\n" +
 	"ServerInfo\x12\x18\n" +
 	"\aproduct\x18\x01 \x01(\tR\aproduct\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
-	"\x06banner\x18\x03 \x01(\tR\x06banner\"W\n" +
+	"\x06banner\x18\x03 \x01(\tR\x06banner\"\xed\x01\n" +
 	"\x0fConnectionError\x12*\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x16.queravue.v1.ErrorKindR\x04kind\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x14\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
+	"\bssh_host\x18\x03 \x01(\tR\asshHost\x124\n" +
+	"\x16ssh_fingerprint_sha256\x18\x04 \x01(\tR\x14sshFingerprintSha256\x12C\n" +
+	"\x1essh_trusted_fingerprint_sha256\x18\x05 \x01(\tR\x1bsshTrustedFingerprintSha256\"\x14\n" +
 	"\x12ListEnginesRequest\"H\n" +
 	"\x13ListEnginesResponse\x121\n" +
 	"\aengines\x18\x01 \x03(\v2\x17.queravue.v1.EngineInfoR\aengines\"\x18\n" +
@@ -1564,23 +2471,31 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\x15GetConnectionResponse\x127\n" +
 	"\n" +
 	"connection\x18\x01 \x01(\v2\x17.queravue.v1.ConnectionR\n" +
-	"connection\"\x80\x01\n" +
+	"connection\"\xf4\x01\n" +
 	"\x17CreateConnectionRequest\x127\n" +
 	"\n" +
 	"connection\x18\x01 \x01(\v2\x17.queravue.v1.ConnectionR\n" +
 	"connection\x12\x1f\n" +
-	"\bpassword\x18\x02 \x01(\tH\x00R\bpassword\x88\x01\x01B\v\n" +
+	"\bpassword\x18\x02 \x01(\tH\x00R\bpassword\x88\x01\x01\x128\n" +
+	"\vssh_secrets\x18\x03 \x01(\v2\x17.queravue.v1.SshSecretsR\n" +
+	"sshSecrets\x128\n" +
+	"\vtls_secrets\x18\x04 \x01(\v2\x17.queravue.v1.TlsSecretsR\n" +
+	"tlsSecretsB\v\n" +
 	"\t_password\"S\n" +
 	"\x18CreateConnectionResponse\x127\n" +
 	"\n" +
 	"connection\x18\x01 \x01(\v2\x17.queravue.v1.ConnectionR\n" +
-	"connection\"\xa7\x01\n" +
+	"connection\"\x9b\x02\n" +
 	"\x17UpdateConnectionRequest\x127\n" +
 	"\n" +
 	"connection\x18\x01 \x01(\v2\x17.queravue.v1.ConnectionR\n" +
 	"connection\x12\x1f\n" +
 	"\bpassword\x18\x02 \x01(\tH\x00R\bpassword\x88\x01\x01\x12%\n" +
-	"\x0eclear_password\x18\x03 \x01(\bR\rclearPasswordB\v\n" +
+	"\x0eclear_password\x18\x03 \x01(\bR\rclearPassword\x128\n" +
+	"\vssh_secrets\x18\x04 \x01(\v2\x17.queravue.v1.SshSecretsR\n" +
+	"sshSecrets\x128\n" +
+	"\vtls_secrets\x18\x05 \x01(\v2\x17.queravue.v1.TlsSecretsR\n" +
+	"tlsSecretsB\v\n" +
 	"\t_password\"S\n" +
 	"\x18UpdateConnectionResponse\x127\n" +
 	"\n" +
@@ -1588,14 +2503,18 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"connection\")\n" +
 	"\x17DeleteConnectionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x1a\n" +
-	"\x18DeleteConnectionResponse\"\xa3\x01\n" +
+	"\x18DeleteConnectionResponse\"\x97\x02\n" +
 	"\x15TestConnectionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x05draft\x18\x02 \x01(\v2\x17.queravue.v1.ConnectionR\x05draft\x12\x1f\n" +
 	"\bpassword\x18\x03 \x01(\tH\x00R\bpassword\x88\x01\x01\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x04 \x01(\rR\ttimeoutMsB\v\n" +
-	"\t_password\"\xcb\x01\n" +
+	"timeout_ms\x18\x04 \x01(\rR\ttimeoutMs\x128\n" +
+	"\vssh_secrets\x18\x05 \x01(\v2\x17.queravue.v1.SshSecretsR\n" +
+	"sshSecrets\x128\n" +
+	"\vtls_secrets\x18\x06 \x01(\v2\x17.queravue.v1.TlsSecretsR\n" +
+	"tlsSecretsB\v\n" +
+	"\t_password\"\xf8\x01\n" +
 	"\x16TestConnectionResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12/\n" +
 	"\x06server\x18\x02 \x01(\v2\x17.queravue.v1.ServerInfoR\x06server\x12\x1d\n" +
@@ -1603,7 +2522,14 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"connect_ms\x18\x03 \x01(\rR\tconnectMs\x12\x1d\n" +
 	"\n" +
 	"latency_ms\x18\x04 \x01(\rR\tlatencyMs\x122\n" +
-	"\x05error\x18\x05 \x01(\v2\x1c.queravue.v1.ConnectionErrorR\x05error\"h\n" +
+	"\x05error\x18\x05 \x01(\v2\x1c.queravue.v1.ConnectionErrorR\x05error\x12+\n" +
+	"\x05steps\x18\x06 \x03(\v2\x15.queravue.v1.TestStepR\x05steps\"\x9b\x01\n" +
+	"\bTestStep\x12,\n" +
+	"\x05stage\x18\x01 \x01(\x0e2\x16.queravue.v1.TestStageR\x05stage\x12\x0e\n" +
+	"\x02ok\x18\x02 \x01(\bR\x02ok\x12\x1d\n" +
+	"\n" +
+	"elapsed_ms\x18\x03 \x01(\rR\telapsedMs\x122\n" +
+	"\x05error\x18\x04 \x01(\v2\x1c.queravue.v1.ConnectionErrorR\x05error\"h\n" +
 	"\x1cParseConnectionStringRequest\x12\x1b\n" +
 	"\tengine_id\x18\x01 \x01(\tR\bengineId\x12+\n" +
 	"\x11connection_string\x18\x02 \x01(\tR\x10connectionString\"\xd8\x01\n" +
@@ -1622,7 +2548,19 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\x0fCOLOR_TAG_GREEN\x10\x04\x12\x12\n" +
 	"\x0eCOLOR_TAG_BLUE\x10\x05\x12\x14\n" +
 	"\x10COLOR_TAG_PURPLE\x10\x06\x12\x12\n" +
-	"\x0eCOLOR_TAG_GRAY\x10\a*\xb1\x01\n" +
+	"\x0eCOLOR_TAG_GRAY\x10\a*\x87\x01\n" +
+	"\rSshAuthMethod\x12\x1f\n" +
+	"\x1bSSH_AUTH_METHOD_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18SSH_AUTH_METHOD_PASSWORD\x10\x01\x12\x1c\n" +
+	"\x18SSH_AUTH_METHOD_KEY_FILE\x10\x02\x12\x19\n" +
+	"\x15SSH_AUTH_METHOD_AGENT\x10\x03*\x96\x01\n" +
+	"\aTlsMode\x12\x18\n" +
+	"\x14TLS_MODE_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10TLS_MODE_DISABLE\x10\x01\x12\x13\n" +
+	"\x0fTLS_MODE_PREFER\x10\x02\x12\x14\n" +
+	"\x10TLS_MODE_REQUIRE\x10\x03\x12\x16\n" +
+	"\x12TLS_MODE_VERIFY_CA\x10\x04\x12\x18\n" +
+	"\x14TLS_MODE_VERIFY_FULL\x10\x05*\xb1\x01\n" +
 	"\tFieldKind\x12\x1a\n" +
 	"\x16FIELD_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fFIELD_KIND_TEXT\x10\x01\x12\x16\n" +
@@ -1630,7 +2568,7 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\x13FIELD_KIND_PASSWORD\x10\x03\x12\x13\n" +
 	"\x0fFIELD_KIND_FILE\x10\x04\x12\x16\n" +
 	"\x12FIELD_KIND_BOOLEAN\x10\x05\x12\x15\n" +
-	"\x11FIELD_KIND_SELECT\x10\x06*\xb9\x01\n" +
+	"\x11FIELD_KIND_SELECT\x10\x06*\xb8\x02\n" +
 	"\tErrorKind\x12\x1a\n" +
 	"\x16ERROR_KIND_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fERROR_KIND_AUTH\x10\x01\x12\x16\n" +
@@ -1638,7 +2576,18 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\x0eERROR_KIND_TLS\x10\x03\x12\x18\n" +
 	"\x14ERROR_KIND_NOT_FOUND\x10\x04\x12\x16\n" +
 	"\x12ERROR_KIND_TIMEOUT\x10\x05\x12\x1d\n" +
-	"\x19ERROR_KIND_INVALID_CONFIG\x10\x062\x89\x06\n" +
+	"\x19ERROR_KIND_INVALID_CONFIG\x10\x06\x12#\n" +
+	"\x1fERROR_KIND_SSH_HOST_KEY_UNKNOWN\x10\a\x12#\n" +
+	"\x1fERROR_KIND_SSH_HOST_KEY_CHANGED\x10\b\x12\x17\n" +
+	"\x13ERROR_KIND_SSH_AUTH\x10\t\x12\x1a\n" +
+	"\x16ERROR_KIND_TUNNEL_LOST\x10\n" +
+	"*y\n" +
+	"\tTestStage\x12\x1a\n" +
+	"\x16TEST_STAGE_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eTEST_STAGE_SSH\x10\x01\x12\x12\n" +
+	"\x0eTEST_STAGE_TLS\x10\x02\x12\x13\n" +
+	"\x0fTEST_STAGE_AUTH\x10\x03\x12\x13\n" +
+	"\x0fTEST_STAGE_PING\x10\x042\xde\x06\n" +
 	"\x11ConnectionService\x12P\n" +
 	"\vListEngines\x12\x1f.queravue.v1.ListEnginesRequest\x1a .queravue.v1.ListEnginesResponse\x12\\\n" +
 	"\x0fListConnections\x12#.queravue.v1.ListConnectionsRequest\x1a$.queravue.v1.ListConnectionsResponse\x12V\n" +
@@ -1647,7 +2596,8 @@ const file_queravue_v1_connections_proto_rawDesc = "" +
 	"\x10UpdateConnection\x12$.queravue.v1.UpdateConnectionRequest\x1a%.queravue.v1.UpdateConnectionResponse\x12_\n" +
 	"\x10DeleteConnection\x12$.queravue.v1.DeleteConnectionRequest\x1a%.queravue.v1.DeleteConnectionResponse\x12Y\n" +
 	"\x0eTestConnection\x12\".queravue.v1.TestConnectionRequest\x1a#.queravue.v1.TestConnectionResponse\x12n\n" +
-	"\x15ParseConnectionString\x12).queravue.v1.ParseConnectionStringRequest\x1a*.queravue.v1.ParseConnectionStringResponseB\xbc\x01\n" +
+	"\x15ParseConnectionString\x12).queravue.v1.ParseConnectionStringRequest\x1a*.queravue.v1.ParseConnectionStringResponse\x12S\n" +
+	"\fTrustHostKey\x12 .queravue.v1.TrustHostKeyRequest\x1a!.queravue.v1.TrustHostKeyResponseB\xbc\x01\n" +
 	"\x0fcom.queravue.v1B\x10ConnectionsProtoP\x01ZJgithub.com/doubledare704/queravue/core/internal/gen/queravue/v1;queravuev1\xa2\x02\x03QXX\xaa\x02\vQueravue.V1\xca\x02\vQueravue\\V1\xe2\x02\x17Queravue\\V1\\GPBMetadata\xea\x02\fQueravue::V1b\x06proto3"
 
 var (
@@ -1662,77 +2612,103 @@ func file_queravue_v1_connections_proto_rawDescGZIP() []byte {
 	return file_queravue_v1_connections_proto_rawDescData
 }
 
-var file_queravue_v1_connections_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_queravue_v1_connections_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_queravue_v1_connections_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_queravue_v1_connections_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_queravue_v1_connections_proto_goTypes = []any{
 	(ColorTag)(0),                         // 0: queravue.v1.ColorTag
-	(FieldKind)(0),                        // 1: queravue.v1.FieldKind
-	(ErrorKind)(0),                        // 2: queravue.v1.ErrorKind
-	(*Connection)(nil),                    // 3: queravue.v1.Connection
-	(*FieldSpec)(nil),                     // 4: queravue.v1.FieldSpec
-	(*EngineInfo)(nil),                    // 5: queravue.v1.EngineInfo
-	(*ServerInfo)(nil),                    // 6: queravue.v1.ServerInfo
-	(*ConnectionError)(nil),               // 7: queravue.v1.ConnectionError
-	(*ListEnginesRequest)(nil),            // 8: queravue.v1.ListEnginesRequest
-	(*ListEnginesResponse)(nil),           // 9: queravue.v1.ListEnginesResponse
-	(*ListConnectionsRequest)(nil),        // 10: queravue.v1.ListConnectionsRequest
-	(*ListConnectionsResponse)(nil),       // 11: queravue.v1.ListConnectionsResponse
-	(*GetConnectionRequest)(nil),          // 12: queravue.v1.GetConnectionRequest
-	(*GetConnectionResponse)(nil),         // 13: queravue.v1.GetConnectionResponse
-	(*CreateConnectionRequest)(nil),       // 14: queravue.v1.CreateConnectionRequest
-	(*CreateConnectionResponse)(nil),      // 15: queravue.v1.CreateConnectionResponse
-	(*UpdateConnectionRequest)(nil),       // 16: queravue.v1.UpdateConnectionRequest
-	(*UpdateConnectionResponse)(nil),      // 17: queravue.v1.UpdateConnectionResponse
-	(*DeleteConnectionRequest)(nil),       // 18: queravue.v1.DeleteConnectionRequest
-	(*DeleteConnectionResponse)(nil),      // 19: queravue.v1.DeleteConnectionResponse
-	(*TestConnectionRequest)(nil),         // 20: queravue.v1.TestConnectionRequest
-	(*TestConnectionResponse)(nil),        // 21: queravue.v1.TestConnectionResponse
-	(*ParseConnectionStringRequest)(nil),  // 22: queravue.v1.ParseConnectionStringRequest
-	(*ParseConnectionStringResponse)(nil), // 23: queravue.v1.ParseConnectionStringResponse
-	nil,                                   // 24: queravue.v1.Connection.ParamsEntry
-	nil,                                   // 25: queravue.v1.ParseConnectionStringResponse.ParamsEntry
-	(*timestamppb.Timestamp)(nil),         // 26: google.protobuf.Timestamp
+	(SshAuthMethod)(0),                    // 1: queravue.v1.SshAuthMethod
+	(TlsMode)(0),                          // 2: queravue.v1.TlsMode
+	(FieldKind)(0),                        // 3: queravue.v1.FieldKind
+	(ErrorKind)(0),                        // 4: queravue.v1.ErrorKind
+	(TestStage)(0),                        // 5: queravue.v1.TestStage
+	(*Connection)(nil),                    // 6: queravue.v1.Connection
+	(*SshTunnel)(nil),                     // 7: queravue.v1.SshTunnel
+	(*SshSecrets)(nil),                    // 8: queravue.v1.SshSecrets
+	(*TlsSettings)(nil),                   // 9: queravue.v1.TlsSettings
+	(*TlsSecrets)(nil),                    // 10: queravue.v1.TlsSecrets
+	(*TrustHostKeyRequest)(nil),           // 11: queravue.v1.TrustHostKeyRequest
+	(*TrustHostKeyResponse)(nil),          // 12: queravue.v1.TrustHostKeyResponse
+	(*FieldSpec)(nil),                     // 13: queravue.v1.FieldSpec
+	(*EngineInfo)(nil),                    // 14: queravue.v1.EngineInfo
+	(*ServerInfo)(nil),                    // 15: queravue.v1.ServerInfo
+	(*ConnectionError)(nil),               // 16: queravue.v1.ConnectionError
+	(*ListEnginesRequest)(nil),            // 17: queravue.v1.ListEnginesRequest
+	(*ListEnginesResponse)(nil),           // 18: queravue.v1.ListEnginesResponse
+	(*ListConnectionsRequest)(nil),        // 19: queravue.v1.ListConnectionsRequest
+	(*ListConnectionsResponse)(nil),       // 20: queravue.v1.ListConnectionsResponse
+	(*GetConnectionRequest)(nil),          // 21: queravue.v1.GetConnectionRequest
+	(*GetConnectionResponse)(nil),         // 22: queravue.v1.GetConnectionResponse
+	(*CreateConnectionRequest)(nil),       // 23: queravue.v1.CreateConnectionRequest
+	(*CreateConnectionResponse)(nil),      // 24: queravue.v1.CreateConnectionResponse
+	(*UpdateConnectionRequest)(nil),       // 25: queravue.v1.UpdateConnectionRequest
+	(*UpdateConnectionResponse)(nil),      // 26: queravue.v1.UpdateConnectionResponse
+	(*DeleteConnectionRequest)(nil),       // 27: queravue.v1.DeleteConnectionRequest
+	(*DeleteConnectionResponse)(nil),      // 28: queravue.v1.DeleteConnectionResponse
+	(*TestConnectionRequest)(nil),         // 29: queravue.v1.TestConnectionRequest
+	(*TestConnectionResponse)(nil),        // 30: queravue.v1.TestConnectionResponse
+	(*TestStep)(nil),                      // 31: queravue.v1.TestStep
+	(*ParseConnectionStringRequest)(nil),  // 32: queravue.v1.ParseConnectionStringRequest
+	(*ParseConnectionStringResponse)(nil), // 33: queravue.v1.ParseConnectionStringResponse
+	nil,                                   // 34: queravue.v1.Connection.ParamsEntry
+	nil,                                   // 35: queravue.v1.ParseConnectionStringResponse.ParamsEntry
+	(*timestamppb.Timestamp)(nil),         // 36: google.protobuf.Timestamp
 }
 var file_queravue_v1_connections_proto_depIdxs = []int32{
-	24, // 0: queravue.v1.Connection.params:type_name -> queravue.v1.Connection.ParamsEntry
+	34, // 0: queravue.v1.Connection.params:type_name -> queravue.v1.Connection.ParamsEntry
 	0,  // 1: queravue.v1.Connection.color:type_name -> queravue.v1.ColorTag
-	26, // 2: queravue.v1.Connection.created_at:type_name -> google.protobuf.Timestamp
-	26, // 3: queravue.v1.Connection.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 4: queravue.v1.FieldSpec.kind:type_name -> queravue.v1.FieldKind
-	4,  // 5: queravue.v1.EngineInfo.fields:type_name -> queravue.v1.FieldSpec
-	2,  // 6: queravue.v1.ConnectionError.kind:type_name -> queravue.v1.ErrorKind
-	5,  // 7: queravue.v1.ListEnginesResponse.engines:type_name -> queravue.v1.EngineInfo
-	3,  // 8: queravue.v1.ListConnectionsResponse.connections:type_name -> queravue.v1.Connection
-	3,  // 9: queravue.v1.GetConnectionResponse.connection:type_name -> queravue.v1.Connection
-	3,  // 10: queravue.v1.CreateConnectionRequest.connection:type_name -> queravue.v1.Connection
-	3,  // 11: queravue.v1.CreateConnectionResponse.connection:type_name -> queravue.v1.Connection
-	3,  // 12: queravue.v1.UpdateConnectionRequest.connection:type_name -> queravue.v1.Connection
-	3,  // 13: queravue.v1.UpdateConnectionResponse.connection:type_name -> queravue.v1.Connection
-	3,  // 14: queravue.v1.TestConnectionRequest.draft:type_name -> queravue.v1.Connection
-	6,  // 15: queravue.v1.TestConnectionResponse.server:type_name -> queravue.v1.ServerInfo
-	7,  // 16: queravue.v1.TestConnectionResponse.error:type_name -> queravue.v1.ConnectionError
-	25, // 17: queravue.v1.ParseConnectionStringResponse.params:type_name -> queravue.v1.ParseConnectionStringResponse.ParamsEntry
-	8,  // 18: queravue.v1.ConnectionService.ListEngines:input_type -> queravue.v1.ListEnginesRequest
-	10, // 19: queravue.v1.ConnectionService.ListConnections:input_type -> queravue.v1.ListConnectionsRequest
-	12, // 20: queravue.v1.ConnectionService.GetConnection:input_type -> queravue.v1.GetConnectionRequest
-	14, // 21: queravue.v1.ConnectionService.CreateConnection:input_type -> queravue.v1.CreateConnectionRequest
-	16, // 22: queravue.v1.ConnectionService.UpdateConnection:input_type -> queravue.v1.UpdateConnectionRequest
-	18, // 23: queravue.v1.ConnectionService.DeleteConnection:input_type -> queravue.v1.DeleteConnectionRequest
-	20, // 24: queravue.v1.ConnectionService.TestConnection:input_type -> queravue.v1.TestConnectionRequest
-	22, // 25: queravue.v1.ConnectionService.ParseConnectionString:input_type -> queravue.v1.ParseConnectionStringRequest
-	9,  // 26: queravue.v1.ConnectionService.ListEngines:output_type -> queravue.v1.ListEnginesResponse
-	11, // 27: queravue.v1.ConnectionService.ListConnections:output_type -> queravue.v1.ListConnectionsResponse
-	13, // 28: queravue.v1.ConnectionService.GetConnection:output_type -> queravue.v1.GetConnectionResponse
-	15, // 29: queravue.v1.ConnectionService.CreateConnection:output_type -> queravue.v1.CreateConnectionResponse
-	17, // 30: queravue.v1.ConnectionService.UpdateConnection:output_type -> queravue.v1.UpdateConnectionResponse
-	19, // 31: queravue.v1.ConnectionService.DeleteConnection:output_type -> queravue.v1.DeleteConnectionResponse
-	21, // 32: queravue.v1.ConnectionService.TestConnection:output_type -> queravue.v1.TestConnectionResponse
-	23, // 33: queravue.v1.ConnectionService.ParseConnectionString:output_type -> queravue.v1.ParseConnectionStringResponse
-	26, // [26:34] is the sub-list for method output_type
-	18, // [18:26] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	36, // 2: queravue.v1.Connection.created_at:type_name -> google.protobuf.Timestamp
+	36, // 3: queravue.v1.Connection.updated_at:type_name -> google.protobuf.Timestamp
+	7,  // 4: queravue.v1.Connection.ssh_tunnel:type_name -> queravue.v1.SshTunnel
+	9,  // 5: queravue.v1.Connection.tls:type_name -> queravue.v1.TlsSettings
+	1,  // 6: queravue.v1.SshTunnel.auth_method:type_name -> queravue.v1.SshAuthMethod
+	7,  // 7: queravue.v1.SshTunnel.jump_host:type_name -> queravue.v1.SshTunnel
+	2,  // 8: queravue.v1.TlsSettings.mode:type_name -> queravue.v1.TlsMode
+	3,  // 9: queravue.v1.FieldSpec.kind:type_name -> queravue.v1.FieldKind
+	13, // 10: queravue.v1.EngineInfo.fields:type_name -> queravue.v1.FieldSpec
+	4,  // 11: queravue.v1.ConnectionError.kind:type_name -> queravue.v1.ErrorKind
+	14, // 12: queravue.v1.ListEnginesResponse.engines:type_name -> queravue.v1.EngineInfo
+	6,  // 13: queravue.v1.ListConnectionsResponse.connections:type_name -> queravue.v1.Connection
+	6,  // 14: queravue.v1.GetConnectionResponse.connection:type_name -> queravue.v1.Connection
+	6,  // 15: queravue.v1.CreateConnectionRequest.connection:type_name -> queravue.v1.Connection
+	8,  // 16: queravue.v1.CreateConnectionRequest.ssh_secrets:type_name -> queravue.v1.SshSecrets
+	10, // 17: queravue.v1.CreateConnectionRequest.tls_secrets:type_name -> queravue.v1.TlsSecrets
+	6,  // 18: queravue.v1.CreateConnectionResponse.connection:type_name -> queravue.v1.Connection
+	6,  // 19: queravue.v1.UpdateConnectionRequest.connection:type_name -> queravue.v1.Connection
+	8,  // 20: queravue.v1.UpdateConnectionRequest.ssh_secrets:type_name -> queravue.v1.SshSecrets
+	10, // 21: queravue.v1.UpdateConnectionRequest.tls_secrets:type_name -> queravue.v1.TlsSecrets
+	6,  // 22: queravue.v1.UpdateConnectionResponse.connection:type_name -> queravue.v1.Connection
+	6,  // 23: queravue.v1.TestConnectionRequest.draft:type_name -> queravue.v1.Connection
+	8,  // 24: queravue.v1.TestConnectionRequest.ssh_secrets:type_name -> queravue.v1.SshSecrets
+	10, // 25: queravue.v1.TestConnectionRequest.tls_secrets:type_name -> queravue.v1.TlsSecrets
+	15, // 26: queravue.v1.TestConnectionResponse.server:type_name -> queravue.v1.ServerInfo
+	16, // 27: queravue.v1.TestConnectionResponse.error:type_name -> queravue.v1.ConnectionError
+	31, // 28: queravue.v1.TestConnectionResponse.steps:type_name -> queravue.v1.TestStep
+	5,  // 29: queravue.v1.TestStep.stage:type_name -> queravue.v1.TestStage
+	16, // 30: queravue.v1.TestStep.error:type_name -> queravue.v1.ConnectionError
+	35, // 31: queravue.v1.ParseConnectionStringResponse.params:type_name -> queravue.v1.ParseConnectionStringResponse.ParamsEntry
+	17, // 32: queravue.v1.ConnectionService.ListEngines:input_type -> queravue.v1.ListEnginesRequest
+	19, // 33: queravue.v1.ConnectionService.ListConnections:input_type -> queravue.v1.ListConnectionsRequest
+	21, // 34: queravue.v1.ConnectionService.GetConnection:input_type -> queravue.v1.GetConnectionRequest
+	23, // 35: queravue.v1.ConnectionService.CreateConnection:input_type -> queravue.v1.CreateConnectionRequest
+	25, // 36: queravue.v1.ConnectionService.UpdateConnection:input_type -> queravue.v1.UpdateConnectionRequest
+	27, // 37: queravue.v1.ConnectionService.DeleteConnection:input_type -> queravue.v1.DeleteConnectionRequest
+	29, // 38: queravue.v1.ConnectionService.TestConnection:input_type -> queravue.v1.TestConnectionRequest
+	32, // 39: queravue.v1.ConnectionService.ParseConnectionString:input_type -> queravue.v1.ParseConnectionStringRequest
+	11, // 40: queravue.v1.ConnectionService.TrustHostKey:input_type -> queravue.v1.TrustHostKeyRequest
+	18, // 41: queravue.v1.ConnectionService.ListEngines:output_type -> queravue.v1.ListEnginesResponse
+	20, // 42: queravue.v1.ConnectionService.ListConnections:output_type -> queravue.v1.ListConnectionsResponse
+	22, // 43: queravue.v1.ConnectionService.GetConnection:output_type -> queravue.v1.GetConnectionResponse
+	24, // 44: queravue.v1.ConnectionService.CreateConnection:output_type -> queravue.v1.CreateConnectionResponse
+	26, // 45: queravue.v1.ConnectionService.UpdateConnection:output_type -> queravue.v1.UpdateConnectionResponse
+	28, // 46: queravue.v1.ConnectionService.DeleteConnection:output_type -> queravue.v1.DeleteConnectionResponse
+	30, // 47: queravue.v1.ConnectionService.TestConnection:output_type -> queravue.v1.TestConnectionResponse
+	33, // 48: queravue.v1.ConnectionService.ParseConnectionString:output_type -> queravue.v1.ParseConnectionStringResponse
+	12, // 49: queravue.v1.ConnectionService.TrustHostKey:output_type -> queravue.v1.TrustHostKeyResponse
+	41, // [41:50] is the sub-list for method output_type
+	32, // [32:41] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_queravue_v1_connections_proto_init() }
@@ -1740,17 +2716,19 @@ func file_queravue_v1_connections_proto_init() {
 	if File_queravue_v1_connections_proto != nil {
 		return
 	}
-	file_queravue_v1_connections_proto_msgTypes[11].OneofWrappers = []any{}
-	file_queravue_v1_connections_proto_msgTypes[13].OneofWrappers = []any{}
+	file_queravue_v1_connections_proto_msgTypes[2].OneofWrappers = []any{}
+	file_queravue_v1_connections_proto_msgTypes[4].OneofWrappers = []any{}
 	file_queravue_v1_connections_proto_msgTypes[17].OneofWrappers = []any{}
-	file_queravue_v1_connections_proto_msgTypes[20].OneofWrappers = []any{}
+	file_queravue_v1_connections_proto_msgTypes[19].OneofWrappers = []any{}
+	file_queravue_v1_connections_proto_msgTypes[23].OneofWrappers = []any{}
+	file_queravue_v1_connections_proto_msgTypes[27].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queravue_v1_connections_proto_rawDesc), len(file_queravue_v1_connections_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   23,
+			NumEnums:      6,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

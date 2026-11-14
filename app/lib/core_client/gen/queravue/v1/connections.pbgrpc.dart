@@ -109,6 +109,16 @@ class ConnectionServiceClient extends $grpc.Client {
     return $createUnaryCall(_$parseConnectionString, request, options: options);
   }
 
+  /// TrustHostKey records an SSH host key the user accepted after an
+  /// ERROR_KIND_SSH_HOST_KEY_UNKNOWN failure. The fingerprint must equal the one
+  /// the failure carried; a changed key can never be trusted this way.
+  $grpc.ResponseFuture<$0.TrustHostKeyResponse> trustHostKey(
+    $0.TrustHostKeyRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$trustHostKey, request, options: options);
+  }
+
   // method descriptors
 
   static final _$listEngines =
@@ -151,6 +161,11 @@ class ConnectionServiceClient extends $grpc.Client {
       '/queravue.v1.ConnectionService/ParseConnectionString',
       ($0.ParseConnectionStringRequest value) => value.writeToBuffer(),
       $0.ParseConnectionStringResponse.fromBuffer);
+  static final _$trustHostKey =
+      $grpc.ClientMethod<$0.TrustHostKeyRequest, $0.TrustHostKeyResponse>(
+          '/queravue.v1.ConnectionService/TrustHostKey',
+          ($0.TrustHostKeyRequest value) => value.writeToBuffer(),
+          $0.TrustHostKeyResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('queravue.v1.ConnectionService')
@@ -230,6 +245,15 @@ abstract class ConnectionServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.ParseConnectionStringRequest.fromBuffer(value),
         ($0.ParseConnectionStringResponse value) => value.writeToBuffer()));
+    $addMethod(
+        $grpc.ServiceMethod<$0.TrustHostKeyRequest, $0.TrustHostKeyResponse>(
+            'TrustHostKey',
+            trustHostKey_Pre,
+            false,
+            false,
+            ($core.List<$core.int> value) =>
+                $0.TrustHostKeyRequest.fromBuffer(value),
+            ($0.TrustHostKeyResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.ListEnginesResponse> listEngines_Pre($grpc.ServiceCall $call,
@@ -302,4 +326,13 @@ abstract class ConnectionServiceBase extends $grpc.Service {
 
   $async.Future<$0.ParseConnectionStringResponse> parseConnectionString(
       $grpc.ServiceCall call, $0.ParseConnectionStringRequest request);
+
+  $async.Future<$0.TrustHostKeyResponse> trustHostKey_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.TrustHostKeyRequest> $request) async {
+    return trustHostKey($call, await $request);
+  }
+
+  $async.Future<$0.TrustHostKeyResponse> trustHostKey(
+      $grpc.ServiceCall call, $0.TrustHostKeyRequest request);
 }

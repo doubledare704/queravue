@@ -41,6 +41,11 @@ service ConnectionService {
   // if present, is returned separately so the UI can put it into the password
   // field without ever storing it in params.
   rpc ParseConnectionString(ParseConnectionStringRequest) returns (ParseConnectionStringResponse);
+
+  // TrustHostKey records an SSH host key the user accepted after an
+  // ERROR_KIND_SSH_HOST_KEY_UNKNOWN failure. The fingerprint must equal the one
+  // the failure carried; a changed key can never be trusted this way.
+  rpc TrustHostKey(TrustHostKeyRequest) returns (TrustHostKeyResponse);
 }
 
 // ColorTag is the color dot shown next to a connection, e.g. red for prod.
@@ -86,7 +91,116 @@ message Connection {
   google.protobuf.Timestamp created_at = 9;
   // Output only: last update time.
   google.protobuf.Timestamp updated_at = 10;
+  // SSH tunnel settings. Unset means no tunnel.
+  SshTunnel ssh_tunnel = 11;
+  // TLS settings. Unset means the engine default.
+  TlsSettings tls = 12;
 }
+
+// SshAuthMethod selects how the tunnel authenticates.
+enum SshAuthMethod {
+  // Not set; treated as password.
+  SSH_AUTH_METHOD_UNSPECIFIED = 0;
+  // Password stored in the keychain.
+  SSH_AUTH_METHOD_PASSWORD = 1;
+  // Private key file, optional passphrase stored in the keychain.
+  SSH_AUTH_METHOD_KEY_FILE = 2;
+  // The running SSH agent.
+  SSH_AUTH_METHOD_AGENT = 3;
+}
+
+// SshTunnel describes the bastion a connection goes through. Secrets are
+// never part of it; see SshSecrets.
+message SshTunnel {
+  // Bastion host.
+  string host = 1;
+  // Bastion port. 0 means 22.
+  uint32 port = 2;
+  // Login user.
+  string user = 3;
+  // Authentication method.
+  SshAuthMethod auth_method = 4;
+  // Private key path for SSH_AUTH_METHOD_KEY_FILE.
+  string key_file = 5;
+  // Keep-alive interval in seconds. 0 means the default (30).
+  uint32 keepalive_seconds = 6;
+  // Connect timeout in seconds. 0 means the default (10).
+  uint32 connect_timeout_seconds = 7;
+  // Optional single jump host the bastion is reached through.
+  SshTunnel jump_host = 8;
+  // Output only: whether a password is stored in the keychain.
+  bool has_password = 9;
+  // Output only: whether a key passphrase is stored in the keychain.
+  bool has_key_passphrase = 10;
+}
+
+// SshSecrets carries tunnel secrets to the core, which stores them in the
+// keychain. They never come back.
+message SshSecrets {
+  // Tunnel password. Unset keeps the stored one.
+  optional string password = 1;
+  // Private key passphrase. Unset keeps the stored one.
+  optional string key_passphrase = 2;
+  // Same for the jump host.
+  optional string jump_password = 3;
+  // Same for the jump host.
+  optional string jump_key_passphrase = 4;
+  // Remove every stored tunnel secret. Ignored for fields that are set.
+  bool clear = 5;
+}
+
+// TlsMode selects how strictly TLS is enforced.
+enum TlsMode {
+  // Not set; the engine default applies.
+  TLS_MODE_UNSPECIFIED = 0;
+  // No TLS.
+  TLS_MODE_DISABLE = 1;
+  // Use TLS if the server offers it.
+  TLS_MODE_PREFER = 2;
+  // TLS required, certificate not verified.
+  TLS_MODE_REQUIRE = 3;
+  // TLS required, certificate chain verified.
+  TLS_MODE_VERIFY_CA = 4;
+  // TLS required, chain and host name verified.
+  TLS_MODE_VERIFY_FULL = 5;
+}
+
+// TlsSettings is the engine-independent TLS configuration.
+message TlsSettings {
+  // Strictness.
+  TlsMode mode = 1;
+  // CA bundle path.
+  string ca_file = 2;
+  // Client certificate path for mutual TLS.
+  string client_cert_file = 3;
+  // Client key path for mutual TLS.
+  string client_key_file = 4;
+  // Host name to verify instead of the connect host.
+  string server_name = 5;
+  // Output only: whether a client key passphrase is stored in the keychain.
+  bool has_client_key_passphrase = 6;
+}
+
+// TlsSecrets carries the client key passphrase to the core.
+message TlsSecrets {
+  // Client key passphrase. Unset keeps the stored one.
+  optional string client_key_passphrase = 1;
+  // Remove the stored passphrase. Ignored if set.
+  bool clear = 2;
+}
+
+// TrustHostKeyRequest accepts an unknown SSH host key.
+message TrustHostKeyRequest {
+  // Host as shown in the failure.
+  string host = 1;
+  // Port as shown in the failure.
+  uint32 port = 2;
+  // SHA256 fingerprint from the failure, e.g. "SHA256:abc...".
+  string fingerprint_sha256 = 3;
+}
+
+// TrustHostKeyResponse is empty.
+message TrustHostKeyResponse {}
 
 // FieldKind tells the UI which input widget to render.
 enum FieldKind {
@@ -142,6 +256,10 @@ message EngineInfo {
   repeated string capabilities = 6;
   // Example URI shown as a placeholder, e.g. "postgres://user@host:5432/db".
   string uri_example = 7;
+  // Whether the engine can be reached through an SSH tunnel.
+  bool supports_ssh = 8;
+  // Whether the engine honours TlsSettings.
+  bool supports_tls = 9;
 }
 
 // ServerInfo is what a successful test learned about the server.
@@ -170,6 +288,15 @@ enum ErrorKind {
   ERROR_KIND_TIMEOUT = 5;
   // The settings are invalid (missing field, bad port...).
   ERROR_KIND_INVALID_CONFIG = 6;
+  // The SSH host key is not known yet. ConnectionError carries its
+  // fingerprint; the UI asks the user and calls TrustHostKey.
+  ERROR_KIND_SSH_HOST_KEY_UNKNOWN = 7;
+  // The SSH host key differs from the trusted one. Never offered for trust.
+  ERROR_KIND_SSH_HOST_KEY_CHANGED = 8;
+  // The bastion rejected the credentials or key.
+  ERROR_KIND_SSH_AUTH = 9;
+  // The tunnel dropped after it was established.
+  ERROR_KIND_TUNNEL_LOST = 10;
 }
 
 // ConnectionError is a typed failure. The message never contains secrets.
@@ -178,6 +305,12 @@ message ConnectionError {
   ErrorKind kind = 1;
   // Human-readable detail.
   string message = 2;
+  // For SSH host key failures: "host:port" of the bastion.
+  string ssh_host = 3;
+  // For SSH host key failures: SHA256 fingerprint of the presented key.
+  string ssh_fingerprint_sha256 = 4;
+  // For ERROR_KIND_SSH_HOST_KEY_CHANGED: the fingerprint that was trusted.
+  string ssh_trusted_fingerprint_sha256 = 5;
 }
 
 // ListEnginesRequest is empty.
@@ -216,6 +349,10 @@ message CreateConnectionRequest {
   Connection connection = 1;
   // Password to store in the keychain. Unset or empty stores none.
   optional string password = 2;
+  // Tunnel secrets to store in the keychain.
+  SshSecrets ssh_secrets = 3;
+  // TLS secrets to store in the keychain.
+  TlsSecrets tls_secrets = 4;
 }
 
 // CreateConnectionResponse returns the saved connection.
@@ -232,6 +369,10 @@ message UpdateConnectionRequest {
   optional string password = 2;
   // Remove the stored password. Ignored if password is set.
   bool clear_password = 3;
+  // Tunnel secrets; unset fields keep the stored values.
+  SshSecrets ssh_secrets = 4;
+  // TLS secrets; unset fields keep the stored values.
+  TlsSecrets tls_secrets = 5;
 }
 
 // UpdateConnectionResponse returns the updated connection.
@@ -262,6 +403,10 @@ message TestConnectionRequest {
   // Timeout in milliseconds. 0 means the default (10000). The core clamps
   // values to [1000, 60000].
   uint32 timeout_ms = 4;
+  // Tunnel secrets for a draft; unset fields fall back to the keychain.
+  SshSecrets ssh_secrets = 5;
+  // TLS secrets for a draft; unset fields fall back to the keychain.
+  TlsSecrets tls_secrets = 6;
 }
 
 // TestConnectionResponse reports the test result.
@@ -276,6 +421,34 @@ message TestConnectionResponse {
   uint32 latency_ms = 4;
   // Failure detail when not ok.
   ConnectionError error = 5;
+  // Per-step outcome in the order the steps ran. Stops at the first failure.
+  repeated TestStep steps = 6;
+}
+
+// TestStage is one step of a connection test.
+enum TestStage {
+  // Not set.
+  TEST_STAGE_UNSPECIFIED = 0;
+  // Opening the SSH tunnel.
+  TEST_STAGE_SSH = 1;
+  // TLS handshake.
+  TEST_STAGE_TLS = 2;
+  // Authenticating to the database.
+  TEST_STAGE_AUTH = 3;
+  // Ping.
+  TEST_STAGE_PING = 4;
+}
+
+// TestStep is the outcome of one stage.
+message TestStep {
+  // Stage.
+  TestStage stage = 1;
+  // Whether it succeeded.
+  bool ok = 2;
+  // Time the stage took, in milliseconds.
+  uint32 elapsed_ms = 3;
+  // Failure detail when not ok.
+  ConnectionError error = 4;
 }
 
 // ParseConnectionStringRequest asks the core to parse a URI or DSN.
