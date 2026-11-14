@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../keyvalue/application/key_value_actions.dart';
 import '../../schema/application/schema_controller.dart';
 import '../../schema/presentation/schema_tree_view.dart';
 import '../application/connection_session.dart';
@@ -192,10 +193,11 @@ class _ConnectionTile extends ConsumerWidget {
           value: _MenuAction.disconnect,
           child: Text('Disconnect'),
         ),
-        const PopupMenuItem(
-          value: _MenuAction.refresh,
-          child: Text('Refresh schema'),
-        ),
+        if (!ref.read(hasKeyValueProvider(row.profile.id)))
+          const PopupMenuItem(
+            value: _MenuAction.refresh,
+            child: Text('Refresh schema'),
+          ),
       ],
       const PopupMenuDivider(),
       const PopupMenuItem(value: _MenuAction.edit, child: Text('Edit…')),
@@ -315,10 +317,11 @@ class _ConnectionTile extends ConsumerWidget {
                           value: _MenuAction.disconnect,
                           child: Text('Disconnect'),
                         ),
-                        const PopupMenuItem(
-                          value: _MenuAction.refresh,
-                          child: Text('Refresh schema'),
-                        ),
+                        if (!ref.watch(hasKeyValueProvider(p.id)))
+                          const PopupMenuItem(
+                            value: _MenuAction.refresh,
+                            child: Text('Refresh schema'),
+                          ),
                       ],
                       const PopupMenuDivider(),
                       const PopupMenuItem(
@@ -341,7 +344,8 @@ class _ConnectionTile extends ConsumerWidget {
             ),
           ),
         ),
-        if (isExpanded) SchemaTreeView(connectionId: p.id),
+        if (isExpanded && !ref.watch(hasKeyValueProvider(p.id)))
+          SchemaTreeView(connectionId: p.id),
       ],
     );
   }

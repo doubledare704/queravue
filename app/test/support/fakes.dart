@@ -8,6 +8,7 @@ import 'package:queravue/core_client/gen/queravue/v1/design.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/index.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/keyvalue.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/schema.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/session.pbgrpc.dart';
@@ -140,6 +141,14 @@ class FakeCoreConnection implements CoreConnection {
   @override
   DocumentServiceClient get documentService =>
       throw UnimplementedError('use a fake DocumentRepository');
+
+  @override
+  KeyValueServiceClient get keyValueService =>
+      throw UnimplementedError('use a fake KeyValueRepository');
+
+  @override
+  Stream<ScanKeysResponse> scanKeyValues(ScanKeysRequest request) =>
+      throw UnimplementedError('use a fake KeyValueRepository');
 
   @override
   ShellServiceClient get shellService =>

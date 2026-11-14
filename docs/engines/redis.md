@@ -55,3 +55,28 @@ The Cluster test needs three masters (an amd64 image, emulated on Apple Silicon)
 docker compose -f dev/docker-compose.yml --profile redis-cluster up -d --wait redis-cluster
 ```
 `REDIS_PERF=1` adds the memory measurement used in `docs/perf/iteration-10.md`. Ports and the password come from `REDIS_PORT`, `VALKEY_PORT` and `REDIS_PASSWORD`.
+
+## Key-value workspace
+
+Connect to a profile that advertises `key_value_store` to open the Keys, CLI
+and Pub/sub tabs. Choose the DB before running scans or commands. Apply a glob
+pattern or a type filter to narrow the scan. The browser retains the most
+recent 2,000 scanned keys. Run a narrower scan to revisit earlier keys.
+Type and TTL badges show metadata as of the last read. Redis stores
+HyperLogLog as a string, so it has no dedicated SCAN type filter.
+
+HyperLogLog browsing shows the estimated cardinality. Stream entries support
+append and delete. List removal applies to every occurrence of the value.
+Rename uses RENAMENX. String editing is available when the full value fits
+in one page. Pub/sub pause freezes the view while messages continue arriving
+in the 10,000-message buffer.
+
+To exercise the macOS workspace with Docker Redis:
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait redis
+make core
+cd app
+QUERAVUE_CONFIG_DIR="$(mktemp -d)" QUERAVUE_SECRETS=memory QUERAVUE_E2E=1 \
+  flutter test integration_test/key_value_workspace_test.dart -d macos
+```

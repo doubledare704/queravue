@@ -20,6 +20,7 @@ import '../../editor/domain/editor_layout.dart';
 import '../../editor/domain/query_models.dart';
 import '../../history/presentation/history_dialog.dart';
 import '../../keybindings/presentation/keybindings_dialog.dart';
+import '../../keyvalue/application/key_value_actions.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../../workspace/presentation/workspace_flows.dart';
 import '../presentation/command_palette.dart';
@@ -90,7 +91,9 @@ bool _isSplit(ActionWatch watch) => _layout(watch).groups.length > 1;
 
 bool _canOpenQueryTab(ActionWatch watch) {
   final id = watch(selectedConnectionProvider);
-  return id != null && !watch(connectionIsDocumentOnlyProvider(id));
+  return id != null &&
+      !watch(hasKeyValueProvider(id)) &&
+      !watch(connectionIsDocumentOnlyProvider(id));
 }
 
 bool _canOpenShellTab(ActionWatch watch) {
@@ -101,6 +104,7 @@ bool _canOpenShellTab(ActionWatch watch) {
 /// Every action of the app. Chords here are defaults; the user can change them.
 final builtinActionsProvider = Provider<List<AppAction>>(
   (ref) => [
+    ...keyValueActions(),
     AppAction(
       id: 'connection.new',
       title: 'New connection',

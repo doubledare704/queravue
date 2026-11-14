@@ -163,3 +163,23 @@ cd core && REDIS_PERF=1 go test -count=1 -tags=integration -v -run 'PerfIdle|Mem
 | `GetKeyInfo` of that hash (`TYPE`, `PTTL`, `OBJECT ENCODING`, `MEMORY USAGE`, `HLEN`) | 1 ms | |
 
 Keys stream to the sink page by page and are not kept, so memory does not depend on the keyspace. Not measured: a cluster scan at this size (the cluster image is emulated on Apple Silicon), a scan over an SSH tunnel, and the app-side key tree.
+
+## Lane E — Redis workspace
+
+The Flutter controller retains at most 2,000 scanned keys and the pub/sub
+controller retains the newest 10,000 messages. The controller tests exercise
+eviction and scan cancellation. The key tree builds row widgets on demand and
+requests metadata for mounted rows.
+
+The core million-key scan was rerun with the Redis 7.4.12 Compose seed in a
+separate project. It took 1.34–1.66 s across the two benchmarks, with 0 KiB of
+peak live heap growth and 40.9 MB peak core test-process RSS during the scan.
+
+An initial macOS release build used 116.5 MiB combined UI and core RSS after
+30 seconds with an empty profile. Five process-to-sidecar-start samples had a
+235 ms median. The time to the completed Hello handshake was not measured.
+
+The macOS UI integration test passed with the million-key fixture present,
+including a filtered rescan after rename and delete. App RSS while paging
+through the full keyspace and retention under high-volume pub/sub remain
+unmeasured.
