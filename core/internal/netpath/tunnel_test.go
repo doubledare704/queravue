@@ -14,6 +14,8 @@ import (
 	"go.uber.org/goleak"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
+
+	"github.com/doubledare704/queravue/core/internal/netpath/nettest"
 )
 
 func TestMain(m *testing.M) { goleak.VerifyTestMain(m) }
@@ -48,7 +50,7 @@ func echoServer(t *testing.T) string {
 }
 
 type rig struct {
-	server *testSSHServer
+	server *nettest.Server
 	keys   *HostKeys
 	cfg    SSHConfig
 	own    string
@@ -56,13 +58,13 @@ type rig struct {
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
-	host := newSigner(t)
-	srv := startSSHServer(t, host, nil)
+	host := nettest.NewSigner(t)
+	srv := nettest.Start(t, host, nil)
 	ip, port := srv.Addr()
 	own := filepath.Join(t.TempDir(), "known_hosts")
 	return &rig{
 		server: srv, own: own, keys: NewHostKeys("", own),
-		cfg: SSHConfig{Host: ip, Port: port, User: "tester", Auth: SSHAuthPassword, Password: testPassword, KeepAlive: 100 * time.Millisecond},
+		cfg: SSHConfig{Host: ip, Port: port, User: "tester", Auth: SSHAuthPassword, Password: nettest.Password, KeepAlive: 100 * time.Millisecond},
 	}
 }
 
@@ -86,7 +88,7 @@ func TestHostKeyStates(t *testing.T) {
 	if !errors.As(err, &unknown) {
 		t.Fatalf("unknown host: got %v", err)
 	}
-	if want := ssh.FingerprintSHA256(r.server.hostKey.PublicKey()); unknown.Fingerprint != want {
+	if want := ssh.FingerprintSHA256(r.server.HostKey.PublicKey()); unknown.Fingerprint != want {
 		t.Fatalf("fingerprint = %s, want %s", unknown.Fingerprint, want)
 	}
 
@@ -105,11 +107,11 @@ func TestHostKeyStates(t *testing.T) {
 		t.Fatalf("known_hosts file: %v %v", st, err)
 	}
 
-	other := startSSHServer(t, newSigner(t), nil)
+	other := nettest.Start(t, nettest.NewSigner(t), nil)
 	ip, port := other.Addr()
 	cfg := r.cfg
 	cfg.Host, cfg.Port = ip, port
-	swapped := knownhosts.Line([]string{knownhosts.Normalize(net.JoinHostPort(ip, strconv.Itoa(port)))}, r.server.hostKey.PublicKey()) + "\n"
+	swapped := knownhosts.Line([]string{knownhosts.Normalize(net.JoinHostPort(ip, strconv.Itoa(port)))}, r.server.HostKey.PublicKey()) + "\n"
 	if err := os.WriteFile(r.own, []byte(swapped), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -152,8 +154,8 @@ func TestAuthErrors(t *testing.T) {
 		t.Fatalf("wrong password: got %v", err)
 	}
 
-	keyPath, pub := writeOpenSSHKey(t, "")
-	r.server.userKey = pub
+	keyPath, pub := nettest.WriteOpenSSHKey(t, "")
+	r.server.UserKey = pub
 	keyCfg := r.cfg
 	keyCfg.Auth, keyCfg.KeyFile = SSHAuthKeyFile, keyPath
 	tun, err := OpenTunnel(context.Background(), keyCfg, r.keys)
@@ -162,14 +164,14 @@ func TestAuthErrors(t *testing.T) {
 	}
 	_ = tun.Close()
 
-	otherKey, _ := writeOpenSSHKey(t, "")
+	otherKey, _ := nettest.WriteOpenSSHKey(t, "")
 	keyCfg.KeyFile = otherKey
 	if _, err := OpenTunnel(context.Background(), keyCfg, r.keys); !isAuthErr(err) {
 		t.Fatalf("unauthorised key: got %v", err)
 	}
 
-	encPath, encPub := writeOpenSSHKey(t, "pp")
-	r.server.userKey = encPub
+	encPath, encPub := nettest.WriteOpenSSHKey(t, "pp")
+	r.server.UserKey = encPub
 	keyCfg.KeyFile = encPath
 	if _, err := OpenTunnel(context.Background(), keyCfg, r.keys); !isAuthErr(err) {
 		t.Fatalf("missing passphrase: got %v", err)

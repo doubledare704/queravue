@@ -1,4 +1,6 @@
-package netpath
+// Package nettest is an in-process SSH server for tests: it accepts a password
+// or one public key and forwards direct-tcpip channels.
+package nettest
 
 import (
 	"crypto/ed25519"
@@ -15,20 +17,23 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const testPassword = "s3cret-test-pw"
+// Password is the only password the server accepts.
+const Password = "s3cret-test-pw"
 
-type testSSHServer struct {
+type Server struct {
 	t        *testing.T
 	listener net.Listener
-	hostKey  ssh.Signer
-	userKey  ssh.PublicKey
+	// HostKey is the key the server presents.
+	HostKey ssh.Signer
+	// UserKey is the one public key the server accepts; nil accepts none.
+	UserKey ssh.PublicKey
 
 	mu    sync.Mutex
 	conns []net.Conn
 	wg    sync.WaitGroup
 }
 
-func newSigner(t *testing.T) ssh.Signer {
+func NewSigner(t *testing.T) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -41,22 +46,22 @@ func newSigner(t *testing.T) ssh.Signer {
 	return s
 }
 
-func startSSHServer(t *testing.T, hostKey ssh.Signer, userKey ssh.PublicKey) *testSSHServer {
+func Start(t *testing.T, hostKey ssh.Signer, userKey ssh.PublicKey) *Server {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := &testSSHServer{t: t, listener: l, hostKey: hostKey, userKey: userKey}
+	s := &Server{t: t, listener: l, HostKey: hostKey, UserKey: userKey}
 	cfg := &ssh.ServerConfig{
 		PasswordCallback: func(_ ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
-			if string(pw) == testPassword {
+			if string(pw) == Password {
 				return nil, nil
 			}
 			return nil, io.ErrUnexpectedEOF
 		},
 		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			if s.userKey != nil && string(key.Marshal()) == string(s.userKey.Marshal()) {
+			if s.UserKey != nil && string(key.Marshal()) == string(s.UserKey.Marshal()) {
 				return nil, nil
 			}
 			return nil, io.ErrUnexpectedEOF
@@ -85,18 +90,21 @@ func startSSHServer(t *testing.T, hostKey ssh.Signer, userKey ssh.PublicKey) *te
 	return s
 }
 
-func (s *testSSHServer) Addr() (string, int) {
+// Addr returns the listen host and port.
+func (s *Server) Addr() (string, int) {
 	a := s.listener.Addr().(*net.TCPAddr)
 	return a.IP.String(), a.Port
 }
 
-func (s *testSSHServer) Close() {
+// Close stops the server and drops every connection.
+func (s *Server) Close() {
 	_ = s.listener.Close()
 	s.DropConnections()
 	s.wg.Wait()
 }
 
-func (s *testSSHServer) DropConnections() {
+// DropConnections closes every open client connection, simulating a lost tunnel.
+func (s *Server) DropConnections() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, c := range s.conns {
@@ -105,7 +113,7 @@ func (s *testSSHServer) DropConnections() {
 	s.conns = nil
 }
 
-func (s *testSSHServer) serve(c net.Conn, cfg *ssh.ServerConfig) {
+func (s *Server) serve(c net.Conn, cfg *ssh.ServerConfig) {
 	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
 	if err != nil {
 		_ = c.Close()
@@ -156,7 +164,7 @@ func (s *testSSHServer) serve(c net.Conn, cfg *ssh.ServerConfig) {
 	}
 }
 
-func writeOpenSSHKey(t *testing.T, passphrase string) (path string, pub ssh.PublicKey) {
+func WriteOpenSSHKey(t *testing.T, passphrase string) (path string, pub ssh.PublicKey) {
 	t.Helper()
 	pubKey, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
