@@ -102,7 +102,7 @@ func (h *HostKeys) Trust(host string, port int, fingerprint string) error {
 	if err := os.MkdirAll(filepath.Dir(h.ownFile), 0o700); err != nil {
 		return fmt.Errorf("netpath: create known_hosts dir: %w", err)
 	}
-	f, err := os.OpenFile(h.ownFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // Queravue's own file
+	f, err := os.OpenFile(h.ownFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("netpath: open known_hosts: %w", err)
 	}

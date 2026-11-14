@@ -34,7 +34,7 @@ func echoServer(t *testing.T) string {
 				return
 			}
 			go func() {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				buf := make([]byte, 64)
 				for {
 					n, err := c.Read(buf)
@@ -211,12 +211,12 @@ func TestTunnelCarriesTraffic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tun.Close()
+	defer func() { _ = tun.Close() }()
 	c, err := tun.DialContext(context.Background(), "tcp", echoServer(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_, _ = c.Write([]byte("ping"))
 	buf := make([]byte, 4)
 	if _, err := c.Read(buf); err != nil || string(buf) != "ping" {
@@ -294,14 +294,14 @@ func TestCancelledOpenLeaksNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		for {
 			c, err := l.Accept()
 			if err != nil {
 				return
 			}
-			defer c.Close()
+			defer func() { _ = c.Close() }()
 		}
 	}()
 	host, portStr, _ := net.SplitHostPort(l.Addr().String())
@@ -326,7 +326,7 @@ func TestCancelledDialLeaksNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer tun.Close()
+	defer func() { _ = tun.Close() }()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := tun.DialContext(ctx, "tcp", echoServer(t)); !errors.Is(err, context.Canceled) {

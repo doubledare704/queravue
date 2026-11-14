@@ -1,6 +1,7 @@
 package netpath
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"sync"
@@ -87,14 +88,21 @@ func (c *deadlineConn) Write(p []byte) (int, error) {
 		return 0, os.ErrDeadlineExceeded
 	default:
 	}
-	return c.Conn.Write(p)
+	n, err := c.Conn.Write(p)
+	if err != nil {
+		return n, fmt.Errorf("netpath: write: %w", err)
+	}
+	return n, nil
 }
 
 func (c *deadlineConn) Close() error {
 	c.closeMu.Do(func() { close(c.closed) })
 	c.readDL.stop()
 	c.writeDL.stop()
-	return c.Conn.Close()
+	if err := c.Conn.Close(); err != nil {
+		return fmt.Errorf("netpath: close: %w", err)
+	}
+	return nil
 }
 
 func (c *deadlineConn) SetDeadline(t time.Time) error {

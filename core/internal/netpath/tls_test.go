@@ -84,13 +84,13 @@ func handshake(t *testing.T, serverCfg *tls.Config, client *tls.Config) error {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	go func() {
 		c, err := l.Accept()
 		if err != nil {
 			return
 		}
-		defer c.Close()
+		defer func() { _ = c.Close() }()
 		if c.(*tls.Conn).Handshake() == nil {
 			_, _ = c.Write([]byte("x"))
 		}
@@ -99,7 +99,7 @@ func handshake(t *testing.T, serverCfg *tls.Config, client *tls.Config) error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	_ = c.SetReadDeadline(time.Now().Add(2 * time.Second))
 	_, err = c.Read(make([]byte, 1))
 	return err

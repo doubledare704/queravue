@@ -20,6 +20,7 @@ import (
 // Password is the only password the server accepts.
 const Password = "s3cret-test-pw"
 
+// Server is a running test SSH server.
 type Server struct {
 	t        *testing.T
 	listener net.Listener
@@ -33,6 +34,7 @@ type Server struct {
 	wg    sync.WaitGroup
 }
 
+// NewSigner returns a fresh ed25519 key.
 func NewSigner(t *testing.T) ssh.Signer {
 	t.Helper()
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -46,6 +48,7 @@ func NewSigner(t *testing.T) ssh.Signer {
 	return s
 }
 
+// Start runs a server on a loopback port until the test ends.
 func Start(t *testing.T, hostKey ssh.Signer, userKey ssh.PublicKey) *Server {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -119,7 +122,7 @@ func (s *Server) serve(c net.Conn, cfg *ssh.ServerConfig) {
 		_ = c.Close()
 		return
 	}
-	defer sc.Close()
+	defer func() { _ = sc.Close() }()
 	go func() {
 		for r := range reqs {
 			if r.WantReply {
@@ -154,8 +157,8 @@ func (s *Server) serve(c net.Conn, cfg *ssh.ServerConfig) {
 		}
 		go ssh.DiscardRequests(chReqs)
 		go func() {
-			defer ch.Close()
-			defer target.Close()
+			defer func() { _ = ch.Close() }()
+			defer func() { _ = target.Close() }()
 			done := make(chan struct{}, 2)
 			go func() { _, _ = io.Copy(ch, target); done <- struct{}{} }()
 			go func() { _, _ = io.Copy(target, ch); done <- struct{}{} }()
@@ -164,6 +167,7 @@ func (s *Server) serve(c net.Conn, cfg *ssh.ServerConfig) {
 	}
 }
 
+// WriteOpenSSHKey writes a fresh private key, optionally encrypted, and returns its path and public key.
 func WriteOpenSSHKey(t *testing.T, passphrase string) (path string, pub ssh.PublicKey) {
 	t.Helper()
 	pubKey, priv, err := ed25519.GenerateKey(rand.Reader)

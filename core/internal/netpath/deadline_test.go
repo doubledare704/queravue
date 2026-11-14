@@ -14,7 +14,7 @@ func pair(t *testing.T) (*deadlineConn, net.Conn) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer l.Close()
+	defer func() { _ = l.Close() }()
 	type accepted struct {
 		c   net.Conn
 		err error

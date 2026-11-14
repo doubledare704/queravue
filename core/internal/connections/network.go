@@ -88,6 +88,9 @@ func fromNetpath(s netpath.TLSSettings) *TLSSettings {
 
 type secretSlot string
 
+// Keychain slot names, not credentials.
+//
+//nolint:gosec
 const (
 	slotSSHPassword      secretSlot = "ssh-password"
 	slotSSHPassphrase    secretSlot = "ssh-key-passphrase"

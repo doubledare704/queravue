@@ -67,9 +67,9 @@ func (s TLSSettings) Build(host string) (*tls.Config, error) {
 	}
 	switch s.Mode {
 	case TLSPrefer, TLSRequire:
-		cfg.InsecureSkipVerify = true //nolint:gosec // the user chose a mode that does not verify
+		cfg.InsecureSkipVerify = true
 	case TLSVerifyCA:
-		cfg.InsecureSkipVerify = true //nolint:gosec // the chain is verified below, only the host name is skipped
+		cfg.InsecureSkipVerify = true
 		cfg.VerifyConnection = verifyChainOnly(cfg.RootCAs)
 	}
 	return cfg, nil
@@ -84,8 +84,10 @@ func verifyChainOnly(roots *x509.CertPool) func(tls.ConnectionState) error {
 		for _, c := range cs.PeerCertificates[1:] {
 			opts.Intermediates.AddCert(c)
 		}
-		_, err := cs.PeerCertificates[0].Verify(opts)
-		return err
+		if _, err := cs.PeerCertificates[0].Verify(opts); err != nil {
+			return fmt.Errorf("tls: verify certificate chain: %w", err)
+		}
+		return nil
 	}
 }
 
@@ -144,7 +146,7 @@ func decryptKeyPEM(data []byte, passphrase string) ([]byte, error) {
 			if err != nil {
 				return nil, &ConfigError{Msg: "client key passphrase is wrong or the key is unsupported"}
 			}
-			der, err := marshalPKCS8(key)
+			der, err := x509.MarshalPKCS8PrivateKey(key)
 			if err != nil {
 				return nil, &ConfigError{Msg: "client key is unsupported"}
 			}
@@ -163,5 +165,3 @@ func decryptKeyPEM(data []byte, passphrase string) ([]byte, error) {
 	}
 	return out, nil
 }
-
-func marshalPKCS8(key any) ([]byte, error) { return x509.MarshalPKCS8PrivateKey(key) }

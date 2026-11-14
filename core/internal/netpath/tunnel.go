@@ -331,7 +331,7 @@ func (t *Tunnel) DialContext(ctx context.Context, network, addr string) (net.Con
 				_ = r.conn.Close()
 			}
 		}()
-		return nil, ctx.Err()
+		return nil, fmt.Errorf("netpath: open channel to %s: %w", addr, ctx.Err())
 	}
 }
 
