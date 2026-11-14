@@ -272,6 +272,8 @@ func lexerByName(name string) (sqlsplit.Dialect, bool) {
 		return sqlsplit.MySQL, true
 	case "mssql", "sqlserver":
 		return sqlsplit.MSSQL, true
+	case "oracle":
+		return sqlsplit.Oracle, true
 	case "sqlite":
 		return sqlsplit.SQLite, true
 	}
