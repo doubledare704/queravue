@@ -62,7 +62,7 @@ func (s *scanner) next() TokenKind {
 		if s.skipOracleQuote() {
 			return TokenString
 		}
-		escapes := s.d.backslashEscapes() || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
+		escapes := s.d.backslashEscapes() || (s.d.dollarQuotes() && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 			(from < 2 || !isIdentPart(text[from-2])))
 		s.skipQuoted('\'', escapes)
 		return TokenString
@@ -75,7 +75,7 @@ func (s *scanner) next() TokenKind {
 	case (s.d == SQLite || s.d == MSSQL) && c == '[':
 		s.skipBracket()
 		return TokenQuotedIdent
-	case s.d == Postgres && c == '$' && (s.pos == 0 || !isIdentPart(text[s.pos-1])):
+	case s.d.dollarQuotes() && c == '$' && (s.pos == 0 || !isIdentPart(text[s.pos-1])):
 		if tag, ok := s.dollarTag(); ok {
 			s.skipDollar(tag)
 			return TokenString

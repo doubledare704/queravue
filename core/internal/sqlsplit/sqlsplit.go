@@ -37,7 +37,14 @@ const (
 	// CREATE PROCEDURE, FUNCTION, PACKAGE, TRIGGER, TYPE BODY), which run to a
 	// "/" on a line of its own. The slash ends any statement.
 	Oracle
+	// DuckDB: Postgres lexing (dollar quotes, nested block comments, E'' escapes)
+	// without BEGIN ATOMIC bodies or CREATE FUNCTION bodies.
+	DuckDB
 )
+
+func (d Dialect) dollarQuotes() bool { return d == Postgres || d == DuckDB }
+
+func (d Dialect) nestedBlockComments() bool { return d == Postgres || d == DuckDB || d == MSSQL }
 
 func (d Dialect) backslashEscapes() bool { return d == MySQL || d == ClickHouse }
 
@@ -362,7 +369,7 @@ func (s *scanner) run() []Range {
 				st.prevWord = ""
 				continue
 			}
-			escapes := s.d.backslashEscapes() || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
+			escapes := s.d.backslashEscapes() || (s.d.dollarQuotes() && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 				(from < 2 || !isIdentPart(text[from-2])))
 			s.skipQuoted('\'', escapes)
 			markTok(from, s.pos)
@@ -379,7 +386,7 @@ func (s *scanner) run() []Range {
 			s.skipBracket()
 			markTok(from, s.pos)
 			st.prevWord = ""
-		case s.d == Postgres && c == '$' && (s.pos == 0 || !isIdentPart(text[s.pos-1])):
+		case s.d.dollarQuotes() && c == '$' && (s.pos == 0 || !isIdentPart(text[s.pos-1])):
 			flushWord(s.pos)
 			from := s.pos
 			if tag, ok := s.dollarTag(); ok {
@@ -424,7 +431,7 @@ func (s *scanner) skipBlockComment() {
 	s.pos += 2
 	for s.pos < len(s.text) {
 		switch {
-		case (s.d == Postgres || s.d == MSSQL) && strings.HasPrefix(s.text[s.pos:], "/*"):
+		case s.d.nestedBlockComments() && strings.HasPrefix(s.text[s.pos:], "/*"):
 			depth++
 			s.pos += 2
 		case strings.HasPrefix(s.text[s.pos:], "*/"):

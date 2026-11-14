@@ -33,8 +33,8 @@ func BuildDiagramDDL(d Dialect, tables []TableChanges) (Script, error) {
 	if err := checkDistinctTables(tables); err != nil {
 		return Script{}, err
 	}
-	// SQLite cannot add a foreign key to an existing table, but it does not check the referenced table when one is created.
-	deferForeignKeys := d.ID() != "sqlite"
+	// SQLite and DuckDB cannot add a foreign key to an existing table, so references stay inside CREATE TABLE.
+	deferForeignKeys := d.ID() != "sqlite" && d.ID() != "duckdb"
 	phases := make([]tablePhases, len(tables))
 	for i, t := range tables {
 		phases[i] = splitForeignKeys(t, deferForeignKeys)
