@@ -41,8 +41,6 @@ github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8 h1:QgXsRtHGoEITJcYOHdJ
 github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8/go.mod h1:L1yoLBco9M3b2Gdh1UZHg+BIePeAdV1bwknaLLxAgoc=
 github.com/duckdb/duckdb-go-bindings v0.20000.0 h1:jCIPcbfOCvGcu6yJxekEspry+5MuxrpOSrRWTqinn20=
 github.com/duckdb/duckdb-go-bindings v0.20000.0/go.mod h1:2bPkl/YewTvhg0+0tHbCR9KNaJVmVZAGD3YJ5Tim23g=
-github.com/duckdb/duckdb-go/v2 v2.20000.0 h1:9iR4duWnUGWjjSpUj56iDNrxxUmHP/xD4YN9h8JRVSQ=
-github.com/duckdb/duckdb-go/v2 v2.20000.0/go.mod h1:78pkJ2q7V0UpIjh6kLpszSmiifa6s+Z8Gy6DnMcYIoA=
 github.com/dustin/go-humanize v1.1.0 h1:dbKTrvD0klcbBV/h4AWJdMuZogJACoMlvWIWZ5b2xWg=
 github.com/dustin/go-humanize v1.1.0/go.mod h1:hc1CvRkJMsgxqjmjMQF3QNRAZBwY8AXBAzKYoSX9sFI=
 github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx59Ho=
