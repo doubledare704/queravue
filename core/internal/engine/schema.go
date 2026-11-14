@@ -28,6 +28,8 @@ type SchemaObject struct {
 	EstimatedRows int64 // -1 if unknown or unsupported
 	Capped        bool  // capped collection
 	SizeBytes     uint64
+	// TableEngine is the storage engine for engines that choose one per table.
+	TableEngine string
 }
 
 // ColumnDef describes a single table column.
@@ -98,7 +100,9 @@ type TableDetails struct {
 	EstimatedRows      int64
 	CanEdit            bool
 	EditDisabledReason string
-	Rebuild            *TableRebuild
+	// TableEngine is the storage engine for engines that choose one per table.
+	TableEngine string
+	Rebuild     *TableRebuild
 }
 
 // SchemaInspector is implemented by Conns with CapSchemaInspector.

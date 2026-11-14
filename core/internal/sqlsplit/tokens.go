@@ -51,7 +51,7 @@ func (s *scanner) next() TokenKind {
 	case c == '-' && s.pos+1 < n && text[s.pos+1] == '-' && (s.d != MySQL || mysqlDashComment(text, s.pos)):
 		s.skipLine()
 		return TokenComment
-	case c == '#' && s.d == MySQL:
+	case c == '#' && s.d.hashComments():
 		s.skipLine()
 		return TokenComment
 	case c == '/' && s.pos+1 < n && text[s.pos+1] == '*':
@@ -59,14 +59,14 @@ func (s *scanner) next() TokenKind {
 		return TokenComment
 	case c == '\'':
 		from := s.pos
-		escapes := s.d == MySQL || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
+		escapes := s.d.backslashEscapes() || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 			(from < 2 || !isIdentPart(text[from-2])))
 		s.skipQuoted('\'', escapes)
 		return TokenString
 	case c == '"' && s.d == MySQL:
 		s.skipQuoted(c, true)
 		return TokenString
-	case c == '"' || (s.d == SQLite || s.d == MySQL) && c == '`':
+	case c == '"' || s.d.backtickIdents() && c == '`':
 		s.skipQuoted(c, false)
 		return TokenQuotedIdent
 	case (s.d == SQLite || s.d == MSSQL) && c == '[':

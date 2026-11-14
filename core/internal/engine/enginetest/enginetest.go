@@ -31,8 +31,13 @@ type Target struct {
 	// Series100k returns SQL producing n rows (one int column "n", 1..n).
 	// Zero means use million_items.
 	Series func(n int) string
-	// SkipEdit skips the edit test (engines without transactional DML).
+	// SkipEdit skips the edit test and expects tables to report edits
+	// disabled with a reason.
 	SkipEdit bool
+	// NoForeignKeys expects the seed tables to have no foreign keys.
+	NoForeignKeys bool
+	// SkipDesigner skips the DDL round trips and diagram DDL tests.
+	SkipDesigner bool
 	// OtherSchema makes a second schema for the cross-schema relation test;
 	// nil skips it.
 	OtherSchema *SchemaFixture
@@ -68,15 +73,25 @@ func Run(t *testing.T, tg Target) {
 	t.Run("StopEarly", func(t *testing.T) { stopEarly(t, tg) })
 	t.Run("SchemaTree", func(t *testing.T) { schemaTree(t, tg) })
 	t.Run("TablePageFilterSort", func(t *testing.T) { tablePage(t, tg) })
-	t.Run("IndexLifecycle", func(t *testing.T) { indexLifecycle(t, tg) })
-	t.Run("OnlineIndexBuild", func(t *testing.T) { onlineIndexBuild(t, tg) })
-	t.Run("ListIndexesOfMissingTable", func(t *testing.T) { listIndexesOfMissingTable(t, tg) })
-	t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
-	t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })
-	t.Run("DiagramDDL", func(t *testing.T) { diagramDDL(t, tg) })
-	t.Run("DiagramCompositeDDL", func(t *testing.T) { diagramCompositeDDL(t, tg) })
-	t.Run("BulkColumns", func(t *testing.T) { bulkColumns(t, tg) })
-	t.Run("SchemaGraph", func(t *testing.T) { schemaGraph(t, tg) })
+	if has(tg, engine.CapIndexManager) {
+		t.Run("IndexLifecycle", func(t *testing.T) { indexLifecycle(t, tg) })
+		t.Run("OnlineIndexBuild", func(t *testing.T) { onlineIndexBuild(t, tg) })
+		t.Run("ListIndexesOfMissingTable", func(t *testing.T) { listIndexesOfMissingTable(t, tg) })
+	}
+	if has(tg, engine.CapStats) {
+		t.Run("TableStats", func(t *testing.T) { tableStats(t, tg) })
+	}
+	if !tg.SkipDesigner {
+		t.Run("DDLRoundTrip", func(t *testing.T) { ddlRoundTrip(t, tg) })
+		t.Run("DiagramDDL", func(t *testing.T) { diagramDDL(t, tg) })
+		t.Run("DiagramCompositeDDL", func(t *testing.T) { diagramCompositeDDL(t, tg) })
+	}
+	if has(tg, engine.CapCompletion) {
+		t.Run("BulkColumns", func(t *testing.T) { bulkColumns(t, tg) })
+	}
+	if has(tg, engine.CapSchemaGraph) {
+		t.Run("SchemaGraph", func(t *testing.T) { schemaGraph(t, tg) })
+	}
 	if tg.OtherSchema != nil {
 		t.Run("SchemaGraphCrossSchema", func(t *testing.T) { crossSchemaRelations(t, tg) })
 	}
@@ -84,6 +99,10 @@ func Run(t *testing.T, tg Target) {
 		t.Run("EditAndRollback", func(t *testing.T) { editRollback(t, tg) })
 	}
 	t.Run("Stream1MMemory", func(t *testing.T) { stream1M(t, tg) })
+}
+
+func has(tg Target, capability engine.Capability) bool {
+	return tg.Engine.Descriptor().HasCapability(capability)
 }
 
 // collector is a RowSink that counts rows and keeps the first few.
@@ -276,10 +295,17 @@ func schemaTree(t *testing.T, tg Target) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !d.CanEdit || len(d.Columns) < 3 || !d.Columns[0].IsPrimaryKey || d.Columns[0].PrimaryKeyOrder != 1 {
+	if d.CanEdit == tg.SkipEdit || len(d.Columns) < 3 || !d.Columns[0].IsPrimaryKey || d.Columns[0].PrimaryKeyOrder != 1 {
 		t.Errorf("orders = %+v", d)
 	}
-	if len(d.ForeignKeys) != 1 || d.ForeignKeys[0].ReferencedTable != "customers" ||
+	if tg.SkipEdit && d.EditDisabledReason == "" {
+		t.Error("orders edits are disabled but give no reason")
+	}
+	if tg.NoForeignKeys {
+		if len(d.ForeignKeys) != 0 {
+			t.Errorf("orders FKs = %+v, want none", d.ForeignKeys)
+		}
+	} else if len(d.ForeignKeys) != 1 || d.ForeignKeys[0].ReferencedTable != "customers" ||
 		len(d.ForeignKeys[0].Columns) != 1 || d.ForeignKeys[0].Columns[0] != "customer_id" {
 		t.Errorf("orders FKs = %+v", d.ForeignKeys)
 	}
