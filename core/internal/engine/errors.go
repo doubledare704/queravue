@@ -52,6 +52,10 @@ const (
 	KindSSHAuth
 	// KindTunnelLost: the SSH tunnel dropped after it was established.
 	KindTunnelLost
+	// KindKeysRefused: KEYS was used; use a paged scan.
+	KindKeysRefused
+	// KindBlockingRefused: a blocking command was used.
+	KindBlockingRefused
 )
 
 // String implements fmt.Stringer.
@@ -93,6 +97,10 @@ func (k Kind) String() string {
 		return "ssh_auth"
 	case KindTunnelLost:
 		return "tunnel_lost"
+	case KindKeysRefused:
+		return "keys_refused"
+	case KindBlockingRefused:
+		return "blocking_refused"
 	default:
 		return "unknown"
 	}
