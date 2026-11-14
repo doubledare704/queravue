@@ -79,6 +79,8 @@ func New(v Variant) *Engine {
 			DisplayName: name,
 			Family:      IDMySQL,
 			SupportsURI: true,
+			SupportsSSH: true,
+			SupportsTLS: true,
 			URIExample:  example,
 			Fields: []engine.FieldSpec{
 				{Key: ParamHost, Label: "Host", Kind: engine.FieldText, Required: true, Default: "localhost", Placeholder: "localhost"},
@@ -118,7 +120,9 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	dc.Addr = net.JoinHostPort(cfg.Param(ParamHost, "localhost"), cfg.Param(ParamPort, "3306"))
 	dc.DBName = cfg.Param(ParamDatabase, "")
 	dc.Timeout = 10 * time.Second
-	dc.TLSConfig = driverTLS[cfg.Param(ParamTLS, "preferred")]
+	if err := applyNetwork(dc, cfg, secret, e.desc.ID); err != nil {
+		return nil, err
+	}
 	dc.ConnectionAttributes = "program_name:Queravue"
 	// TIMESTAMP values come back as UTC; DATETIME is shown as stored.
 	dc.Params = map[string]string{"time_zone": "'+00:00'"}
@@ -238,4 +242,27 @@ func parseBanner(banner string) engine.ServerInfo {
 		v = v[:i]
 	}
 	return engine.ServerInfo{Product: "MySQL", Version: v, Banner: banner}
+}
+
+// applyNetwork sets the dialer and TLS. TLSSettings win over the legacy tls param.
+func applyNetwork(dc *drv.Config, cfg engine.Config, secret engine.Secret, id string) error {
+	if cfg.Net.Tunneled() {
+		dc.DialFunc = cfg.Net.Dial
+	}
+	if !cfg.Net.HasTLSSettings() {
+		dc.TLSConfig = driverTLS[cfg.Param(ParamTLS, "preferred")]
+		return nil
+	}
+	t := cfg.Net.TLS
+	if !t.Enabled() {
+		dc.TLSConfig = "false"
+		return nil
+	}
+	tlsCfg, err := t.Build(cfg.Param(ParamHost, "localhost"))
+	if err != nil {
+		return &engine.Error{Kind: engine.KindInvalidConfig, Engine: id, Op: "config", Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	dc.TLS = tlsCfg
+	dc.AllowFallbackToPlaintext = t.FallbackToPlaintext()
+	return nil
 }

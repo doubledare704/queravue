@@ -49,6 +49,8 @@ func New() *Engine {
 		DisplayName: "ClickHouse",
 		Family:      ID,
 		SupportsURI: true,
+		SupportsSSH: true,
+		SupportsTLS: true,
 		URIExample:  "clickhouse://default@localhost:9000/default",
 		Fields: []engine.FieldSpec{
 			{Key: ParamHost, Label: "Host", Kind: engine.FieldText, Required: true, Default: "localhost", Placeholder: "localhost"},
@@ -84,7 +86,7 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	if err != nil {
 		return nil, err
 	}
-	db := sql.OpenDB(chdriver.Connector(&chdriver.Options{
+	opts := &chdriver.Options{
 		Addr: []string{net.JoinHostPort(cfg.Param(ParamHost, "localhost"), cfg.Param(ParamPort, "9000"))},
 		Auth: chdriver.Auth{
 			Database: cfg.Param(ParamDatabase, "default"),
@@ -95,7 +97,12 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 		DialTimeout: dialTimeout,
 		Settings:    chdriver.Settings{"max_block_size": blockSize},
 		ClientInfo:  chdriver.ClientInfo{Products: []struct{ Name, Version string }{{Name: "Queravue"}}},
-	}))
+	}
+	if cfg.Net.Tunneled() {
+		dial := cfg.Net.Dial
+		opts.DialContext = func(ctx context.Context, addr string) (net.Conn, error) { return dial(ctx, "tcp", addr) }
+	}
+	db := sql.OpenDB(chdriver.Connector(opts))
 	db.SetMaxOpenConns(maxOpenConns)
 	db.SetConnMaxLifetime(connMaxLifetime)
 	if err := db.PingContext(ctx); err != nil {
@@ -106,6 +113,13 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 }
 
 func tlsConfigFor(cfg engine.Config) (*tls.Config, error) {
+	if cfg.Net.HasTLSSettings() {
+		built, err := cfg.Net.TLS.Build(cfg.Param(ParamHost, "localhost"))
+		if err != nil {
+			return nil, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "config", Msg: err.Error(), Err: err}
+		}
+		return built, nil
+	}
 	switch cfg.Param(ParamTLS, "disable") {
 	case "disable":
 		return nil, nil

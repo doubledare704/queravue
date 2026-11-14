@@ -121,6 +121,10 @@ type Descriptor struct {
 	SupportsURI bool
 	// URIExample is a placeholder for the URI input.
 	URIExample string
+	// SupportsSSH: the engine connects over TCP and can go through an SSH tunnel.
+	SupportsSSH bool
+	// SupportsTLS: the engine honours netpath.TLSSettings.
+	SupportsTLS bool
 	// Capabilities the engine's Conn provides. Must include CapConnect.
 	Capabilities []Capability
 }
