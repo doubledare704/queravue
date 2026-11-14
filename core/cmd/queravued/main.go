@@ -22,6 +22,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/connections"
 	"github.com/doubledare704/queravue/core/internal/engine/engines"
 	"github.com/doubledare704/queravue/core/internal/history"
+	"github.com/doubledare704/queravue/core/internal/netpath"
 	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/schema"
 	"github.com/doubledare704/queravue/core/internal/secrets"
@@ -190,7 +191,8 @@ func newConnectionService(configDir, secretsBackend string, log *slog.Logger) (*
 		return nil, err
 	}
 	log.Info("config", "dir", configDir, "secrets", secretsBackend)
-	return connections.NewService(reg, connections.NewFileStore(configDir), store, connections.WithLogger(log)), nil
+	return connections.NewService(reg, connections.NewFileStore(configDir), store, connections.WithLogger(log),
+		connections.WithKnownHosts(netpath.DefaultUserKnownHosts(), filepath.Join(configDir, "known_hosts"))), nil
 }
 
 func envInt(getenv func(string) string, key string, def int64) int64 {
