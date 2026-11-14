@@ -153,3 +153,39 @@ func TestCloseCancelsRunningStatement(t *testing.T) {
 
 // Dialect makes fakeConn a sqldialect.Provider.
 func (*fakeConn) Dialect() sqldialect.Dialect { return sqldialect.Postgres }
+
+type releasingOpener struct {
+	fakeOpener
+	order *[]string
+}
+
+func (o *releasingOpener) OpenReleasing(ctx context.Context, id string) (engine.Conn, engine.Descriptor, func(), error) {
+	conn, desc, err := o.Open(ctx, id)
+	if err != nil {
+		return nil, desc, nil, err
+	}
+	return &orderedConn{Conn: conn, order: o.order}, desc, func() { *o.order = append(*o.order, "release") }, nil
+}
+
+type orderedConn struct {
+	engine.Conn
+	order *[]string
+}
+
+func (c *orderedConn) Close() error {
+	*c.order = append(*c.order, "close")
+	return c.Conn.Close()
+}
+
+func TestReleaseRunsAfterConnClose(t *testing.T) {
+	var order []string
+	m := newMgr(t, &releasingOpener{order: &order})
+	s, err := m.Open(context.Background(), "pg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Close(s.ID)
+	if len(order) != 2 || order[0] != "close" || order[1] != "release" {
+		t.Fatalf("order = %v", order)
+	}
+}

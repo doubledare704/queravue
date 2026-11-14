@@ -7,8 +7,12 @@ import (
 	"errors"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -311,4 +315,51 @@ func TestSessionOverSSHLeaksNoGoroutines(t *testing.T) {
 	if err := goleak.Find(before, goleak.IgnoreAnyFunction("internal/poll.runtime_pollWait")); err != nil {
 		t.Fatalf("goroutines left after a cancelled open: %v", err)
 	}
+}
+
+func rssMB(t *testing.T) float64 {
+	t.Helper()
+	out, err := exec.Command("ps", "-o", "rss=", "-p", strconv.Itoa(os.Getpid())).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	kb, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return float64(kb) / 1024
+}
+
+func TestIdleMemoryWithTunnelOpen(t *testing.T) {
+	if os.Getenv("NETCELLS_PERF") == "" {
+		t.Skip("set NETCELLS_PERF=1 to measure")
+	}
+	reachable(t, bastionAddr)
+	reachable(t, "127.0.0.1:5432")
+	svc := newService(t)
+	d := connections.Connection{Name: "n", EngineID: "postgres", SSH: bastion(netpath.SSHAuthPassword),
+		Params: map[string]string{"host": "postgres", "port": "5432", "database": "queravue", "user": "queravue"}}
+	sec := connections.Secrets{Password: str("queravue"), SSH: connections.SSHSecrets{Password: str(bastionPass)}}
+	testTrusting(t, svc, connections.TestRequest{Draft: &d, Secrets: sec, Password: str("queravue")})
+	c, err := svc.CreateWith(context.Background(), d, sec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime.GC()
+	before := rssMB(t)
+	conn, _, release, err := svc.OpenReleasing(context.Background(), c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.Ping(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
+	runtime.GC()
+	debug.FreeOSMemory()
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("RSS before open %.1f MB, with tunnel and session open %.1f MB, heap in use %.1f MB", before, rssMB(t), float64(ms.HeapInuse)/(1<<20))
+	_ = conn.Close()
+	release()
 }
