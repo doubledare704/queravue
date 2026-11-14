@@ -302,7 +302,10 @@ ORDER BY c.constraint_name, cc.position`, owner, table)
 		fk.Columns = append(fk.Columns, column)
 		fk.ReferencedColumns = append(fk.ReferencedColumns, refColumn.String)
 	}
-	return pk, rows.Err()
+	if err := rows.Err(); err != nil {
+		return pk, c.execError(ctx, err)
+	}
+	return pk, nil
 }
 
 func (c *Conn) describeIndexes(ctx context.Context, conn *sql.Conn, owner, table, primaryIndex string) ([]engine.IndexDef, error) {
@@ -329,7 +332,10 @@ ORDER BY i.index_name, ic.column_position`, owner, table)
 		last := &out[len(out)-1]
 		last.Columns = append(last.Columns, indexKey(column, expression).Name)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, c.execError(ctx, err)
+	}
+	return out, nil
 }
 
 // decideEditable allows edits for tables with a primary key, or a unique

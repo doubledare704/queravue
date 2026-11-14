@@ -43,6 +43,9 @@ const (
 
 const prefetchRows = engine.MaxBatchRows
 
+// Inline LOB fetch is 80 times faster than streaming for small LOBs with the same live heap; see docs/perf/iteration-10.md.
+var lobFetchMode = "PRE"
+
 // Engine is the Oracle engine.
 type Engine struct{ desc engine.Descriptor }
 
@@ -114,6 +117,7 @@ func dataSourceName(cfg engine.Config, secret engine.Secret) (string, error) {
 	options := map[string]string{
 		"CONNECT TIMEOUT": "10",
 		"PREFETCH_ROWS":   strconv.Itoa(prefetchRows),
+		"LOB FETCH":       lobFetchMode,
 	}
 	if cfg.Param(ParamRole, RoleNormal) == RoleSysDBA {
 		options["DBA PRIVILEGE"] = "SYSDBA"

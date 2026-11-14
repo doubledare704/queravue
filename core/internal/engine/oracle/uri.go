@@ -142,7 +142,8 @@ func applyEasyConnect(params map[string]string, s string) error {
 
 func applyHostPort(params map[string]string, hostport string) error {
 	host, port := hostport, ""
-	if strings.Contains(hostport, ":") && !(strings.HasPrefix(hostport, "[") && strings.HasSuffix(hostport, "]")) {
+	bracketed := strings.HasPrefix(hostport, "[") && strings.HasSuffix(hostport, "]")
+	if strings.Contains(hostport, ":") && !bracketed {
 		h, p, err := net.SplitHostPort(hostport)
 		if err != nil {
 			return fmt.Errorf("invalid host:port %q", hostport)

@@ -52,8 +52,8 @@ func classify(op string, err error, secret engine.Secret) *engine.Error {
 		if k, ok := errorKinds[oe.ErrCode]; ok {
 			e.Kind = k
 		}
-		if e.Kind == engine.KindSQL && oe.ErrPos() > 0 {
-			e.Position = oe.ErrPos()
+		if e.Kind == engine.KindSQL && oe.ErrPos() >= 0 {
+			e.Position = oe.ErrPos() + 1
 		}
 		return e
 	}
