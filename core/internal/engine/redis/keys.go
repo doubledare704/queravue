@@ -3,6 +3,7 @@ package redis
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -179,7 +180,7 @@ func (s *scanner) node(ctx context.Context, node *goredis.Client, emit func(engi
 			return nil
 		}
 		if err := ctx.Err(); err != nil {
-			return err
+			return fmt.Errorf("redis: scan: %w", err)
 		}
 	}
 }

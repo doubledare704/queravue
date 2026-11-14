@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -48,7 +49,7 @@ func (c *Conn) ExecuteCommand(ctx context.Context, database uint32, args [][]byt
 	err = cl.Process(ctx, cmd)
 	switch {
 	case err == nil:
-	case err == goredis.Nil:
+	case errors.Is(err, goredis.Nil):
 		return engine.Reply{Kind: engine.ReplyNil}, nil
 	case isServerReply(err):
 		return engine.Reply{Kind: engine.ReplyError, Text: err.Error()}, nil

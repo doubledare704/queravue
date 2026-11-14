@@ -78,7 +78,7 @@ func (c *Conn) readString(ctx context.Context, cl goredis.UniversalClient, k str
 		if err != nil {
 			return engine.ValuePage{}, err
 		}
-		return engine.ValuePage{Type: engine.KeyTypeHyperLogLog, Cardinality: uint64(n)}, nil
+		return engine.ValuePage{Type: engine.KeyTypeHyperLogLog, Cardinality: uint64(max(n, 0))}, nil
 	}
 	total, err := cl.StrLen(ctx, k).Result()
 	if err != nil {
@@ -95,7 +95,7 @@ func (c *Conn) readString(ctx context.Context, cl goredis.UniversalClient, k str
 	if offset+int64(len(chunk)) < total {
 		chunk = chunk[:len(chunk)-incompleteRuneTail(chunk)]
 	}
-	page := engine.ValuePage{Type: engine.KeyTypeString, String: chunk, TotalBytes: uint64(total), Binary: !utf8.Valid(chunk)}
+	page := engine.ValuePage{Type: engine.KeyTypeString, String: chunk, TotalBytes: uint64(max(total, 0)), Binary: !utf8.Valid(chunk)}
 	if next := offset + int64(len(chunk)); next < total && len(chunk) > 0 {
 		page.NextCursor = strconv.FormatInt(next, 10)
 	}
@@ -340,7 +340,11 @@ func parseOffsetU(cursor string) (uint64, error) {
 	if cursor == "" {
 		return 0, nil
 	}
-	return strconv.ParseUint(cursor, 10, 64)
+	n, err := strconv.ParseUint(cursor, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("cursor %q: %w", cursor, err)
+	}
+	return n, nil
 }
 
 func badCursor(err error) error {

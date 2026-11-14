@@ -259,7 +259,9 @@ func TestKeyValueSubscribeStopsOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	st := &subStream{ctx: ctx, msgs: make(chan *queravuev1.SubscribeResponse, 4)}
 	done := make(chan error, 1)
-	go func() { done <- svc.Subscribe(&queravuev1.SubscribeRequest{SessionId: sid, Channels: []string{"c"}}, st) }()
+	go func() {
+		done <- svc.Subscribe(&queravuev1.SubscribeRequest{SessionId: sid, Channels: []string{"c"}}, st)
+	}()
 	if m := <-st.msgs; string(m.GetPayload()) != "hi" {
 		t.Fatalf("message = %v", m)
 	}

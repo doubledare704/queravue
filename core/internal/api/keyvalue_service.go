@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -16,6 +17,8 @@ import (
 	"github.com/doubledare704/queravue/core/internal/rediscli"
 	"github.com/doubledare704/queravue/core/internal/session"
 )
+
+const maxTTLMillis = uint64(math.MaxInt64 / int64(time.Millisecond))
 
 // KeyValueService implements queravuev1.KeyValueServiceServer. Calls overlap
 // on one session; the engine's client is safe for concurrent use.
@@ -93,6 +96,13 @@ func keyValueErrorKind(k engine.Kind) queravuev1.KeyValueErrorKind {
 	return queravuev1.KeyValueErrorKind_KEY_VALUE_ERROR_KIND_SERVER
 }
 
+func wrapSend(err error) error {
+	if err != nil {
+		return fmt.Errorf("keyvalue: send: %w", err)
+	}
+	return nil
+}
+
 // ListKvDatabases implements the RPC.
 func (k *KeyValueService) ListKvDatabases(ctx context.Context, req *queravuev1.ListKvDatabasesRequest) (*queravuev1.ListKvDatabasesResponse, error) {
 	_, kv, err := k.store(req.GetSessionId())
@@ -134,15 +144,15 @@ func (k *KeyValueService) ScanKeys(req *queravuev1.ScanKeysRequest, stream quera
 		return nil
 	})
 	if sendErr != nil {
-		return sendErr
+		return wrapSend(sendErr)
 	}
 	if err != nil {
 		if stream.Context().Err() != nil {
 			return status.FromContextError(stream.Context().Err()).Err()
 		}
-		return stream.Send(&queravuev1.ScanKeysResponse{Scanned: scanned, Error: toKeyValueError(err)})
+		return wrapSend(stream.Send(&queravuev1.ScanKeysResponse{Scanned: scanned, Error: toKeyValueError(err)}))
 	}
-	return stream.Send(&queravuev1.ScanKeysResponse{Scanned: scanned, Done: true})
+	return wrapSend(stream.Send(&queravuev1.ScanKeysResponse{Scanned: scanned, Done: true}))
 }
 
 // GetKeyInfo implements the RPC.
@@ -216,7 +226,7 @@ func (k *KeyValueService) SetExpiry(ctx context.Context, req *queravuev1.SetExpi
 	}
 	var ttl *time.Duration
 	if req.TtlMs != nil {
-		d := time.Duration(min(req.GetTtlMs(), uint64(1<<62/uint64(time.Millisecond)))) * time.Millisecond
+		d := time.Duration(min(req.GetTtlMs(), maxTTLMillis)) * time.Millisecond
 		ttl = &d
 	}
 	if err := kv.SetExpiry(ctx, req.GetDatabase(), req.GetKey(), ttl); err != nil {
@@ -282,11 +292,11 @@ func (k *KeyValueService) Subscribe(req *queravuev1.SubscribeRequest, stream que
 	})
 	switch {
 	case sendErr != nil:
-		return sendErr
+		return wrapSend(sendErr)
 	case stream.Context().Err() != nil:
 		return nil
 	case err != nil:
-		return stream.Send(&queravuev1.SubscribeResponse{Error: toKeyValueError(err)})
+		return wrapSend(stream.Send(&queravuev1.SubscribeResponse{Error: toKeyValueError(err)}))
 	}
 	return nil
 }

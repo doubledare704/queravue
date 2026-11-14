@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -139,7 +140,7 @@ func newDialer(cfg engine.Config) (dialFunc, error) {
 			if settings.FallbackToPlaintext() {
 				return raw(ctx, network, addr)
 			}
-			return nil, err
+			return nil, fmt.Errorf("redis: tls handshake with %s: %w", addr, err)
 		}
 		return tc, nil
 	}, nil

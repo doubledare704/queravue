@@ -36,7 +36,7 @@ func classifyReply(msg string) engine.Kind {
 	upper := strings.ToUpper(msg)
 	switch {
 	case strings.HasPrefix(upper, "WRONGPASS"), strings.HasPrefix(upper, "NOAUTH"),
-		strings.HasPrefix(upper, "NOPERM"), strings.Contains(upper, "INVALID PASSWORD"):
+		strings.Contains(upper, "INVALID PASSWORD"):
 		return engine.KindAuth
 	case strings.Contains(upper, "UNKNOWN COMMAND"), strings.Contains(upper, "UNKNOWN SUBCOMMAND"):
 		return engine.KindUnsupported

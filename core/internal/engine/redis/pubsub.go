@@ -19,6 +19,16 @@ func (c *Conn) Subscribe(ctx context.Context, channels, patterns []string, emit 
 	}
 	ps := cl.Subscribe(ctx, channels...)
 	defer func() { _ = ps.Close() }()
+	stopped := make(chan struct{})
+	defer close(stopped)
+	// ReceiveMessage does not return on cancellation by itself; closing does.
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = ps.Close()
+		case <-stopped:
+		}
+	}()
 	if len(patterns) > 0 {
 		if err := ps.PSubscribe(ctx, patterns...); err != nil {
 			return c.fail("subscribe", err)
