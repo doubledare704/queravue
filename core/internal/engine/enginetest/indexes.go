@@ -25,7 +25,7 @@ func indexLifecycle(t *testing.T, tg Target) {
 	}
 	table := d.QualifyTableIn(tg.Database, tg.Schema, probeTable)
 	exec(t, c, "DROP TABLE IF EXISTS "+table)
-	exec(t, c, "CREATE TABLE "+table+" (a INT NOT NULL, b VARCHAR(50), c INT)")
+	exec(t, c, "CREATE TABLE "+table+" ("+tg.id("a")+" INT NOT NULL, "+tg.id("b")+" VARCHAR(50), "+tg.id("c")+" INT)")
 	t.Cleanup(func() { exec(t, c, "DROP TABLE IF EXISTS "+table) })
 
 	create := func(spec engine.IndexSpec) {
@@ -92,9 +92,9 @@ func onlineIndexBuild(t *testing.T, tg Target) {
 	}
 	table := d.QualifyTableIn(tg.Database, tg.Schema, probeTable)
 	exec(t, c, "DROP TABLE IF EXISTS "+table)
-	exec(t, c, "CREATE TABLE "+table+" (a INT NOT NULL, b VARCHAR(50))")
+	exec(t, c, "CREATE TABLE "+table+" ("+tg.id("a")+" INT NOT NULL, "+tg.id("b")+" VARCHAR(50))")
 	t.Cleanup(func() { exec(t, c, "DROP TABLE IF EXISTS "+table) })
-	exec(t, c, "INSERT INTO "+table+" (a, b) VALUES (1, 'x'), (2, 'y')")
+	exec(t, c, "INSERT INTO "+table+" ("+tg.id("a")+", "+tg.id("b")+") VALUES (1, 'x'), (2, 'y')")
 
 	spec := engine.IndexSpec{Name: "qv_probe_online", Keys: []engine.IndexKey{{Name: "b"}}, Options: map[string]string{sqldialect.OptionOnline: "true"}}
 	sql, warnings, err := d.CreateIndex(tg.Database, tg.Schema, probeTable, spec)

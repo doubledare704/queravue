@@ -98,7 +98,7 @@ func diagramCompositeDDL(t *testing.T, tg Target) {
 	}
 	cleanup()
 	t.Cleanup(cleanup)
-	exec(t, c, "CREATE TABLE "+d.QualifyTableIn(tg.Database, tg.Schema, diagramNotes)+" (id integer PRIMARY KEY, order_no integer)")
+	exec(t, c, "CREATE TABLE "+d.QualifyTableIn(tg.Database, tg.Schema, diagramNotes)+" ("+tg.id("id")+" integer PRIMARY KEY, "+tg.id("order_no")+" integer)")
 
 	target := func(name string) sqldialect.Target {
 		return sqldialect.Target{Database: tg.Database, Schema: tg.Schema, Table: name}

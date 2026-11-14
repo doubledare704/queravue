@@ -221,6 +221,25 @@ services:
       retries: 30
       start_period: 10s
 
+  oracle:
+    image: gvenzl/oracle-free:23.26.3-slim-faststart
+    # Service FREEPDB1, user queravue. The seed in dev/seed/oracle runs on the
+    # first start of a fresh volume (drop it to reload).
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-Queravue_dev1}
+      APP_USER: ${ORACLE_USER:-queravue}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD:-queravue}
+    ports: ["127.0.0.1:${ORACLE_PORT:-1521}:1521"]
+    volumes:
+      - oracle:/opt/oracle/oradata
+      - ./seed/oracle:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
 volumes:
   postgres:
   mysql:
@@ -230,3 +249,4 @@ volumes:
   redis:
   mssql:
   clickhouse:
+  oracle:
