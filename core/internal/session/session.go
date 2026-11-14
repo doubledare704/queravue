@@ -58,6 +58,7 @@ type Session struct {
 
 	mu       sync.Mutex
 	cancel   context.CancelFunc
+	holds    int
 	lastUsed time.Time
 	closed   bool
 }
@@ -102,7 +103,33 @@ func (s *Session) Cancel() {
 func (s *Session) idleSince() (time.Time, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.lastUsed, s.cancel == nil
+	return s.lastUsed, s.cancel == nil && s.holds == 0
+}
+
+// Touch records activity so the session does not count as idle.
+func (s *Session) Touch() {
+	s.mu.Lock()
+	s.lastUsed = s.now()
+	s.mu.Unlock()
+}
+
+// Hold keeps the session from idling out until release is called. Unlike
+// Begin it does not exclude other calls: key-value reads and subscriptions
+// overlap.
+func (s *Session) Hold() (release func()) {
+	s.mu.Lock()
+	s.holds++
+	s.lastUsed = s.now()
+	s.mu.Unlock()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.mu.Lock()
+			s.holds--
+			s.lastUsed = s.now()
+			s.mu.Unlock()
+		})
+	}
 }
 
 // shutdown cancels any statement, waits for it, and closes the connection.

@@ -168,6 +168,53 @@ services:
       timeout: 5s
       retries: 20
 
+  redis-seed:
+    # One-shot: loads dev/seed/redis (every type, nested names, 1M small keys,
+    # three 100k-element collections). It starts with FLUSHALL.
+    #   docker compose -f dev/docker-compose.yml --profile seed up redis-seed
+    profiles: ["seed"]
+    image: redis:7.4.12
+    depends_on:
+      redis: {condition: service_healthy}
+    environment:
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-queravue}
+    volumes: ["./seed/redis:/seed:ro"]
+    entrypoint: ["sh", "/seed/seed.sh"]
+    restart: "no"
+
+  valkey:
+    image: valkey/valkey:8.1.4
+    command: ["valkey-server", "--requirepass", "${REDIS_PASSWORD:-queravue}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-queravue}
+    ports: ["127.0.0.1:${VALKEY_PORT:-6380}:6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis-cluster:
+    # Three masters on 7000-7002 in one container, no password. Not started by
+    # a plain `up`: name it, or use `--profile redis-cluster`. The image is
+    # amd64 only (emulated on Apple Silicon). IP is what nodes announce.
+    profiles: ["redis-cluster"]
+    image: grokzen/redis-cluster:7.0.10
+    platform: linux/amd64
+    environment:
+      IP: 127.0.0.1
+      INITIAL_PORT: "7000"
+      MASTERS: "3"
+      SLAVES_PER_MASTER: "0"
+    ports: ["127.0.0.1:7000-7002:7000-7002"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -p 7000 cluster info | grep -q cluster_state:ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
     # No arm64 image: runs under emulation on Apple Silicon (enable Rosetta in

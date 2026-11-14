@@ -18,6 +18,7 @@ linters:
       ignore-package-globs:
         - google.golang.org/grpc/*
         - github.com/doubledare704/queravue/*
+        - github.com/redis/go-redis/*
   exclusions:
     generated: strict
     paths:

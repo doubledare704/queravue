@@ -11,6 +11,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine/mysql"
 	"github.com/doubledare704/queravue/core/internal/engine/oracle"
 	"github.com/doubledare704/queravue/core/internal/engine/postgres"
+	"github.com/doubledare704/queravue/core/internal/engine/redis"
 	"github.com/doubledare704/queravue/core/internal/engine/sqlite"
 )
 
@@ -33,6 +34,8 @@ func builtIn() []engine.Engine {
 		mongo.New(mongo.VariantMongoDB),
 		mongo.New(mongo.VariantCosmos),
 		mongo.New(mongo.VariantDocumentDB),
+		redis.New(redis.VariantRedis),
+		redis.New(redis.VariantValkey),
 		sqlite.New(),
 	}
 }

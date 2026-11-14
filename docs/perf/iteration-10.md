@@ -140,3 +140,26 @@ cd core && NETCELLS_PERF=1 go test -count=1 -tags=integration -v -run TestIdleMe
 | Open with a key file, with a passphrase-protected key | 40 ms, 360 ms | |
 
 The passphrase-protected key costs its key derivation on every open, since the passphrase is read from the keychain and the key is parsed each time. Not measured: throughput of a large result over a tunnel, and a bastion across a real network.
+
+
+## Lane D: Redis
+
+Apple Silicon laptop, 2026-11-14, `redis:7.4.12` (arm64) from `dev/docker-compose.yml` seeded by `redis-seed` (1,000,030 keys), core and server on the same machine, `go-redis` v9.23.0, RESP3.
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait redis
+docker compose -f dev/docker-compose.yml --profile seed up redis-seed
+cd core && REDIS_PERF=1 go test -count=1 -tags=integration -v -run 'PerfIdle|Memory' ./internal/engine/redis/
+```
+
+| Measurement | Result | Budget |
+|---|---|---|
+| Resident memory of the test process (core code, all drivers linked) before opening | 25.4 MB | |
+| Same, with a Redis session open and idle for 2 s | 25.6 MB | idle ≤ 150 MB (UI + core) |
+| Peak resident memory during `SCAN` of 1,000,000 keys (500 per page, 1,999 pages) | 26.2 MB | 1M-row result ≤ +200 MB |
+| Live heap growth during the same scan (`TestIntegrationScan1MKeysKeepsMemoryFlat`, forced GC every 200 pages) | 0 KiB (test limit 16 MiB) | |
+| `SCAN` of 1,000,000 keys, time | 0.6 to 1.0 s | |
+| `HSCAN` of a 100,000-field hash in pages of 1,000 | 49 ms | |
+| `GetKeyInfo` of that hash (`TYPE`, `PTTL`, `OBJECT ENCODING`, `MEMORY USAGE`, `HLEN`) | 1 ms | |
+
+Keys stream to the sink page by page and are not kept, so memory does not depend on the keyspace. Not measured: a cluster scan at this size (the cluster image is emulated on Apple Silicon), a scan over an SSH tunnel, and the app-side key tree.
