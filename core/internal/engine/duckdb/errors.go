@@ -23,7 +23,8 @@ func classify(op string, err error) *engine.Error {
 		e.Kind, e.Msg = engine.KindCanceled, "statement cancelled"
 	case errors.Is(err, context.DeadlineExceeded):
 		e.Kind = engine.KindTimeout
-	case strings.Contains(low, "could not set lock on file"), strings.Contains(low, "conflicting lock is held"):
+	case strings.Contains(low, "could not set lock on file"), strings.Contains(low, "conflicting lock is held"),
+		strings.Contains(low, "being used by another process"):
 		e.Kind = engine.KindTimeout
 		e.Err = errors.Join(ErrFileLocked, err)
 		e.Msg = lockedMessage(msg)
@@ -62,7 +63,7 @@ func isStatementError(msg string) bool {
 }
 
 func lockedMessage(raw string) string {
-	detail := raw
+	detail := strings.TrimPrefix(raw, "IO Error: ")
 	if i := strings.Index(raw, "Could not set lock"); i >= 0 {
 		detail = raw[i:]
 	}

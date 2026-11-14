@@ -1,7 +1,7 @@
 # Testing
 
 ## Unit and widget tests
-- Core: `make test-core` (`go test -race ./...`). Integration tests: `make test-integration`, against the docker databases.
+- Core: `make test-core` (`go test -race ./...`). Integration tests: `make test-integration`, against the docker databases. The DuckDB engine is built only with `-tags duckdb` (cgo): `make test-core-duckdb`, see `docs/engines/duckdb.md`.
 - App: `make test-app` (`flutter test`), with fake repositories in `app/test/support/`.
 
 ## End-to-end tests (real app and core)

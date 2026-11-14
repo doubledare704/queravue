@@ -23,6 +23,7 @@ func TestClassify(t *testing.T) {
 		{"constraint", driverError("Constraint Error: Duplicate key \"id: 1\" violates primary key constraint"), engine.KindSQL},
 		{"interrupt", driverError("INTERRUPT Error: Interrupted!"), engine.KindCanceled},
 		{"context", context.Canceled, engine.KindCanceled},
+		{"locked on windows", driverError(`IO Error: Cannot open file "C:\\a.duckdb": The process cannot access the file because it is being used by another process.`), engine.KindTimeout},
 		{"missing file", driverError(`IO Error: Cannot open file "/x/a.duckdb": No such file or directory`), engine.KindNotFound},
 		{"missing read-only", driverError(`IO Error: Cannot open database "/x/a.duckdb" in read-only mode: database does not exist`), engine.KindNotFound},
 		{"not a database", driverError(`IO Error: The file "/x/a.duckdb" exists, but it is not a valid DuckDB database file!`), engine.KindInvalidConfig},

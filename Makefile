@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: test-perf-completion help proto core app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-design test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
+.PHONY: test-perf-completion help proto core core-duckdb test-core-duckdb lint-core-duckdb app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-design test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -17,6 +17,9 @@ proto: ## Lint the contract and regenerate Go + Dart code
 
 core: ## Build the core sidecar into core/bin/
 	cd core && CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o bin/queravued ./cmd/queravued
+
+core-duckdb: ## Build the core with the DuckDB engine into core/bin/ (cgo; a C compiler is required)
+	cd core && CGO_ENABLED=1 go build -trimpath -tags duckdb -ldflags '$(LDFLAGS)' -o bin/queravued ./cmd/queravued
 
 # The "Embed queravued" Xcode build phase copies $(CORE_BIN) into
 # Queravue.app/Contents/MacOS/ on every macOS build, so the binary survives
@@ -28,6 +31,9 @@ test: test-core test-app ## Run core and app unit tests
 
 test-core:
 	cd core && go test -race ./...
+
+test-core-duckdb: ## Run the core tests with the DuckDB engine (cgo)
+	cd core && CGO_ENABLED=1 go test -race -tags duckdb ./...
 
 test-app:
 	cd app && flutter test
@@ -76,6 +82,9 @@ lint-proto:
 
 lint-core:
 	cd core && golangci-lint run --build-tags=integration
+
+lint-core-duckdb:
+	cd core && CGO_ENABLED=1 golangci-lint run --build-tags=integration,duckdb
 
 lint-app:
 	cd app && flutter analyze

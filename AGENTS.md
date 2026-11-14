@@ -42,6 +42,7 @@ cd proto && buf lint && buf generate
 # core
 cd core && go build ./... && go test ./... && golangci-lint run
 cd core && go test -tags=integration ./...      # needs docker DBs
+cd core && CGO_ENABLED=1 go build -tags duckdb ./... && CGO_ENABLED=1 go test -tags duckdb ./...   # with the cgo DuckDB engine (make core-duckdb)
 
 # app
 cd app && flutter pub get && flutter analyze && flutter test
