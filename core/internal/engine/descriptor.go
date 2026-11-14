@@ -38,6 +38,8 @@ const (
 	// CapSchemaGraph: RelationLister, or DocumentStore whose samples core
 	// infers the graph from (Iteration 9, ADR 0017).
 	CapSchemaGraph Capability = "schema_graph"
+	// CapKeyValueStore: KeyValueStore (Iteration 10, ADR 0020).
+	CapKeyValueStore Capability = "key_value_store"
 )
 
 // CapabilitiesWithoutInterface lists capabilities that core implements on its
@@ -57,6 +59,7 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapValidation:      reflect.TypeFor[ValidationManager](),
 	CapCompletion:      reflect.TypeFor[ColumnLister](),
 	CapSchemaGraph:     reflect.TypeFor[RelationLister](),
+	CapKeyValueStore:   reflect.TypeFor[KeyValueStore](),
 }
 
 // CapabilityAlternatives lists further Conn interfaces that provide a

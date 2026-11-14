@@ -37,6 +37,42 @@ final $typed_data.Uint8List colorTagDescriptor = $convert.base64Decode(
     'QUdfR1JFRU4QBBISCg5DT0xPUl9UQUdfQkxVRRAFEhQKEENPTE9SX1RBR19QVVJQTEUQBhISCg'
     '5DT0xPUl9UQUdfR1JBWRAH');
 
+@$core.Deprecated('Use sshAuthMethodDescriptor instead')
+const SshAuthMethod$json = {
+  '1': 'SshAuthMethod',
+  '2': [
+    {'1': 'SSH_AUTH_METHOD_UNSPECIFIED', '2': 0},
+    {'1': 'SSH_AUTH_METHOD_PASSWORD', '2': 1},
+    {'1': 'SSH_AUTH_METHOD_KEY_FILE', '2': 2},
+    {'1': 'SSH_AUTH_METHOD_AGENT', '2': 3},
+  ],
+};
+
+/// Descriptor for `SshAuthMethod`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List sshAuthMethodDescriptor = $convert.base64Decode(
+    'Cg1Tc2hBdXRoTWV0aG9kEh8KG1NTSF9BVVRIX01FVEhPRF9VTlNQRUNJRklFRBAAEhwKGFNTSF'
+    '9BVVRIX01FVEhPRF9QQVNTV09SRBABEhwKGFNTSF9BVVRIX01FVEhPRF9LRVlfRklMRRACEhkK'
+    'FVNTSF9BVVRIX01FVEhPRF9BR0VOVBAD');
+
+@$core.Deprecated('Use tlsModeDescriptor instead')
+const TlsMode$json = {
+  '1': 'TlsMode',
+  '2': [
+    {'1': 'TLS_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'TLS_MODE_DISABLE', '2': 1},
+    {'1': 'TLS_MODE_PREFER', '2': 2},
+    {'1': 'TLS_MODE_REQUIRE', '2': 3},
+    {'1': 'TLS_MODE_VERIFY_CA', '2': 4},
+    {'1': 'TLS_MODE_VERIFY_FULL', '2': 5},
+  ],
+};
+
+/// Descriptor for `TlsMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List tlsModeDescriptor = $convert.base64Decode(
+    'CgdUbHNNb2RlEhgKFFRMU19NT0RFX1VOU1BFQ0lGSUVEEAASFAoQVExTX01PREVfRElTQUJMRR'
+    'ABEhMKD1RMU19NT0RFX1BSRUZFUhACEhQKEFRMU19NT0RFX1JFUVVJUkUQAxIWChJUTFNfTU9E'
+    'RV9WRVJJRllfQ0EQBBIYChRUTFNfTU9ERV9WRVJJRllfRlVMTBAF');
+
 @$core.Deprecated('Use fieldKindDescriptor instead')
 const FieldKind$json = {
   '1': 'FieldKind',
@@ -69,6 +105,10 @@ const ErrorKind$json = {
     {'1': 'ERROR_KIND_NOT_FOUND', '2': 4},
     {'1': 'ERROR_KIND_TIMEOUT', '2': 5},
     {'1': 'ERROR_KIND_INVALID_CONFIG', '2': 6},
+    {'1': 'ERROR_KIND_SSH_HOST_KEY_UNKNOWN', '2': 7},
+    {'1': 'ERROR_KIND_SSH_HOST_KEY_CHANGED', '2': 8},
+    {'1': 'ERROR_KIND_SSH_AUTH', '2': 9},
+    {'1': 'ERROR_KIND_TUNNEL_LOST', '2': 10},
   ],
 };
 
@@ -77,7 +117,27 @@ final $typed_data.Uint8List errorKindDescriptor = $convert.base64Decode(
     'CglFcnJvcktpbmQSGgoWRVJST1JfS0lORF9VTlNQRUNJRklFRBAAEhMKD0VSUk9SX0tJTkRfQV'
     'VUSBABEhYKEkVSUk9SX0tJTkRfTkVUV09SSxACEhIKDkVSUk9SX0tJTkRfVExTEAMSGAoURVJS'
     'T1JfS0lORF9OT1RfRk9VTkQQBBIWChJFUlJPUl9LSU5EX1RJTUVPVVQQBRIdChlFUlJPUl9LSU'
-    '5EX0lOVkFMSURfQ09ORklHEAY=');
+    '5EX0lOVkFMSURfQ09ORklHEAYSIwofRVJST1JfS0lORF9TU0hfSE9TVF9LRVlfVU5LTk9XThAH'
+    'EiMKH0VSUk9SX0tJTkRfU1NIX0hPU1RfS0VZX0NIQU5HRUQQCBIXChNFUlJPUl9LSU5EX1NTSF'
+    '9BVVRIEAkSGgoWRVJST1JfS0lORF9UVU5ORUxfTE9TVBAK');
+
+@$core.Deprecated('Use testStageDescriptor instead')
+const TestStage$json = {
+  '1': 'TestStage',
+  '2': [
+    {'1': 'TEST_STAGE_UNSPECIFIED', '2': 0},
+    {'1': 'TEST_STAGE_SSH', '2': 1},
+    {'1': 'TEST_STAGE_TLS', '2': 2},
+    {'1': 'TEST_STAGE_AUTH', '2': 3},
+    {'1': 'TEST_STAGE_PING', '2': 4},
+  ],
+};
+
+/// Descriptor for `TestStage`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List testStageDescriptor = $convert.base64Decode(
+    'CglUZXN0U3RhZ2USGgoWVEVTVF9TVEFHRV9VTlNQRUNJRklFRBAAEhIKDlRFU1RfU1RBR0VfU1'
+    'NIEAESEgoOVEVTVF9TVEFHRV9UTFMQAhITCg9URVNUX1NUQUdFX0FVVEgQAxITCg9URVNUX1NU'
+    'QUdFX1BJTkcQBA==');
 
 @$core.Deprecated('Use connectionDescriptor instead')
 const Connection$json = {
@@ -121,6 +181,22 @@ const Connection$json = {
       '6': '.google.protobuf.Timestamp',
       '10': 'updatedAt'
     },
+    {
+      '1': 'ssh_tunnel',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.SshTunnel',
+      '10': 'sshTunnel'
+    },
+    {
+      '1': 'tls',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.TlsSettings',
+      '10': 'tls'
+    },
   ],
   '3': [Connection_ParamsEntry$json],
 };
@@ -144,8 +220,218 @@ final $typed_data.Uint8List connectionDescriptor = $convert.base64Decode(
     'ByABKAhSCnByb2R1Y3Rpb24SIQoMaGFzX3Bhc3N3b3JkGAggASgIUgtoYXNQYXNzd29yZBI5Cg'
     'pjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIJY3JlYXRlZEF0'
     'EjkKCnVwZGF0ZWRfYXQYCiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgl1cGRhdG'
-    'VkQXQaOQoLUGFyYW1zRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZh'
-    'bHVlOgI4AQ==');
+    'VkQXQSNQoKc3NoX3R1bm5lbBgLIAEoCzIWLnF1ZXJhdnVlLnYxLlNzaFR1bm5lbFIJc3NoVHVu'
+    'bmVsEioKA3RscxgMIAEoCzIYLnF1ZXJhdnVlLnYxLlRsc1NldHRpbmdzUgN0bHMaOQoLUGFyYW'
+    '1zRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AQ==');
+
+@$core.Deprecated('Use sshTunnelDescriptor instead')
+const SshTunnel$json = {
+  '1': 'SshTunnel',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {'1': 'port', '3': 2, '4': 1, '5': 13, '10': 'port'},
+    {'1': 'user', '3': 3, '4': 1, '5': 9, '10': 'user'},
+    {
+      '1': 'auth_method',
+      '3': 4,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.SshAuthMethod',
+      '10': 'authMethod'
+    },
+    {'1': 'key_file', '3': 5, '4': 1, '5': 9, '10': 'keyFile'},
+    {
+      '1': 'keepalive_seconds',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '10': 'keepaliveSeconds'
+    },
+    {
+      '1': 'connect_timeout_seconds',
+      '3': 7,
+      '4': 1,
+      '5': 13,
+      '10': 'connectTimeoutSeconds'
+    },
+    {
+      '1': 'jump_host',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.SshTunnel',
+      '10': 'jumpHost'
+    },
+    {'1': 'has_password', '3': 9, '4': 1, '5': 8, '10': 'hasPassword'},
+    {
+      '1': 'has_key_passphrase',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '10': 'hasKeyPassphrase'
+    },
+  ],
+};
+
+/// Descriptor for `SshTunnel`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sshTunnelDescriptor = $convert.base64Decode(
+    'CglTc2hUdW5uZWwSEgoEaG9zdBgBIAEoCVIEaG9zdBISCgRwb3J0GAIgASgNUgRwb3J0EhIKBH'
+    'VzZXIYAyABKAlSBHVzZXISOwoLYXV0aF9tZXRob2QYBCABKA4yGi5xdWVyYXZ1ZS52MS5Tc2hB'
+    'dXRoTWV0aG9kUgphdXRoTWV0aG9kEhkKCGtleV9maWxlGAUgASgJUgdrZXlGaWxlEisKEWtlZX'
+    'BhbGl2ZV9zZWNvbmRzGAYgASgNUhBrZWVwYWxpdmVTZWNvbmRzEjYKF2Nvbm5lY3RfdGltZW91'
+    'dF9zZWNvbmRzGAcgASgNUhVjb25uZWN0VGltZW91dFNlY29uZHMSMwoJanVtcF9ob3N0GAggAS'
+    'gLMhYucXVlcmF2dWUudjEuU3NoVHVubmVsUghqdW1wSG9zdBIhCgxoYXNfcGFzc3dvcmQYCSAB'
+    'KAhSC2hhc1Bhc3N3b3JkEiwKEmhhc19rZXlfcGFzc3BocmFzZRgKIAEoCFIQaGFzS2V5UGFzc3'
+    'BocmFzZQ==');
+
+@$core.Deprecated('Use sshSecretsDescriptor instead')
+const SshSecrets$json = {
+  '1': 'SshSecrets',
+  '2': [
+    {
+      '1': 'password',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'password',
+      '17': true
+    },
+    {
+      '1': 'key_passphrase',
+      '3': 2,
+      '4': 1,
+      '5': 9,
+      '9': 1,
+      '10': 'keyPassphrase',
+      '17': true
+    },
+    {
+      '1': 'jump_password',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'jumpPassword',
+      '17': true
+    },
+    {
+      '1': 'jump_key_passphrase',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'jumpKeyPassphrase',
+      '17': true
+    },
+    {'1': 'clear', '3': 5, '4': 1, '5': 8, '10': 'clear'},
+  ],
+  '8': [
+    {'1': '_password'},
+    {'1': '_key_passphrase'},
+    {'1': '_jump_password'},
+    {'1': '_jump_key_passphrase'},
+  ],
+};
+
+/// Descriptor for `SshSecrets`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sshSecretsDescriptor = $convert.base64Decode(
+    'CgpTc2hTZWNyZXRzEh8KCHBhc3N3b3JkGAEgASgJSABSCHBhc3N3b3JkiAEBEioKDmtleV9wYX'
+    'NzcGhyYXNlGAIgASgJSAFSDWtleVBhc3NwaHJhc2WIAQESKAoNanVtcF9wYXNzd29yZBgDIAEo'
+    'CUgCUgxqdW1wUGFzc3dvcmSIAQESMwoTanVtcF9rZXlfcGFzc3BocmFzZRgEIAEoCUgDUhFqdW'
+    '1wS2V5UGFzc3BocmFzZYgBARIUCgVjbGVhchgFIAEoCFIFY2xlYXJCCwoJX3Bhc3N3b3JkQhEK'
+    'D19rZXlfcGFzc3BocmFzZUIQCg5fanVtcF9wYXNzd29yZEIWChRfanVtcF9rZXlfcGFzc3Bocm'
+    'FzZQ==');
+
+@$core.Deprecated('Use tlsSettingsDescriptor instead')
+const TlsSettings$json = {
+  '1': 'TlsSettings',
+  '2': [
+    {
+      '1': 'mode',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.TlsMode',
+      '10': 'mode'
+    },
+    {'1': 'ca_file', '3': 2, '4': 1, '5': 9, '10': 'caFile'},
+    {'1': 'client_cert_file', '3': 3, '4': 1, '5': 9, '10': 'clientCertFile'},
+    {'1': 'client_key_file', '3': 4, '4': 1, '5': 9, '10': 'clientKeyFile'},
+    {'1': 'server_name', '3': 5, '4': 1, '5': 9, '10': 'serverName'},
+    {
+      '1': 'has_client_key_passphrase',
+      '3': 6,
+      '4': 1,
+      '5': 8,
+      '10': 'hasClientKeyPassphrase'
+    },
+  ],
+};
+
+/// Descriptor for `TlsSettings`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tlsSettingsDescriptor = $convert.base64Decode(
+    'CgtUbHNTZXR0aW5ncxIoCgRtb2RlGAEgASgOMhQucXVlcmF2dWUudjEuVGxzTW9kZVIEbW9kZR'
+    'IXCgdjYV9maWxlGAIgASgJUgZjYUZpbGUSKAoQY2xpZW50X2NlcnRfZmlsZRgDIAEoCVIOY2xp'
+    'ZW50Q2VydEZpbGUSJgoPY2xpZW50X2tleV9maWxlGAQgASgJUg1jbGllbnRLZXlGaWxlEh8KC3'
+    'NlcnZlcl9uYW1lGAUgASgJUgpzZXJ2ZXJOYW1lEjkKGWhhc19jbGllbnRfa2V5X3Bhc3NwaHJh'
+    'c2UYBiABKAhSFmhhc0NsaWVudEtleVBhc3NwaHJhc2U=');
+
+@$core.Deprecated('Use tlsSecretsDescriptor instead')
+const TlsSecrets$json = {
+  '1': 'TlsSecrets',
+  '2': [
+    {
+      '1': 'client_key_passphrase',
+      '3': 1,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'clientKeyPassphrase',
+      '17': true
+    },
+    {'1': 'clear', '3': 2, '4': 1, '5': 8, '10': 'clear'},
+  ],
+  '8': [
+    {'1': '_client_key_passphrase'},
+  ],
+};
+
+/// Descriptor for `TlsSecrets`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tlsSecretsDescriptor = $convert.base64Decode(
+    'CgpUbHNTZWNyZXRzEjcKFWNsaWVudF9rZXlfcGFzc3BocmFzZRgBIAEoCUgAUhNjbGllbnRLZX'
+    'lQYXNzcGhyYXNliAEBEhQKBWNsZWFyGAIgASgIUgVjbGVhckIYChZfY2xpZW50X2tleV9wYXNz'
+    'cGhyYXNl');
+
+@$core.Deprecated('Use trustHostKeyRequestDescriptor instead')
+const TrustHostKeyRequest$json = {
+  '1': 'TrustHostKeyRequest',
+  '2': [
+    {'1': 'host', '3': 1, '4': 1, '5': 9, '10': 'host'},
+    {'1': 'port', '3': 2, '4': 1, '5': 13, '10': 'port'},
+    {
+      '1': 'fingerprint_sha256',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '10': 'fingerprintSha256'
+    },
+  ],
+};
+
+/// Descriptor for `TrustHostKeyRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List trustHostKeyRequestDescriptor = $convert.base64Decode(
+    'ChNUcnVzdEhvc3RLZXlSZXF1ZXN0EhIKBGhvc3QYASABKAlSBGhvc3QSEgoEcG9ydBgCIAEoDV'
+    'IEcG9ydBItChJmaW5nZXJwcmludF9zaGEyNTYYAyABKAlSEWZpbmdlcnByaW50U2hhMjU2');
+
+@$core.Deprecated('Use trustHostKeyResponseDescriptor instead')
+const TrustHostKeyResponse$json = {
+  '1': 'TrustHostKeyResponse',
+};
+
+/// Descriptor for `TrustHostKeyResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List trustHostKeyResponseDescriptor =
+    $convert.base64Decode('ChRUcnVzdEhvc3RLZXlSZXNwb25zZQ==');
 
 @$core.Deprecated('Use fieldSpecDescriptor instead')
 const FieldSpec$json = {
@@ -193,6 +479,8 @@ const EngineInfo$json = {
     {'1': 'supports_uri', '3': 5, '4': 1, '5': 8, '10': 'supportsUri'},
     {'1': 'capabilities', '3': 6, '4': 3, '5': 9, '10': 'capabilities'},
     {'1': 'uri_example', '3': 7, '4': 1, '5': 9, '10': 'uriExample'},
+    {'1': 'supports_ssh', '3': 8, '4': 1, '5': 8, '10': 'supportsSsh'},
+    {'1': 'supports_tls', '3': 9, '4': 1, '5': 8, '10': 'supportsTls'},
   ],
 };
 
@@ -202,7 +490,8 @@ final $typed_data.Uint8List engineInfoDescriptor = $convert.base64Decode(
     'BsYXlOYW1lEhYKBmZhbWlseRgDIAEoCVIGZmFtaWx5Ei4KBmZpZWxkcxgEIAMoCzIWLnF1ZXJh'
     'dnVlLnYxLkZpZWxkU3BlY1IGZmllbGRzEiEKDHN1cHBvcnRzX3VyaRgFIAEoCFILc3VwcG9ydH'
     'NVcmkSIgoMY2FwYWJpbGl0aWVzGAYgAygJUgxjYXBhYmlsaXRpZXMSHwoLdXJpX2V4YW1wbGUY'
-    'ByABKAlSCnVyaUV4YW1wbGU=');
+    'ByABKAlSCnVyaUV4YW1wbGUSIQoMc3VwcG9ydHNfc3NoGAggASgIUgtzdXBwb3J0c1NzaBIhCg'
+    'xzdXBwb3J0c190bHMYCSABKAhSC3N1cHBvcnRzVGxz');
 
 @$core.Deprecated('Use serverInfoDescriptor instead')
 const ServerInfo$json = {
@@ -232,13 +521,31 @@ const ConnectionError$json = {
       '10': 'kind'
     },
     {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+    {'1': 'ssh_host', '3': 3, '4': 1, '5': 9, '10': 'sshHost'},
+    {
+      '1': 'ssh_fingerprint_sha256',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '10': 'sshFingerprintSha256'
+    },
+    {
+      '1': 'ssh_trusted_fingerprint_sha256',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '10': 'sshTrustedFingerprintSha256'
+    },
   ],
 };
 
 /// Descriptor for `ConnectionError`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List connectionErrorDescriptor = $convert.base64Decode(
     'Cg9Db25uZWN0aW9uRXJyb3ISKgoEa2luZBgBIAEoDjIWLnF1ZXJhdnVlLnYxLkVycm9yS2luZF'
-    'IEa2luZBIYCgdtZXNzYWdlGAIgASgJUgdtZXNzYWdl');
+    'IEa2luZBIYCgdtZXNzYWdlGAIgASgJUgdtZXNzYWdlEhkKCHNzaF9ob3N0GAMgASgJUgdzc2hI'
+    'b3N0EjQKFnNzaF9maW5nZXJwcmludF9zaGEyNTYYBCABKAlSFHNzaEZpbmdlcnByaW50U2hhMj'
+    'U2EkMKHnNzaF90cnVzdGVkX2ZpbmdlcnByaW50X3NoYTI1NhgFIAEoCVIbc3NoVHJ1c3RlZEZp'
+    'bmdlcnByaW50U2hhMjU2');
 
 @$core.Deprecated('Use listEnginesRequestDescriptor instead')
 const ListEnginesRequest$json = {
@@ -352,6 +659,22 @@ const CreateConnectionRequest$json = {
       '10': 'password',
       '17': true
     },
+    {
+      '1': 'ssh_secrets',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.SshSecrets',
+      '10': 'sshSecrets'
+    },
+    {
+      '1': 'tls_secrets',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.TlsSecrets',
+      '10': 'tlsSecrets'
+    },
   ],
   '8': [
     {'1': '_password'},
@@ -362,7 +685,9 @@ const CreateConnectionRequest$json = {
 final $typed_data.Uint8List createConnectionRequestDescriptor = $convert.base64Decode(
     'ChdDcmVhdGVDb25uZWN0aW9uUmVxdWVzdBI3Cgpjb25uZWN0aW9uGAEgASgLMhcucXVlcmF2dW'
     'UudjEuQ29ubmVjdGlvblIKY29ubmVjdGlvbhIfCghwYXNzd29yZBgCIAEoCUgAUghwYXNzd29y'
-    'ZIgBAUILCglfcGFzc3dvcmQ=');
+    'ZIgBARI4Cgtzc2hfc2VjcmV0cxgDIAEoCzIXLnF1ZXJhdnVlLnYxLlNzaFNlY3JldHNSCnNzaF'
+    'NlY3JldHMSOAoLdGxzX3NlY3JldHMYBCABKAsyFy5xdWVyYXZ1ZS52MS5UbHNTZWNyZXRzUgp0'
+    'bHNTZWNyZXRzQgsKCV9wYXNzd29yZA==');
 
 @$core.Deprecated('Use createConnectionResponseDescriptor instead')
 const CreateConnectionResponse$json = {
@@ -407,6 +732,22 @@ const UpdateConnectionRequest$json = {
       '17': true
     },
     {'1': 'clear_password', '3': 3, '4': 1, '5': 8, '10': 'clearPassword'},
+    {
+      '1': 'ssh_secrets',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.SshSecrets',
+      '10': 'sshSecrets'
+    },
+    {
+      '1': 'tls_secrets',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.TlsSecrets',
+      '10': 'tlsSecrets'
+    },
   ],
   '8': [
     {'1': '_password'},
@@ -417,8 +758,10 @@ const UpdateConnectionRequest$json = {
 final $typed_data.Uint8List updateConnectionRequestDescriptor = $convert.base64Decode(
     'ChdVcGRhdGVDb25uZWN0aW9uUmVxdWVzdBI3Cgpjb25uZWN0aW9uGAEgASgLMhcucXVlcmF2dW'
     'UudjEuQ29ubmVjdGlvblIKY29ubmVjdGlvbhIfCghwYXNzd29yZBgCIAEoCUgAUghwYXNzd29y'
-    'ZIgBARIlCg5jbGVhcl9wYXNzd29yZBgDIAEoCFINY2xlYXJQYXNzd29yZEILCglfcGFzc3dvcm'
-    'Q=');
+    'ZIgBARIlCg5jbGVhcl9wYXNzd29yZBgDIAEoCFINY2xlYXJQYXNzd29yZBI4Cgtzc2hfc2Vjcm'
+    'V0cxgEIAEoCzIXLnF1ZXJhdnVlLnYxLlNzaFNlY3JldHNSCnNzaFNlY3JldHMSOAoLdGxzX3Nl'
+    'Y3JldHMYBSABKAsyFy5xdWVyYXZ1ZS52MS5UbHNTZWNyZXRzUgp0bHNTZWNyZXRzQgsKCV9wYX'
+    'Nzd29yZA==');
 
 @$core.Deprecated('Use updateConnectionResponseDescriptor instead')
 const UpdateConnectionResponse$json = {
@@ -485,6 +828,22 @@ const TestConnectionRequest$json = {
       '17': true
     },
     {'1': 'timeout_ms', '3': 4, '4': 1, '5': 13, '10': 'timeoutMs'},
+    {
+      '1': 'ssh_secrets',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.SshSecrets',
+      '10': 'sshSecrets'
+    },
+    {
+      '1': 'tls_secrets',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.TlsSecrets',
+      '10': 'tlsSecrets'
+    },
   ],
   '8': [
     {'1': '_password'},
@@ -495,7 +854,10 @@ const TestConnectionRequest$json = {
 final $typed_data.Uint8List testConnectionRequestDescriptor = $convert.base64Decode(
     'ChVUZXN0Q29ubmVjdGlvblJlcXVlc3QSDgoCaWQYASABKAlSAmlkEi0KBWRyYWZ0GAIgASgLMh'
     'cucXVlcmF2dWUudjEuQ29ubmVjdGlvblIFZHJhZnQSHwoIcGFzc3dvcmQYAyABKAlIAFIIcGFz'
-    'c3dvcmSIAQESHQoKdGltZW91dF9tcxgEIAEoDVIJdGltZW91dE1zQgsKCV9wYXNzd29yZA==');
+    'c3dvcmSIAQESHQoKdGltZW91dF9tcxgEIAEoDVIJdGltZW91dE1zEjgKC3NzaF9zZWNyZXRzGA'
+    'UgASgLMhcucXVlcmF2dWUudjEuU3NoU2VjcmV0c1IKc3NoU2VjcmV0cxI4Cgt0bHNfc2VjcmV0'
+    'cxgGIAEoCzIXLnF1ZXJhdnVlLnYxLlRsc1NlY3JldHNSCnRsc1NlY3JldHNCCwoJX3Bhc3N3b3'
+    'Jk');
 
 @$core.Deprecated('Use testConnectionResponseDescriptor instead')
 const TestConnectionResponse$json = {
@@ -520,6 +882,14 @@ const TestConnectionResponse$json = {
       '6': '.queravue.v1.ConnectionError',
       '10': 'error'
     },
+    {
+      '1': 'steps',
+      '3': 6,
+      '4': 3,
+      '5': 11,
+      '6': '.queravue.v1.TestStep',
+      '10': 'steps'
+    },
   ],
 };
 
@@ -528,7 +898,39 @@ final $typed_data.Uint8List testConnectionResponseDescriptor = $convert.base64De
     'ChZUZXN0Q29ubmVjdGlvblJlc3BvbnNlEg4KAm9rGAEgASgIUgJvaxIvCgZzZXJ2ZXIYAiABKA'
     'syFy5xdWVyYXZ1ZS52MS5TZXJ2ZXJJbmZvUgZzZXJ2ZXISHQoKY29ubmVjdF9tcxgDIAEoDVIJ'
     'Y29ubmVjdE1zEh0KCmxhdGVuY3lfbXMYBCABKA1SCWxhdGVuY3lNcxIyCgVlcnJvchgFIAEoCz'
-    'IcLnF1ZXJhdnVlLnYxLkNvbm5lY3Rpb25FcnJvclIFZXJyb3I=');
+    'IcLnF1ZXJhdnVlLnYxLkNvbm5lY3Rpb25FcnJvclIFZXJyb3ISKwoFc3RlcHMYBiADKAsyFS5x'
+    'dWVyYXZ1ZS52MS5UZXN0U3RlcFIFc3RlcHM=');
+
+@$core.Deprecated('Use testStepDescriptor instead')
+const TestStep$json = {
+  '1': 'TestStep',
+  '2': [
+    {
+      '1': 'stage',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.TestStage',
+      '10': 'stage'
+    },
+    {'1': 'ok', '3': 2, '4': 1, '5': 8, '10': 'ok'},
+    {'1': 'elapsed_ms', '3': 3, '4': 1, '5': 13, '10': 'elapsedMs'},
+    {
+      '1': 'error',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.ConnectionError',
+      '10': 'error'
+    },
+  ],
+};
+
+/// Descriptor for `TestStep`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List testStepDescriptor = $convert.base64Decode(
+    'CghUZXN0U3RlcBIsCgVzdGFnZRgBIAEoDjIWLnF1ZXJhdnVlLnYxLlRlc3RTdGFnZVIFc3RhZ2'
+    'USDgoCb2sYAiABKAhSAm9rEh0KCmVsYXBzZWRfbXMYAyABKA1SCWVsYXBzZWRNcxIyCgVlcnJv'
+    'chgEIAEoCzIcLnF1ZXJhdnVlLnYxLkNvbm5lY3Rpb25FcnJvclIFZXJyb3I=');
 
 @$core.Deprecated('Use parseConnectionStringRequestDescriptor instead')
 const ParseConnectionStringRequest$json = {

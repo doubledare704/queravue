@@ -35,6 +35,8 @@ class Connection extends $pb.GeneratedMessage {
     $core.bool? hasPassword,
     $1.Timestamp? createdAt,
     $1.Timestamp? updatedAt,
+    SshTunnel? sshTunnel,
+    TlsSettings? tls,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -47,6 +49,8 @@ class Connection extends $pb.GeneratedMessage {
     if (hasPassword != null) result.hasPassword = hasPassword;
     if (createdAt != null) result.createdAt = createdAt;
     if (updatedAt != null) result.updatedAt = updatedAt;
+    if (sshTunnel != null) result.sshTunnel = sshTunnel;
+    if (tls != null) result.tls = tls;
     return result;
   }
 
@@ -80,6 +84,10 @@ class Connection extends $pb.GeneratedMessage {
         subBuilder: $1.Timestamp.create)
     ..aOM<$1.Timestamp>(10, _omitFieldNames ? '' : 'updatedAt',
         subBuilder: $1.Timestamp.create)
+    ..aOM<SshTunnel>(11, _omitFieldNames ? '' : 'sshTunnel',
+        subBuilder: SshTunnel.create)
+    ..aOM<TlsSettings>(12, _omitFieldNames ? '' : 'tls',
+        subBuilder: TlsSettings.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -198,6 +206,630 @@ class Connection extends $pb.GeneratedMessage {
   void clearUpdatedAt() => $_clearField(10);
   @$pb.TagNumber(10)
   $1.Timestamp ensureUpdatedAt() => $_ensure(9);
+
+  /// SSH tunnel settings. Unset means no tunnel.
+  @$pb.TagNumber(11)
+  SshTunnel get sshTunnel => $_getN(10);
+  @$pb.TagNumber(11)
+  set sshTunnel(SshTunnel value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasSshTunnel() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearSshTunnel() => $_clearField(11);
+  @$pb.TagNumber(11)
+  SshTunnel ensureSshTunnel() => $_ensure(10);
+
+  /// TLS settings. Unset means the engine default.
+  @$pb.TagNumber(12)
+  TlsSettings get tls => $_getN(11);
+  @$pb.TagNumber(12)
+  set tls(TlsSettings value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTls() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTls() => $_clearField(12);
+  @$pb.TagNumber(12)
+  TlsSettings ensureTls() => $_ensure(11);
+}
+
+/// SshTunnel describes the bastion a connection goes through. Secrets are
+/// never part of it; see SshSecrets.
+class SshTunnel extends $pb.GeneratedMessage {
+  factory SshTunnel({
+    $core.String? host,
+    $core.int? port,
+    $core.String? user,
+    SshAuthMethod? authMethod,
+    $core.String? keyFile,
+    $core.int? keepaliveSeconds,
+    $core.int? connectTimeoutSeconds,
+    SshTunnel? jumpHost,
+    $core.bool? hasPassword,
+    $core.bool? hasKeyPassphrase,
+  }) {
+    final result = create();
+    if (host != null) result.host = host;
+    if (port != null) result.port = port;
+    if (user != null) result.user = user;
+    if (authMethod != null) result.authMethod = authMethod;
+    if (keyFile != null) result.keyFile = keyFile;
+    if (keepaliveSeconds != null) result.keepaliveSeconds = keepaliveSeconds;
+    if (connectTimeoutSeconds != null)
+      result.connectTimeoutSeconds = connectTimeoutSeconds;
+    if (jumpHost != null) result.jumpHost = jumpHost;
+    if (hasPassword != null) result.hasPassword = hasPassword;
+    if (hasKeyPassphrase != null) result.hasKeyPassphrase = hasKeyPassphrase;
+    return result;
+  }
+
+  SshTunnel._();
+
+  factory SshTunnel.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SshTunnel.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SshTunnel',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aI(2, _omitFieldNames ? '' : 'port', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'user')
+    ..aE<SshAuthMethod>(4, _omitFieldNames ? '' : 'authMethod',
+        enumValues: SshAuthMethod.values)
+    ..aOS(5, _omitFieldNames ? '' : 'keyFile')
+    ..aI(6, _omitFieldNames ? '' : 'keepaliveSeconds',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'connectTimeoutSeconds',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<SshTunnel>(8, _omitFieldNames ? '' : 'jumpHost',
+        subBuilder: SshTunnel.create)
+    ..aOB(9, _omitFieldNames ? '' : 'hasPassword')
+    ..aOB(10, _omitFieldNames ? '' : 'hasKeyPassphrase')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshTunnel clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshTunnel copyWith(void Function(SshTunnel) updates) =>
+      super.copyWith((message) => updates(message as SshTunnel)) as SshTunnel;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SshTunnel create() => SshTunnel._();
+  @$core.override
+  SshTunnel createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SshTunnel getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SshTunnel>(create);
+  static SshTunnel? _defaultInstance;
+
+  /// Bastion host.
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  /// Bastion port. 0 means 22.
+  @$pb.TagNumber(2)
+  $core.int get port => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set port($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPort() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPort() => $_clearField(2);
+
+  /// Login user.
+  @$pb.TagNumber(3)
+  $core.String get user => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set user($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUser() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUser() => $_clearField(3);
+
+  /// Authentication method.
+  @$pb.TagNumber(4)
+  SshAuthMethod get authMethod => $_getN(3);
+  @$pb.TagNumber(4)
+  set authMethod(SshAuthMethod value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAuthMethod() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAuthMethod() => $_clearField(4);
+
+  /// Private key path for SSH_AUTH_METHOD_KEY_FILE.
+  @$pb.TagNumber(5)
+  $core.String get keyFile => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set keyFile($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasKeyFile() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearKeyFile() => $_clearField(5);
+
+  /// Keep-alive interval in seconds. 0 means the default (30).
+  @$pb.TagNumber(6)
+  $core.int get keepaliveSeconds => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set keepaliveSeconds($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasKeepaliveSeconds() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearKeepaliveSeconds() => $_clearField(6);
+
+  /// Connect timeout in seconds. 0 means the default (10).
+  @$pb.TagNumber(7)
+  $core.int get connectTimeoutSeconds => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set connectTimeoutSeconds($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasConnectTimeoutSeconds() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearConnectTimeoutSeconds() => $_clearField(7);
+
+  /// Optional single jump host the bastion is reached through.
+  @$pb.TagNumber(8)
+  SshTunnel get jumpHost => $_getN(7);
+  @$pb.TagNumber(8)
+  set jumpHost(SshTunnel value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasJumpHost() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearJumpHost() => $_clearField(8);
+  @$pb.TagNumber(8)
+  SshTunnel ensureJumpHost() => $_ensure(7);
+
+  /// Output only: whether a password is stored in the keychain.
+  @$pb.TagNumber(9)
+  $core.bool get hasPassword => $_getBF(8);
+  @$pb.TagNumber(9)
+  set hasPassword($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasHasPassword() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearHasPassword() => $_clearField(9);
+
+  /// Output only: whether a key passphrase is stored in the keychain.
+  @$pb.TagNumber(10)
+  $core.bool get hasKeyPassphrase => $_getBF(9);
+  @$pb.TagNumber(10)
+  set hasKeyPassphrase($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasHasKeyPassphrase() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearHasKeyPassphrase() => $_clearField(10);
+}
+
+/// SshSecrets carries tunnel secrets to the core, which stores them in the
+/// keychain. They never come back.
+class SshSecrets extends $pb.GeneratedMessage {
+  factory SshSecrets({
+    $core.String? password,
+    $core.String? keyPassphrase,
+    $core.String? jumpPassword,
+    $core.String? jumpKeyPassphrase,
+    $core.bool? clear_5,
+  }) {
+    final result = create();
+    if (password != null) result.password = password;
+    if (keyPassphrase != null) result.keyPassphrase = keyPassphrase;
+    if (jumpPassword != null) result.jumpPassword = jumpPassword;
+    if (jumpKeyPassphrase != null) result.jumpKeyPassphrase = jumpKeyPassphrase;
+    if (clear_5 != null) result.clear_5 = clear_5;
+    return result;
+  }
+
+  SshSecrets._();
+
+  factory SshSecrets.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SshSecrets.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SshSecrets',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'password')
+    ..aOS(2, _omitFieldNames ? '' : 'keyPassphrase')
+    ..aOS(3, _omitFieldNames ? '' : 'jumpPassword')
+    ..aOS(4, _omitFieldNames ? '' : 'jumpKeyPassphrase')
+    ..aOB(5, _omitFieldNames ? '' : 'clear')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshSecrets clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SshSecrets copyWith(void Function(SshSecrets) updates) =>
+      super.copyWith((message) => updates(message as SshSecrets)) as SshSecrets;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SshSecrets create() => SshSecrets._();
+  @$core.override
+  SshSecrets createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SshSecrets getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SshSecrets>(create);
+  static SshSecrets? _defaultInstance;
+
+  /// Tunnel password. Unset keeps the stored one.
+  @$pb.TagNumber(1)
+  $core.String get password => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set password($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPassword() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPassword() => $_clearField(1);
+
+  /// Private key passphrase. Unset keeps the stored one.
+  @$pb.TagNumber(2)
+  $core.String get keyPassphrase => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set keyPassphrase($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasKeyPassphrase() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearKeyPassphrase() => $_clearField(2);
+
+  /// Same for the jump host.
+  @$pb.TagNumber(3)
+  $core.String get jumpPassword => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set jumpPassword($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasJumpPassword() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearJumpPassword() => $_clearField(3);
+
+  /// Same for the jump host.
+  @$pb.TagNumber(4)
+  $core.String get jumpKeyPassphrase => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set jumpKeyPassphrase($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasJumpKeyPassphrase() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearJumpKeyPassphrase() => $_clearField(4);
+
+  /// Remove every stored tunnel secret. Ignored for fields that are set.
+  @$pb.TagNumber(5)
+  $core.bool get clear_5 => $_getBF(4);
+  @$pb.TagNumber(5)
+  set clear_5($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasClear_5() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearClear_5() => $_clearField(5);
+}
+
+/// TlsSettings is the engine-independent TLS configuration.
+class TlsSettings extends $pb.GeneratedMessage {
+  factory TlsSettings({
+    TlsMode? mode,
+    $core.String? caFile,
+    $core.String? clientCertFile,
+    $core.String? clientKeyFile,
+    $core.String? serverName,
+    $core.bool? hasClientKeyPassphrase,
+  }) {
+    final result = create();
+    if (mode != null) result.mode = mode;
+    if (caFile != null) result.caFile = caFile;
+    if (clientCertFile != null) result.clientCertFile = clientCertFile;
+    if (clientKeyFile != null) result.clientKeyFile = clientKeyFile;
+    if (serverName != null) result.serverName = serverName;
+    if (hasClientKeyPassphrase != null)
+      result.hasClientKeyPassphrase = hasClientKeyPassphrase;
+    return result;
+  }
+
+  TlsSettings._();
+
+  factory TlsSettings.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TlsSettings.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TlsSettings',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aE<TlsMode>(1, _omitFieldNames ? '' : 'mode', enumValues: TlsMode.values)
+    ..aOS(2, _omitFieldNames ? '' : 'caFile')
+    ..aOS(3, _omitFieldNames ? '' : 'clientCertFile')
+    ..aOS(4, _omitFieldNames ? '' : 'clientKeyFile')
+    ..aOS(5, _omitFieldNames ? '' : 'serverName')
+    ..aOB(6, _omitFieldNames ? '' : 'hasClientKeyPassphrase')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TlsSettings clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TlsSettings copyWith(void Function(TlsSettings) updates) =>
+      super.copyWith((message) => updates(message as TlsSettings))
+          as TlsSettings;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TlsSettings create() => TlsSettings._();
+  @$core.override
+  TlsSettings createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TlsSettings getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TlsSettings>(create);
+  static TlsSettings? _defaultInstance;
+
+  /// Strictness.
+  @$pb.TagNumber(1)
+  TlsMode get mode => $_getN(0);
+  @$pb.TagNumber(1)
+  set mode(TlsMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMode() => $_clearField(1);
+
+  /// CA bundle path.
+  @$pb.TagNumber(2)
+  $core.String get caFile => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set caFile($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCaFile() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCaFile() => $_clearField(2);
+
+  /// Client certificate path for mutual TLS.
+  @$pb.TagNumber(3)
+  $core.String get clientCertFile => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set clientCertFile($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasClientCertFile() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearClientCertFile() => $_clearField(3);
+
+  /// Client key path for mutual TLS.
+  @$pb.TagNumber(4)
+  $core.String get clientKeyFile => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set clientKeyFile($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasClientKeyFile() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearClientKeyFile() => $_clearField(4);
+
+  /// Host name to verify instead of the connect host.
+  @$pb.TagNumber(5)
+  $core.String get serverName => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set serverName($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasServerName() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearServerName() => $_clearField(5);
+
+  /// Output only: whether a client key passphrase is stored in the keychain.
+  @$pb.TagNumber(6)
+  $core.bool get hasClientKeyPassphrase => $_getBF(5);
+  @$pb.TagNumber(6)
+  set hasClientKeyPassphrase($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasHasClientKeyPassphrase() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearHasClientKeyPassphrase() => $_clearField(6);
+}
+
+/// TlsSecrets carries the client key passphrase to the core.
+class TlsSecrets extends $pb.GeneratedMessage {
+  factory TlsSecrets({
+    $core.String? clientKeyPassphrase,
+    $core.bool? clear_2,
+  }) {
+    final result = create();
+    if (clientKeyPassphrase != null)
+      result.clientKeyPassphrase = clientKeyPassphrase;
+    if (clear_2 != null) result.clear_2 = clear_2;
+    return result;
+  }
+
+  TlsSecrets._();
+
+  factory TlsSecrets.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TlsSecrets.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TlsSecrets',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'clientKeyPassphrase')
+    ..aOB(2, _omitFieldNames ? '' : 'clear')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TlsSecrets clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TlsSecrets copyWith(void Function(TlsSecrets) updates) =>
+      super.copyWith((message) => updates(message as TlsSecrets)) as TlsSecrets;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TlsSecrets create() => TlsSecrets._();
+  @$core.override
+  TlsSecrets createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TlsSecrets getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TlsSecrets>(create);
+  static TlsSecrets? _defaultInstance;
+
+  /// Client key passphrase. Unset keeps the stored one.
+  @$pb.TagNumber(1)
+  $core.String get clientKeyPassphrase => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set clientKeyPassphrase($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasClientKeyPassphrase() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearClientKeyPassphrase() => $_clearField(1);
+
+  /// Remove the stored passphrase. Ignored if set.
+  @$pb.TagNumber(2)
+  $core.bool get clear_2 => $_getBF(1);
+  @$pb.TagNumber(2)
+  set clear_2($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasClear_2() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearClear_2() => $_clearField(2);
+}
+
+/// TrustHostKeyRequest accepts an unknown SSH host key.
+class TrustHostKeyRequest extends $pb.GeneratedMessage {
+  factory TrustHostKeyRequest({
+    $core.String? host,
+    $core.int? port,
+    $core.String? fingerprintSha256,
+  }) {
+    final result = create();
+    if (host != null) result.host = host;
+    if (port != null) result.port = port;
+    if (fingerprintSha256 != null) result.fingerprintSha256 = fingerprintSha256;
+    return result;
+  }
+
+  TrustHostKeyRequest._();
+
+  factory TrustHostKeyRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TrustHostKeyRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TrustHostKeyRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'host')
+    ..aI(2, _omitFieldNames ? '' : 'port', fieldType: $pb.PbFieldType.OU3)
+    ..aOS(3, _omitFieldNames ? '' : 'fingerprintSha256')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TrustHostKeyRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TrustHostKeyRequest copyWith(void Function(TrustHostKeyRequest) updates) =>
+      super.copyWith((message) => updates(message as TrustHostKeyRequest))
+          as TrustHostKeyRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TrustHostKeyRequest create() => TrustHostKeyRequest._();
+  @$core.override
+  TrustHostKeyRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TrustHostKeyRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TrustHostKeyRequest>(create);
+  static TrustHostKeyRequest? _defaultInstance;
+
+  /// Host as shown in the failure.
+  @$pb.TagNumber(1)
+  $core.String get host => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set host($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasHost() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHost() => $_clearField(1);
+
+  /// Port as shown in the failure.
+  @$pb.TagNumber(2)
+  $core.int get port => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set port($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPort() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPort() => $_clearField(2);
+
+  /// SHA256 fingerprint from the failure, e.g. "SHA256:abc...".
+  @$pb.TagNumber(3)
+  $core.String get fingerprintSha256 => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set fingerprintSha256($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFingerprintSha256() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFingerprintSha256() => $_clearField(3);
+}
+
+/// TrustHostKeyResponse is empty.
+class TrustHostKeyResponse extends $pb.GeneratedMessage {
+  factory TrustHostKeyResponse() => create();
+
+  TrustHostKeyResponse._();
+
+  factory TrustHostKeyResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TrustHostKeyResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TrustHostKeyResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TrustHostKeyResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TrustHostKeyResponse copyWith(void Function(TrustHostKeyResponse) updates) =>
+      super.copyWith((message) => updates(message as TrustHostKeyResponse))
+          as TrustHostKeyResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TrustHostKeyResponse create() => TrustHostKeyResponse._();
+  @$core.override
+  TrustHostKeyResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TrustHostKeyResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TrustHostKeyResponse>(create);
+  static TrustHostKeyResponse? _defaultInstance;
 }
 
 /// FieldSpec describes one connection form field.
@@ -338,6 +970,8 @@ class EngineInfo extends $pb.GeneratedMessage {
     $core.bool? supportsUri,
     $core.Iterable<$core.String>? capabilities,
     $core.String? uriExample,
+    $core.bool? supportsSsh,
+    $core.bool? supportsTls,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -347,6 +981,8 @@ class EngineInfo extends $pb.GeneratedMessage {
     if (supportsUri != null) result.supportsUri = supportsUri;
     if (capabilities != null) result.capabilities.addAll(capabilities);
     if (uriExample != null) result.uriExample = uriExample;
+    if (supportsSsh != null) result.supportsSsh = supportsSsh;
+    if (supportsTls != null) result.supportsTls = supportsTls;
     return result;
   }
 
@@ -371,6 +1007,8 @@ class EngineInfo extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'supportsUri')
     ..pPS(6, _omitFieldNames ? '' : 'capabilities')
     ..aOS(7, _omitFieldNames ? '' : 'uriExample')
+    ..aOB(8, _omitFieldNames ? '' : 'supportsSsh')
+    ..aOB(9, _omitFieldNames ? '' : 'supportsTls')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -449,6 +1087,26 @@ class EngineInfo extends $pb.GeneratedMessage {
   $core.bool hasUriExample() => $_has(6);
   @$pb.TagNumber(7)
   void clearUriExample() => $_clearField(7);
+
+  /// Whether the engine can be reached through an SSH tunnel.
+  @$pb.TagNumber(8)
+  $core.bool get supportsSsh => $_getBF(7);
+  @$pb.TagNumber(8)
+  set supportsSsh($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasSupportsSsh() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSupportsSsh() => $_clearField(8);
+
+  /// Whether the engine honours TlsSettings.
+  @$pb.TagNumber(9)
+  $core.bool get supportsTls => $_getBF(8);
+  @$pb.TagNumber(9)
+  set supportsTls($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSupportsTls() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSupportsTls() => $_clearField(9);
 }
 
 /// ServerInfo is what a successful test learned about the server.
@@ -537,10 +1195,18 @@ class ConnectionError extends $pb.GeneratedMessage {
   factory ConnectionError({
     ErrorKind? kind,
     $core.String? message,
+    $core.String? sshHost,
+    $core.String? sshFingerprintSha256,
+    $core.String? sshTrustedFingerprintSha256,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
     if (message != null) result.message = message;
+    if (sshHost != null) result.sshHost = sshHost;
+    if (sshFingerprintSha256 != null)
+      result.sshFingerprintSha256 = sshFingerprintSha256;
+    if (sshTrustedFingerprintSha256 != null)
+      result.sshTrustedFingerprintSha256 = sshTrustedFingerprintSha256;
     return result;
   }
 
@@ -560,6 +1226,9 @@ class ConnectionError extends $pb.GeneratedMessage {
     ..aE<ErrorKind>(1, _omitFieldNames ? '' : 'kind',
         enumValues: ErrorKind.values)
     ..aOS(2, _omitFieldNames ? '' : 'message')
+    ..aOS(3, _omitFieldNames ? '' : 'sshHost')
+    ..aOS(4, _omitFieldNames ? '' : 'sshFingerprintSha256')
+    ..aOS(5, _omitFieldNames ? '' : 'sshTrustedFingerprintSha256')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -600,6 +1269,36 @@ class ConnectionError extends $pb.GeneratedMessage {
   $core.bool hasMessage() => $_has(1);
   @$pb.TagNumber(2)
   void clearMessage() => $_clearField(2);
+
+  /// For SSH host key failures: "host:port" of the bastion.
+  @$pb.TagNumber(3)
+  $core.String get sshHost => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set sshHost($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSshHost() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSshHost() => $_clearField(3);
+
+  /// For SSH host key failures: SHA256 fingerprint of the presented key.
+  @$pb.TagNumber(4)
+  $core.String get sshFingerprintSha256 => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set sshFingerprintSha256($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSshFingerprintSha256() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSshFingerprintSha256() => $_clearField(4);
+
+  /// For ERROR_KIND_SSH_HOST_KEY_CHANGED: the fingerprint that was trusted.
+  @$pb.TagNumber(5)
+  $core.String get sshTrustedFingerprintSha256 => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sshTrustedFingerprintSha256($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSshTrustedFingerprintSha256() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSshTrustedFingerprintSha256() => $_clearField(5);
 }
 
 /// ListEnginesRequest is empty.
@@ -905,10 +1604,14 @@ class CreateConnectionRequest extends $pb.GeneratedMessage {
   factory CreateConnectionRequest({
     Connection? connection,
     $core.String? password,
+    SshSecrets? sshSecrets,
+    TlsSecrets? tlsSecrets,
   }) {
     final result = create();
     if (connection != null) result.connection = connection;
     if (password != null) result.password = password;
+    if (sshSecrets != null) result.sshSecrets = sshSecrets;
+    if (tlsSecrets != null) result.tlsSecrets = tlsSecrets;
     return result;
   }
 
@@ -928,6 +1631,10 @@ class CreateConnectionRequest extends $pb.GeneratedMessage {
     ..aOM<Connection>(1, _omitFieldNames ? '' : 'connection',
         subBuilder: Connection.create)
     ..aOS(2, _omitFieldNames ? '' : 'password')
+    ..aOM<SshSecrets>(3, _omitFieldNames ? '' : 'sshSecrets',
+        subBuilder: SshSecrets.create)
+    ..aOM<TlsSecrets>(4, _omitFieldNames ? '' : 'tlsSecrets',
+        subBuilder: TlsSecrets.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -971,6 +1678,30 @@ class CreateConnectionRequest extends $pb.GeneratedMessage {
   $core.bool hasPassword() => $_has(1);
   @$pb.TagNumber(2)
   void clearPassword() => $_clearField(2);
+
+  /// Tunnel secrets to store in the keychain.
+  @$pb.TagNumber(3)
+  SshSecrets get sshSecrets => $_getN(2);
+  @$pb.TagNumber(3)
+  set sshSecrets(SshSecrets value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSshSecrets() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSshSecrets() => $_clearField(3);
+  @$pb.TagNumber(3)
+  SshSecrets ensureSshSecrets() => $_ensure(2);
+
+  /// TLS secrets to store in the keychain.
+  @$pb.TagNumber(4)
+  TlsSecrets get tlsSecrets => $_getN(3);
+  @$pb.TagNumber(4)
+  set tlsSecrets(TlsSecrets value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTlsSecrets() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTlsSecrets() => $_clearField(4);
+  @$pb.TagNumber(4)
+  TlsSecrets ensureTlsSecrets() => $_ensure(3);
 }
 
 /// CreateConnectionResponse returns the saved connection.
@@ -1039,11 +1770,15 @@ class UpdateConnectionRequest extends $pb.GeneratedMessage {
     Connection? connection,
     $core.String? password,
     $core.bool? clearPassword_3,
+    SshSecrets? sshSecrets,
+    TlsSecrets? tlsSecrets,
   }) {
     final result = create();
     if (connection != null) result.connection = connection;
     if (password != null) result.password = password;
     if (clearPassword_3 != null) result.clearPassword_3 = clearPassword_3;
+    if (sshSecrets != null) result.sshSecrets = sshSecrets;
+    if (tlsSecrets != null) result.tlsSecrets = tlsSecrets;
     return result;
   }
 
@@ -1064,6 +1799,10 @@ class UpdateConnectionRequest extends $pb.GeneratedMessage {
         subBuilder: Connection.create)
     ..aOS(2, _omitFieldNames ? '' : 'password')
     ..aOB(3, _omitFieldNames ? '' : 'clearPassword')
+    ..aOM<SshSecrets>(4, _omitFieldNames ? '' : 'sshSecrets',
+        subBuilder: SshSecrets.create)
+    ..aOM<TlsSecrets>(5, _omitFieldNames ? '' : 'tlsSecrets',
+        subBuilder: TlsSecrets.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1117,6 +1856,30 @@ class UpdateConnectionRequest extends $pb.GeneratedMessage {
   $core.bool hasClearPassword_3() => $_has(2);
   @$pb.TagNumber(3)
   void clearClearPassword_3() => $_clearField(3);
+
+  /// Tunnel secrets; unset fields keep the stored values.
+  @$pb.TagNumber(4)
+  SshSecrets get sshSecrets => $_getN(3);
+  @$pb.TagNumber(4)
+  set sshSecrets(SshSecrets value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSshSecrets() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSshSecrets() => $_clearField(4);
+  @$pb.TagNumber(4)
+  SshSecrets ensureSshSecrets() => $_ensure(3);
+
+  /// TLS secrets; unset fields keep the stored values.
+  @$pb.TagNumber(5)
+  TlsSecrets get tlsSecrets => $_getN(4);
+  @$pb.TagNumber(5)
+  set tlsSecrets(TlsSecrets value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTlsSecrets() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTlsSecrets() => $_clearField(5);
+  @$pb.TagNumber(5)
+  TlsSecrets ensureTlsSecrets() => $_ensure(4);
 }
 
 /// UpdateConnectionResponse returns the updated connection.
@@ -1285,12 +2048,16 @@ class TestConnectionRequest extends $pb.GeneratedMessage {
     Connection? draft,
     $core.String? password,
     $core.int? timeoutMs,
+    SshSecrets? sshSecrets,
+    TlsSecrets? tlsSecrets,
   }) {
     final result = create();
     if (id != null) result.id = id;
     if (draft != null) result.draft = draft;
     if (password != null) result.password = password;
     if (timeoutMs != null) result.timeoutMs = timeoutMs;
+    if (sshSecrets != null) result.sshSecrets = sshSecrets;
+    if (tlsSecrets != null) result.tlsSecrets = tlsSecrets;
     return result;
   }
 
@@ -1312,6 +2079,10 @@ class TestConnectionRequest extends $pb.GeneratedMessage {
         subBuilder: Connection.create)
     ..aOS(3, _omitFieldNames ? '' : 'password')
     ..aI(4, _omitFieldNames ? '' : 'timeoutMs', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<SshSecrets>(5, _omitFieldNames ? '' : 'sshSecrets',
+        subBuilder: SshSecrets.create)
+    ..aOM<TlsSecrets>(6, _omitFieldNames ? '' : 'tlsSecrets',
+        subBuilder: TlsSecrets.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1376,6 +2147,30 @@ class TestConnectionRequest extends $pb.GeneratedMessage {
   $core.bool hasTimeoutMs() => $_has(3);
   @$pb.TagNumber(4)
   void clearTimeoutMs() => $_clearField(4);
+
+  /// Tunnel secrets for a draft; unset fields fall back to the keychain.
+  @$pb.TagNumber(5)
+  SshSecrets get sshSecrets => $_getN(4);
+  @$pb.TagNumber(5)
+  set sshSecrets(SshSecrets value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSshSecrets() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSshSecrets() => $_clearField(5);
+  @$pb.TagNumber(5)
+  SshSecrets ensureSshSecrets() => $_ensure(4);
+
+  /// TLS secrets for a draft; unset fields fall back to the keychain.
+  @$pb.TagNumber(6)
+  TlsSecrets get tlsSecrets => $_getN(5);
+  @$pb.TagNumber(6)
+  set tlsSecrets(TlsSecrets value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasTlsSecrets() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTlsSecrets() => $_clearField(6);
+  @$pb.TagNumber(6)
+  TlsSecrets ensureTlsSecrets() => $_ensure(5);
 }
 
 /// TestConnectionResponse reports the test result.
@@ -1386,6 +2181,7 @@ class TestConnectionResponse extends $pb.GeneratedMessage {
     $core.int? connectMs,
     $core.int? latencyMs,
     ConnectionError? error,
+    $core.Iterable<TestStep>? steps,
   }) {
     final result = create();
     if (ok != null) result.ok = ok;
@@ -1393,6 +2189,7 @@ class TestConnectionResponse extends $pb.GeneratedMessage {
     if (connectMs != null) result.connectMs = connectMs;
     if (latencyMs != null) result.latencyMs = latencyMs;
     if (error != null) result.error = error;
+    if (steps != null) result.steps.addAll(steps);
     return result;
   }
 
@@ -1416,6 +2213,8 @@ class TestConnectionResponse extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'latencyMs', fieldType: $pb.PbFieldType.OU3)
     ..aOM<ConnectionError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: ConnectionError.create)
+    ..pPM<TestStep>(6, _omitFieldNames ? '' : 'steps',
+        subBuilder: TestStep.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1491,6 +2290,108 @@ class TestConnectionResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   ConnectionError ensureError() => $_ensure(4);
+
+  /// Per-step outcome in the order the steps ran. Stops at the first failure.
+  @$pb.TagNumber(6)
+  $pb.PbList<TestStep> get steps => $_getList(5);
+}
+
+/// TestStep is the outcome of one stage.
+class TestStep extends $pb.GeneratedMessage {
+  factory TestStep({
+    TestStage? stage,
+    $core.bool? ok,
+    $core.int? elapsedMs,
+    ConnectionError? error,
+  }) {
+    final result = create();
+    if (stage != null) result.stage = stage;
+    if (ok != null) result.ok = ok;
+    if (elapsedMs != null) result.elapsedMs = elapsedMs;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  TestStep._();
+
+  factory TestStep.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TestStep.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TestStep',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aE<TestStage>(1, _omitFieldNames ? '' : 'stage',
+        enumValues: TestStage.values)
+    ..aOB(2, _omitFieldNames ? '' : 'ok')
+    ..aI(3, _omitFieldNames ? '' : 'elapsedMs', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<ConnectionError>(4, _omitFieldNames ? '' : 'error',
+        subBuilder: ConnectionError.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestStep clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TestStep copyWith(void Function(TestStep) updates) =>
+      super.copyWith((message) => updates(message as TestStep)) as TestStep;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TestStep create() => TestStep._();
+  @$core.override
+  TestStep createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TestStep getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TestStep>(create);
+  static TestStep? _defaultInstance;
+
+  /// Stage.
+  @$pb.TagNumber(1)
+  TestStage get stage => $_getN(0);
+  @$pb.TagNumber(1)
+  set stage(TestStage value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStage() => $_clearField(1);
+
+  /// Whether it succeeded.
+  @$pb.TagNumber(2)
+  $core.bool get ok => $_getBF(1);
+  @$pb.TagNumber(2)
+  set ok($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOk() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOk() => $_clearField(2);
+
+  /// Time the stage took, in milliseconds.
+  @$pb.TagNumber(3)
+  $core.int get elapsedMs => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set elapsedMs($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasElapsedMs() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearElapsedMs() => $_clearField(3);
+
+  /// Failure detail when not ok.
+  @$pb.TagNumber(4)
+  ConnectionError get error => $_getN(3);
+  @$pb.TagNumber(4)
+  set error(ConnectionError value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ConnectionError ensureError() => $_ensure(3);
 }
 
 /// ParseConnectionStringRequest asks the core to parse a URI or DSN.

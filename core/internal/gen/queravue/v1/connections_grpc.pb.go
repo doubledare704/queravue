@@ -27,6 +27,7 @@ const (
 	ConnectionService_DeleteConnection_FullMethodName      = "/queravue.v1.ConnectionService/DeleteConnection"
 	ConnectionService_TestConnection_FullMethodName        = "/queravue.v1.ConnectionService/TestConnection"
 	ConnectionService_ParseConnectionString_FullMethodName = "/queravue.v1.ConnectionService/ParseConnectionString"
+	ConnectionService_TrustHostKey_FullMethodName          = "/queravue.v1.ConnectionService/TrustHostKey"
 )
 
 // ConnectionServiceClient is the client API for ConnectionService service.
@@ -63,6 +64,10 @@ type ConnectionServiceClient interface {
 	// if present, is returned separately so the UI can put it into the password
 	// field without ever storing it in params.
 	ParseConnectionString(ctx context.Context, in *ParseConnectionStringRequest, opts ...grpc.CallOption) (*ParseConnectionStringResponse, error)
+	// TrustHostKey records an SSH host key the user accepted after an
+	// ERROR_KIND_SSH_HOST_KEY_UNKNOWN failure. The fingerprint must equal the one
+	// the failure carried; a changed key can never be trusted this way.
+	TrustHostKey(ctx context.Context, in *TrustHostKeyRequest, opts ...grpc.CallOption) (*TrustHostKeyResponse, error)
 }
 
 type connectionServiceClient struct {
@@ -153,6 +158,16 @@ func (c *connectionServiceClient) ParseConnectionString(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *connectionServiceClient) TrustHostKey(ctx context.Context, in *TrustHostKeyRequest, opts ...grpc.CallOption) (*TrustHostKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TrustHostKeyResponse)
+	err := c.cc.Invoke(ctx, ConnectionService_TrustHostKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConnectionServiceServer is the server API for ConnectionService service.
 // All implementations must embed UnimplementedConnectionServiceServer
 // for forward compatibility.
@@ -187,6 +202,10 @@ type ConnectionServiceServer interface {
 	// if present, is returned separately so the UI can put it into the password
 	// field without ever storing it in params.
 	ParseConnectionString(context.Context, *ParseConnectionStringRequest) (*ParseConnectionStringResponse, error)
+	// TrustHostKey records an SSH host key the user accepted after an
+	// ERROR_KIND_SSH_HOST_KEY_UNKNOWN failure. The fingerprint must equal the one
+	// the failure carried; a changed key can never be trusted this way.
+	TrustHostKey(context.Context, *TrustHostKeyRequest) (*TrustHostKeyResponse, error)
 	mustEmbedUnimplementedConnectionServiceServer()
 }
 
@@ -220,6 +239,9 @@ func (UnimplementedConnectionServiceServer) TestConnection(context.Context, *Tes
 }
 func (UnimplementedConnectionServiceServer) ParseConnectionString(context.Context, *ParseConnectionStringRequest) (*ParseConnectionStringResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ParseConnectionString not implemented")
+}
+func (UnimplementedConnectionServiceServer) TrustHostKey(context.Context, *TrustHostKeyRequest) (*TrustHostKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TrustHostKey not implemented")
 }
 func (UnimplementedConnectionServiceServer) mustEmbedUnimplementedConnectionServiceServer() {}
 func (UnimplementedConnectionServiceServer) testEmbeddedByValue()                           {}
@@ -386,6 +408,24 @@ func _ConnectionService_ParseConnectionString_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConnectionService_TrustHostKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TrustHostKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectionServiceServer).TrustHostKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConnectionService_TrustHostKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectionServiceServer).TrustHostKey(ctx, req.(*TrustHostKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConnectionService_ServiceDesc is the grpc.ServiceDesc for ConnectionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -424,6 +464,10 @@ var ConnectionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ParseConnectionString",
 			Handler:    _ConnectionService_ParseConnectionString_Handler,
+		},
+		{
+			MethodName: "TrustHostKey",
+			Handler:    _ConnectionService_TrustHostKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

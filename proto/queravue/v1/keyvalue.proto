@@ -1,0 +1,627 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+// KeyValueService browses and edits key-value stores (Redis and compatible).
+// It is available on sessions whose capabilities include "key_value_store".
+// Failures that the user can act on are returned in-band in `error`.
+service KeyValueService {
+  // ListDatabases lists logical databases with their key counts.
+  rpc ListKvDatabases(ListKvDatabasesRequest) returns (ListKvDatabasesResponse);
+
+  // ScanKeys streams matching keys in pages using SCAN, never KEYS. On a
+  // cluster it scans every master. Cancelling stops the scan.
+  rpc ScanKeys(ScanKeysRequest) returns (stream ScanKeysResponse);
+
+  // GetKeyInfo returns type, TTL, encoding, length and memory use of one key.
+  rpc GetKeyInfo(GetKeyInfoRequest) returns (GetKeyInfoResponse);
+
+  // ReadValue reads one page of a key's value. Collections are always paged.
+  rpc ReadValue(ReadValueRequest) returns (ReadValueResponse);
+
+  // WriteValue applies one typed edit to a key.
+  rpc WriteValue(WriteValueRequest) returns (WriteValueResponse);
+
+  // RenameKey renames a key.
+  rpc RenameKey(RenameKeyRequest) returns (RenameKeyResponse);
+
+  // SetExpiry sets or removes a key's time to live.
+  rpc SetExpiry(SetExpiryRequest) returns (SetExpiryResponse);
+
+  // DeleteKeys deletes keys.
+  rpc DeleteKeys(DeleteKeysRequest) returns (DeleteKeysResponse);
+
+  // ExecuteCommand runs one command and returns its typed reply. Blocking
+  // commands are refused; use Subscribe for pub/sub.
+  rpc ExecuteCommand(ExecuteCommandRequest) returns (ExecuteCommandResponse);
+
+  // Subscribe streams messages from channels and patterns until cancelled.
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+
+  // Publish sends a message to a channel and returns the receiver count.
+  rpc Publish(PublishRequest) returns (PublishResponse);
+}
+
+// KeyValueErrorKind classifies a failed key-value call.
+enum KeyValueErrorKind {
+  // Unspecified. Never sent.
+  KEY_VALUE_ERROR_KIND_UNSPECIFIED = 0;
+  // Refused and nothing changed. Repeat with confirmed=true after the user
+  // agrees; `operation` says what to confirm.
+  KEY_VALUE_ERROR_KIND_CONFIRMATION_REQUIRED = 1;
+  // The command or module is not available on this server.
+  KEY_VALUE_ERROR_KIND_UNSUPPORTED = 2;
+  // The request is malformed.
+  KEY_VALUE_ERROR_KIND_INVALID = 3;
+  // The key does not exist.
+  KEY_VALUE_ERROR_KIND_NOT_FOUND = 4;
+  // The server rejected the command; message carries its explanation.
+  KEY_VALUE_ERROR_KIND_SERVER = 5;
+  // The operation was cancelled.
+  KEY_VALUE_ERROR_KIND_CANCELED = 6;
+  // KEYS was used; message points to ScanKeys.
+  KEY_VALUE_ERROR_KIND_KEYS_REFUSED = 7;
+  // A blocking command was used; message points to Subscribe.
+  KEY_VALUE_ERROR_KIND_BLOCKING_REFUSED = 8;
+}
+
+// KeyValueError describes why a call did nothing or stopped early.
+message KeyValueError {
+  // Failure category.
+  KeyValueErrorKind kind = 1;
+  // Human-readable explanation, safe to show to the user.
+  string message = 2;
+  // For CONFIRMATION_REQUIRED: what needs confirming, for example
+  // "FLUSHDB on db 0" or "delete 120 keys".
+  string operation = 3;
+}
+
+// KeyType is the Redis data type of a key.
+enum KeyType {
+  // Unknown or not loaded yet.
+  KEY_TYPE_UNSPECIFIED = 0;
+  // String.
+  KEY_TYPE_STRING = 1;
+  // Hash.
+  KEY_TYPE_HASH = 2;
+  // List.
+  KEY_TYPE_LIST = 3;
+  // Set.
+  KEY_TYPE_SET = 4;
+  // Sorted set.
+  KEY_TYPE_ZSET = 5;
+  // Stream.
+  KEY_TYPE_STREAM = 6;
+  // ReJSON document.
+  KEY_TYPE_JSON = 7;
+  // HyperLogLog (a string with a count; no element access).
+  KEY_TYPE_HYPERLOGLOG = 8;
+}
+
+// KvDatabase is one logical database.
+message KvDatabase {
+  // Database index.
+  uint32 index = 1;
+  // Number of keys from INFO keyspace.
+  uint64 key_count = 2;
+  // Number of keys with a TTL.
+  uint64 expiring_count = 3;
+}
+
+// ListKvDatabasesRequest names the session.
+message ListKvDatabasesRequest {
+  // Session id.
+  string session_id = 1;
+}
+
+// ListKvDatabasesResponse lists databases that hold keys, plus db 0.
+message ListKvDatabasesResponse {
+  // Databases.
+  repeated KvDatabase databases = 1;
+  // Number of databases the server allows. 1 on a cluster.
+  uint32 database_limit = 2;
+  // Set when the call failed.
+  KeyValueError error = 3;
+}
+
+// ScanKeysRequest starts a scan.
+message ScanKeysRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // MATCH pattern. Empty means "*".
+  string pattern = 3;
+  // Only keys of this type. Unspecified means any.
+  KeyType type_filter = 4;
+  // COUNT hint and page size. 0 means 500.
+  uint32 page_size = 5;
+}
+
+// KeySummary is one scanned key.
+message KeySummary {
+  // Key bytes; binary keys are not valid UTF-8.
+  bytes key = 1;
+  // Type if the scan asked the server for it.
+  KeyType type = 2;
+  // Remaining time to live in milliseconds. -1 means none, -2 unknown.
+  int64 ttl_ms = 3;
+}
+
+// ScanKeysResponse is one page of keys.
+message ScanKeysResponse {
+  // Keys of this page.
+  repeated KeySummary keys = 1;
+  // Keys scanned so far.
+  uint64 scanned = 2;
+  // Set on the last message.
+  bool done = 3;
+  // Set when the scan failed.
+  KeyValueError error = 4;
+}
+
+// GetKeyInfoRequest selects a key.
+message GetKeyInfoRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Key bytes.
+  bytes key = 3;
+}
+
+// GetKeyInfoResponse describes a key.
+message GetKeyInfoResponse {
+  // Type.
+  KeyType type = 1;
+  // Remaining time to live in milliseconds. -1 means none.
+  int64 ttl_ms = 2;
+  // Internal encoding, e.g. "listpack".
+  string encoding = 3;
+  // Element count, or byte length for strings.
+  uint64 length = 4;
+  // MEMORY USAGE in bytes. Unset where not allowed.
+  optional uint64 memory_bytes = 5;
+  // Whether the key is large enough that reading it whole would be unsafe.
+  bool big_key = 6;
+  // Set when the call failed.
+  KeyValueError error = 7;
+}
+
+// ReadValueRequest asks for one page of a value.
+message ReadValueRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Key bytes.
+  bytes key = 3;
+  // Opaque cursor from the previous page. Empty starts at the beginning
+  // (for streams: the range start).
+  string cursor = 4;
+  // Page size. 0 means 200.
+  uint32 page_size = 5;
+  // Strings: bytes to read at most. 0 means 1 MiB.
+  uint32 max_bytes = 6;
+  // Lists and sorted sets: read from the end.
+  bool reverse = 7;
+  // Sorted sets: order by score (otherwise ZSCAN order).
+  bool order_by_score = 8;
+}
+
+// HashEntry is a field and its value.
+message HashEntry {
+  // Field name.
+  bytes field = 1;
+  // Value.
+  bytes value = 2;
+}
+
+// ZsetEntry is a member with its score.
+message ZsetEntry {
+  // Member.
+  bytes member = 1;
+  // Score.
+  double score = 2;
+}
+
+// StreamEntry is one stream entry.
+message StreamEntry {
+  // Entry id, e.g. "1700000000000-0".
+  string id = 1;
+  // Field/value pairs in order.
+  repeated HashEntry fields = 2;
+}
+
+// ListValues is a page of list elements.
+message ListValues {
+  // Elements.
+  repeated bytes items = 1;
+  // Index of the first element of the page.
+  uint64 start_index = 2;
+}
+
+// SetValues is a page of set members.
+message SetValues {
+  // Members.
+  repeated bytes members = 1;
+}
+
+// HashValues is a page of hash entries.
+message HashValues {
+  // Entries.
+  repeated HashEntry entries = 1;
+}
+
+// ZsetValues is a page of sorted set entries.
+message ZsetValues {
+  // Entries.
+  repeated ZsetEntry entries = 1;
+}
+
+// StreamValues is a page of stream entries.
+message StreamValues {
+  // Entries.
+  repeated StreamEntry entries = 1;
+}
+
+// StringValue is a string value, possibly truncated.
+message StringValue {
+  // Bytes read, at most max_bytes.
+  bytes data = 1;
+  // Total size of the value.
+  uint64 total_bytes = 2;
+  // Whether the value is not valid UTF-8.
+  bool binary = 3;
+}
+
+// JsonValue is a ReJSON document.
+message JsonValue {
+  // Document as JSON text.
+  string json = 1;
+}
+
+// HyperLogLogValue is the cardinality estimate.
+message HyperLogLogValue {
+  // PFCOUNT result.
+  uint64 count = 1;
+}
+
+// ReadValueResponse is one page of a value.
+message ReadValueResponse {
+  // Type of the key.
+  KeyType type = 1;
+  // Page content, matching the type.
+  oneof value {
+    // String.
+    StringValue string_value = 2;
+    // Hash.
+    HashValues hash = 3;
+    // List.
+    ListValues list = 4;
+    // Set.
+    SetValues set = 5;
+    // Sorted set.
+    ZsetValues zset = 6;
+    // Stream.
+    StreamValues stream = 7;
+    // ReJSON.
+    JsonValue json = 8;
+    // HyperLogLog.
+    HyperLogLogValue hyperloglog = 9;
+  }
+  // Cursor for the next page. Empty when there is none.
+  string next_cursor = 10;
+  // Set when the call failed.
+  KeyValueError error = 11;
+}
+
+// WriteOp is one typed edit.
+message WriteOp {
+  // SET key value.
+  message SetString {
+    // New value.
+    bytes value = 1;
+  }
+  // HSET field value.
+  message HashSet {
+    // Field.
+    bytes field = 1;
+    // Value.
+    bytes value = 2;
+  }
+  // HDEL field.
+  message HashDelete {
+    // Field.
+    bytes field = 1;
+  }
+  // LPUSH or RPUSH.
+  message ListPush {
+    // Values.
+    repeated bytes values = 1;
+    // Push at the head instead of the tail.
+    bool at_head = 2;
+  }
+  // LSET index value.
+  message ListSet {
+    // Index.
+    int64 index = 1;
+    // Value.
+    bytes value = 2;
+  }
+  // LREM count value.
+  message ListRemove {
+    // Value to remove.
+    bytes value = 1;
+    // Occurrences to remove; 0 removes all.
+    int64 count = 2;
+  }
+  // SADD.
+  message SetAdd {
+    // Members.
+    repeated bytes members = 1;
+  }
+  // SREM.
+  message SetRemove {
+    // Members.
+    repeated bytes members = 1;
+  }
+  // ZADD.
+  message ZsetAdd {
+    // Entries.
+    repeated ZsetEntry entries = 1;
+  }
+  // ZREM.
+  message ZsetRemove {
+    // Members.
+    repeated bytes members = 1;
+  }
+  // XADD.
+  message StreamAdd {
+    // Entry id; "*" lets the server assign one.
+    string id = 1;
+    // Fields.
+    repeated HashEntry fields = 2;
+  }
+  // XDEL.
+  message StreamDelete {
+    // Entry ids.
+    repeated string ids = 1;
+  }
+  // JSON.SET.
+  message JsonSet {
+    // Path, e.g. "$".
+    string path = 1;
+    // JSON text.
+    string json = 2;
+  }
+
+  // The edit.
+  oneof op {
+    // SET.
+    SetString set_string = 1;
+    // HSET.
+    HashSet hash_set = 2;
+    // HDEL.
+    HashDelete hash_delete = 3;
+    // LPUSH / RPUSH.
+    ListPush list_push = 4;
+    // LSET.
+    ListSet list_set = 5;
+    // LREM.
+    ListRemove list_remove = 6;
+    // SADD.
+    SetAdd set_add = 7;
+    // SREM.
+    SetRemove set_remove = 8;
+    // ZADD.
+    ZsetAdd zset_add = 9;
+    // ZREM.
+    ZsetRemove zset_remove = 10;
+    // XADD.
+    StreamAdd stream_add = 11;
+    // XDEL.
+    StreamDelete stream_delete = 12;
+    // JSON.SET.
+    JsonSet json_set = 13;
+  }
+}
+
+// WriteValueRequest applies one edit.
+message WriteValueRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Key bytes.
+  bytes key = 3;
+  // The edit.
+  WriteOp op = 4;
+  // Set after the user confirmed a CONFIRMATION_REQUIRED failure.
+  bool confirmed = 5;
+}
+
+// WriteValueResponse reports the outcome.
+message WriteValueResponse {
+  // Set when the edit was refused or failed.
+  KeyValueError error = 1;
+}
+
+// RenameKeyRequest renames a key.
+message RenameKeyRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Current key.
+  bytes key = 3;
+  // New key.
+  bytes new_key = 4;
+  // Overwrite an existing new_key (RENAME instead of RENAMENX).
+  bool overwrite = 5;
+  // Set after the user confirmed a CONFIRMATION_REQUIRED failure.
+  bool confirmed = 6;
+}
+
+// RenameKeyResponse reports the outcome.
+message RenameKeyResponse {
+  // Set when the rename was refused or failed.
+  KeyValueError error = 1;
+}
+
+// SetExpiryRequest sets or removes a TTL.
+message SetExpiryRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Key bytes.
+  bytes key = 3;
+  // New TTL in milliseconds. Unset removes the TTL (PERSIST).
+  optional uint64 ttl_ms = 4;
+}
+
+// SetExpiryResponse reports the outcome.
+message SetExpiryResponse {
+  // Set when the call failed.
+  KeyValueError error = 1;
+}
+
+// DeleteKeysRequest deletes keys.
+message DeleteKeysRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Keys to delete.
+  repeated bytes keys = 3;
+  // Set after the user confirmed a CONFIRMATION_REQUIRED failure. More than
+  // one key always needs confirmation on production connections.
+  bool confirmed = 4;
+}
+
+// DeleteKeysResponse reports the outcome.
+message DeleteKeysResponse {
+  // Keys actually removed.
+  uint64 deleted = 1;
+  // Set when the call was refused or failed.
+  KeyValueError error = 2;
+}
+
+// ExecuteCommandRequest runs one command.
+message ExecuteCommandRequest {
+  // Session id.
+  string session_id = 1;
+  // Database index.
+  uint32 database = 2;
+  // Command name and arguments, already split.
+  repeated bytes args = 3;
+  // Set after the user confirmed a CONFIRMATION_REQUIRED failure. FLUSHALL,
+  // FLUSHDB, multi-key DEL, CONFIG SET, SHUTDOWN and DEBUG need it on
+  // production connections.
+  bool confirmed = 4;
+}
+
+// RespValue is a typed RESP3 reply.
+message RespValue {
+  // Key and value of a map reply.
+  message MapEntry {
+    // Key.
+    RespValue key = 1;
+    // Value.
+    RespValue value = 2;
+  }
+  // Elements of an array or set reply.
+  message Items {
+    // Elements.
+    repeated RespValue items = 1;
+  }
+  // Entries of a map reply.
+  message Entries {
+    // Entries in server order.
+    repeated MapEntry entries = 1;
+  }
+  // Verbatim string with its format.
+  message Verbatim {
+    // Format, e.g. "txt".
+    string format = 1;
+    // Text.
+    string text = 2;
+  }
+
+  // The reply.
+  oneof kind {
+    // Simple or bulk string.
+    bytes string_value = 1;
+    // Integer.
+    int64 integer = 2;
+    // Double.
+    double double_value = 3;
+    // Boolean.
+    bool boolean = 4;
+    // Nil reply.
+    bool nil = 5;
+    // Array.
+    Items array = 6;
+    // Map.
+    Entries map = 7;
+    // Set.
+    Items set = 8;
+    // Verbatim string.
+    Verbatim verbatim = 9;
+    // Error reply text from the server.
+    string error = 10;
+  }
+}
+
+// ExecuteCommandResponse holds the reply.
+message ExecuteCommandResponse {
+  // The server's reply. Unset when `error` is set.
+  RespValue reply = 1;
+  // Set when the command was refused before it ran.
+  KeyValueError error = 2;
+  // Time the command took, in milliseconds.
+  uint32 elapsed_ms = 3;
+}
+
+// SubscribeRequest starts a subscription.
+message SubscribeRequest {
+  // Session id.
+  string session_id = 1;
+  // Exact channels.
+  repeated string channels = 2;
+  // Glob patterns.
+  repeated string patterns = 3;
+}
+
+// SubscribeResponse is one delivered message or the end of the stream.
+message SubscribeResponse {
+  // Channel the message arrived on.
+  string channel = 1;
+  // Pattern that matched, for pattern subscriptions.
+  string pattern = 2;
+  // Payload.
+  bytes payload = 3;
+  // Receive time in milliseconds since the Unix epoch.
+  int64 received_unix_ms = 4;
+  // Set when the subscription failed.
+  KeyValueError error = 5;
+}
+
+// PublishRequest publishes a message.
+message PublishRequest {
+  // Session id.
+  string session_id = 1;
+  // Channel.
+  string channel = 2;
+  // Payload.
+  bytes payload = 3;
+}
+
+// PublishResponse reports the outcome.
+message PublishResponse {
+  // Clients that received the message.
+  uint64 receivers = 1;
+  // Set when the call failed.
+  KeyValueError error = 2;
+}

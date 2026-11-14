@@ -67,6 +67,82 @@ class ColorTag extends $pb.ProtobufEnum {
   const ColorTag._(super.value, super.name);
 }
 
+/// SshAuthMethod selects how the tunnel authenticates.
+class SshAuthMethod extends $pb.ProtobufEnum {
+  /// Not set; treated as password.
+  static const SshAuthMethod SSH_AUTH_METHOD_UNSPECIFIED =
+      SshAuthMethod._(0, _omitEnumNames ? '' : 'SSH_AUTH_METHOD_UNSPECIFIED');
+
+  /// Password stored in the keychain.
+  static const SshAuthMethod SSH_AUTH_METHOD_PASSWORD =
+      SshAuthMethod._(1, _omitEnumNames ? '' : 'SSH_AUTH_METHOD_PASSWORD');
+
+  /// Private key file, optional passphrase stored in the keychain.
+  static const SshAuthMethod SSH_AUTH_METHOD_KEY_FILE =
+      SshAuthMethod._(2, _omitEnumNames ? '' : 'SSH_AUTH_METHOD_KEY_FILE');
+
+  /// The running SSH agent.
+  static const SshAuthMethod SSH_AUTH_METHOD_AGENT =
+      SshAuthMethod._(3, _omitEnumNames ? '' : 'SSH_AUTH_METHOD_AGENT');
+
+  static const $core.List<SshAuthMethod> values = <SshAuthMethod>[
+    SSH_AUTH_METHOD_UNSPECIFIED,
+    SSH_AUTH_METHOD_PASSWORD,
+    SSH_AUTH_METHOD_KEY_FILE,
+    SSH_AUTH_METHOD_AGENT,
+  ];
+
+  static final $core.List<SshAuthMethod?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static SshAuthMethod? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const SshAuthMethod._(super.value, super.name);
+}
+
+/// TlsMode selects how strictly TLS is enforced.
+class TlsMode extends $pb.ProtobufEnum {
+  /// Not set; the engine default applies.
+  static const TlsMode TLS_MODE_UNSPECIFIED =
+      TlsMode._(0, _omitEnumNames ? '' : 'TLS_MODE_UNSPECIFIED');
+
+  /// No TLS.
+  static const TlsMode TLS_MODE_DISABLE =
+      TlsMode._(1, _omitEnumNames ? '' : 'TLS_MODE_DISABLE');
+
+  /// Use TLS if the server offers it.
+  static const TlsMode TLS_MODE_PREFER =
+      TlsMode._(2, _omitEnumNames ? '' : 'TLS_MODE_PREFER');
+
+  /// TLS required, certificate not verified.
+  static const TlsMode TLS_MODE_REQUIRE =
+      TlsMode._(3, _omitEnumNames ? '' : 'TLS_MODE_REQUIRE');
+
+  /// TLS required, certificate chain verified.
+  static const TlsMode TLS_MODE_VERIFY_CA =
+      TlsMode._(4, _omitEnumNames ? '' : 'TLS_MODE_VERIFY_CA');
+
+  /// TLS required, chain and host name verified.
+  static const TlsMode TLS_MODE_VERIFY_FULL =
+      TlsMode._(5, _omitEnumNames ? '' : 'TLS_MODE_VERIFY_FULL');
+
+  static const $core.List<TlsMode> values = <TlsMode>[
+    TLS_MODE_UNSPECIFIED,
+    TLS_MODE_DISABLE,
+    TLS_MODE_PREFER,
+    TLS_MODE_REQUIRE,
+    TLS_MODE_VERIFY_CA,
+    TLS_MODE_VERIFY_FULL,
+  ];
+
+  static final $core.List<TlsMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static TlsMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TlsMode._(super.value, super.name);
+}
+
 /// FieldKind tells the UI which input widget to render.
 class FieldKind extends $pb.ProtobufEnum {
   /// Not set; render as text.
@@ -146,6 +222,23 @@ class ErrorKind extends $pb.ProtobufEnum {
   static const ErrorKind ERROR_KIND_INVALID_CONFIG =
       ErrorKind._(6, _omitEnumNames ? '' : 'ERROR_KIND_INVALID_CONFIG');
 
+  /// The SSH host key is not known yet. ConnectionError carries its
+  /// fingerprint; the UI asks the user and calls TrustHostKey.
+  static const ErrorKind ERROR_KIND_SSH_HOST_KEY_UNKNOWN =
+      ErrorKind._(7, _omitEnumNames ? '' : 'ERROR_KIND_SSH_HOST_KEY_UNKNOWN');
+
+  /// The SSH host key differs from the trusted one. Never offered for trust.
+  static const ErrorKind ERROR_KIND_SSH_HOST_KEY_CHANGED =
+      ErrorKind._(8, _omitEnumNames ? '' : 'ERROR_KIND_SSH_HOST_KEY_CHANGED');
+
+  /// The bastion rejected the credentials or key.
+  static const ErrorKind ERROR_KIND_SSH_AUTH =
+      ErrorKind._(9, _omitEnumNames ? '' : 'ERROR_KIND_SSH_AUTH');
+
+  /// The tunnel dropped after it was established.
+  static const ErrorKind ERROR_KIND_TUNNEL_LOST =
+      ErrorKind._(10, _omitEnumNames ? '' : 'ERROR_KIND_TUNNEL_LOST');
+
   static const $core.List<ErrorKind> values = <ErrorKind>[
     ERROR_KIND_UNSPECIFIED,
     ERROR_KIND_AUTH,
@@ -154,14 +247,56 @@ class ErrorKind extends $pb.ProtobufEnum {
     ERROR_KIND_NOT_FOUND,
     ERROR_KIND_TIMEOUT,
     ERROR_KIND_INVALID_CONFIG,
+    ERROR_KIND_SSH_HOST_KEY_UNKNOWN,
+    ERROR_KIND_SSH_HOST_KEY_CHANGED,
+    ERROR_KIND_SSH_AUTH,
+    ERROR_KIND_TUNNEL_LOST,
   ];
 
   static final $core.List<ErrorKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
+      $pb.ProtobufEnum.$_initByValueList(values, 10);
   static ErrorKind? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ErrorKind._(super.value, super.name);
+}
+
+/// TestStage is one step of a connection test.
+class TestStage extends $pb.ProtobufEnum {
+  /// Not set.
+  static const TestStage TEST_STAGE_UNSPECIFIED =
+      TestStage._(0, _omitEnumNames ? '' : 'TEST_STAGE_UNSPECIFIED');
+
+  /// Opening the SSH tunnel.
+  static const TestStage TEST_STAGE_SSH =
+      TestStage._(1, _omitEnumNames ? '' : 'TEST_STAGE_SSH');
+
+  /// TLS handshake.
+  static const TestStage TEST_STAGE_TLS =
+      TestStage._(2, _omitEnumNames ? '' : 'TEST_STAGE_TLS');
+
+  /// Authenticating to the database.
+  static const TestStage TEST_STAGE_AUTH =
+      TestStage._(3, _omitEnumNames ? '' : 'TEST_STAGE_AUTH');
+
+  /// Ping.
+  static const TestStage TEST_STAGE_PING =
+      TestStage._(4, _omitEnumNames ? '' : 'TEST_STAGE_PING');
+
+  static const $core.List<TestStage> values = <TestStage>[
+    TEST_STAGE_UNSPECIFIED,
+    TEST_STAGE_SSH,
+    TEST_STAGE_TLS,
+    TEST_STAGE_AUTH,
+    TEST_STAGE_PING,
+  ];
+
+  static final $core.List<TestStage?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static TestStage? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TestStage._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =
