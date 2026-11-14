@@ -94,6 +94,6 @@ cd core && NETCELLS_PERF=1 go test -count=1 -tags=integration -v -run TestIdleMe
 | Same, with a tunnel and a PostgreSQL session open and idle for 2 s | 23.6 MB | idle ≤ 150 MB (UI + core) |
 | Go heap in use at that point | 2.4 MB | |
 | Dial through the tunnel (password auth, local bastion) | 15 to 35 ms | |
-| Key, encrypted key (scrypt-style KDF) | 40 ms, 360 ms | |
+| Open with a key file, with a passphrase-protected key | 40 ms, 360 ms | |
 
-The encrypted OpenSSH key costs its KDF time on every open, since the passphrase is read from the keychain and the key is parsed each time. Not measured: throughput of a large result over a tunnel (the SSH channel window is 2 MB by default in `x/crypto`), and a bastion across a real network.
+The passphrase-protected key costs its key derivation on every open, since the passphrase is read from the keychain and the key is parsed each time. Not measured: throughput of a large result over a tunnel, and a bastion across a real network.
