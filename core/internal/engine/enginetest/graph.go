@@ -120,8 +120,8 @@ func crossSchemaRelations(t *testing.T, tg Target) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		statements := []string{
-			"DROP TABLE IF EXISTS " + local + "." + crossChild,
-			"DROP TABLE IF EXISTS " + local + "." + CrossSchemaParent,
+			"DROP TABLE IF EXISTS " + local + "." + tg.id(crossChild),
+			"DROP TABLE IF EXISTS " + local + "." + tg.id(CrossSchemaParent),
 		}
 		for _, sql := range append(statements, tg.OtherSchema.Drop(crossSchemaName)...) {
 			_, _ = ex.Execute(ctx, engine.Statement{SQL: sql}, &collector{})
@@ -135,12 +135,13 @@ func crossSchemaRelations(t *testing.T, tg Target) {
 			t.Fatalf("%s: %v (MySQL and MariaDB: apply the grant in dev/seed/<engine>/02_test_grants.sql)", sql, err)
 		}
 	}
+	id, other := tg.id, tg.id(crossSchemaName)
 	for _, sql := range append([]string{},
-		"CREATE TABLE "+crossSchemaName+"."+CrossSchemaParent+" (id INT PRIMARY KEY)",
-		"CREATE TABLE "+local+"."+CrossSchemaParent+" (id INT PRIMARY KEY)",
-		"CREATE TABLE "+local+"."+crossChild+" (id INT PRIMARY KEY, parent_id INT, local_id INT, "+
-			"CONSTRAINT fk_qv_ext_other FOREIGN KEY (parent_id) REFERENCES "+crossSchemaName+"."+CrossSchemaParent+" (id), "+
-			"CONSTRAINT fk_qv_ext_local FOREIGN KEY (local_id) REFERENCES "+local+"."+CrossSchemaParent+" (id))",
+		"CREATE TABLE "+other+"."+id(CrossSchemaParent)+" ("+id("id")+" INT PRIMARY KEY)",
+		"CREATE TABLE "+local+"."+id(CrossSchemaParent)+" ("+id("id")+" INT PRIMARY KEY)",
+		"CREATE TABLE "+local+"."+id(crossChild)+" ("+id("id")+" INT PRIMARY KEY, "+id("parent_id")+" INT, "+id("local_id")+" INT, "+
+			"CONSTRAINT "+id("fk_qv_ext_other")+" FOREIGN KEY ("+id("parent_id")+") REFERENCES "+other+"."+id(CrossSchemaParent)+" ("+id("id")+"), "+
+			"CONSTRAINT "+id("fk_qv_ext_local")+" FOREIGN KEY ("+id("local_id")+") REFERENCES "+local+"."+id(CrossSchemaParent)+" ("+id("id")+"))",
 	) {
 		exec(t, c, sql)
 	}

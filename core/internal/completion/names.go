@@ -56,6 +56,9 @@ func needsQuoting(d sqlsplit.Dialect, name string) bool {
 	if !isSimpleIdent(name) {
 		return true
 	}
+	if d == sqlsplit.Oracle && name != strings.ToUpper(name) {
+		return true
+	}
 	if d == sqlsplit.Postgres && name != strings.ToLower(name) {
 		return true
 	}
@@ -68,7 +71,7 @@ func quoteIdent(d sqlsplit.Dialect, name string) string {
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	case sqlsplit.MSSQL:
 		return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
-	case sqlsplit.SQLite, sqlsplit.Postgres:
+	case sqlsplit.SQLite, sqlsplit.Postgres, sqlsplit.Oracle:
 	}
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

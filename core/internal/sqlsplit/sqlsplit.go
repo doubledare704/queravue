@@ -33,6 +33,10 @@ const (
 	// ClickHouse: backslash escapes in '...', backtick and "..." identifiers,
 	// # and -- line comments, no DELIMITER command.
 	ClickHouse
+	// Oracle: q'[...]' alternative quoting, and PL/SQL blocks (BEGIN, DECLARE,
+	// CREATE PROCEDURE, FUNCTION, PACKAGE, TRIGGER, TYPE BODY), which run to a
+	// "/" on a line of its own. The slash ends any statement.
+	Oracle
 )
 
 func (d Dialect) backslashEscapes() bool { return d == MySQL || d == ClickHouse }
@@ -165,11 +169,11 @@ func (st *stmtState) word(d Dialect, w string) {
 	if len(st.words) < 8 {
 		st.words = append(st.words, up)
 		st.blockStart = bodyStatement(d, st.words)
-		if d == MSSQL && st.blockStart {
+		if (d == MSSQL || d == Oracle) && st.blockStart {
 			st.batchBody = true
 		}
 	}
-	if d == MSSQL {
+	if d == MSSQL || d == Oracle {
 		return
 	}
 	switch {
@@ -194,6 +198,9 @@ func (st *stmtState) word(d Dialect, w string) {
 func bodyStatement(d Dialect, w []string) bool {
 	if d == MSSQL {
 		return mssqlBodyStatement(w)
+	}
+	if d == Oracle {
+		return oracleBodyStatement(w)
 	}
 	i := 0
 	if len(w) == 0 || w[0] != "CREATE" {
@@ -245,6 +252,38 @@ func mssqlBodyStatement(w []string) bool {
 	return false
 }
 
+var oracleCreateModifiers = map[string]bool{
+	"OR": true, "REPLACE": true, "EDITIONABLE": true, "NONEDITIONABLE": true, "FORCE": true, "NOFORCE": true,
+}
+
+// oracleBodyStatement reports whether the leading words start a PL/SQL block
+// or a stored unit whose body holds semicolons.
+func oracleBodyStatement(w []string) bool {
+	if len(w) == 0 {
+		return false
+	}
+	if w[0] == "BEGIN" || w[0] == "DECLARE" {
+		return true
+	}
+	if w[0] != "CREATE" {
+		return false
+	}
+	i := 1
+	for i < len(w) && oracleCreateModifiers[w[i]] {
+		i++
+	}
+	if i >= len(w) {
+		return false
+	}
+	switch w[i] {
+	case "PROCEDURE", "FUNCTION", "PACKAGE", "TRIGGER":
+		return true
+	case "TYPE":
+		return i+1 < len(w) && w[i+1] == "BODY"
+	}
+	return false
+}
+
 func (s *scanner) run() []Range {
 	var out []Range
 	text := s.text
@@ -288,6 +327,12 @@ func (s *scanner) run() []Range {
 			endStmt(s.pos)
 			continue
 		}
+		if s.d == Oracle && c == '/' && s.oracleSlashLine() {
+			flushWord(s.pos)
+			s.pos++
+			endStmt(s.pos)
+			continue
+		}
 		switch {
 		case isSpace(c):
 			flushWord(s.pos)
@@ -312,6 +357,11 @@ func (s *scanner) run() []Range {
 		case c == '\'':
 			flushWord(s.pos)
 			from := s.pos
+			if s.skipOracleQuote() {
+				markTok(from, s.pos)
+				st.prevWord = ""
+				continue
+			}
 			escapes := s.d.backslashEscapes() || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 				(from < 2 || !isIdentPart(text[from-2])))
 			s.skipQuoted('\'', escapes)
@@ -498,5 +548,60 @@ func (s *scanner) mssqlGoLine() bool {
 		return false
 	}
 	s.pos = i
+	return true
+}
+
+// oracleSlashLine reports whether the text at s.pos is a "/" alone on its
+// line, apart from blanks.
+func (s *scanner) oracleSlashLine() bool {
+	t := s.text
+	for i := s.pos - 1; i >= 0 && t[i] != '\n'; i-- {
+		if t[i] != ' ' && t[i] != '\t' && t[i] != '\r' {
+			return false
+		}
+	}
+	for i := s.pos + 1; i < len(t) && t[i] != '\n'; i++ {
+		if t[i] != ' ' && t[i] != '\t' && t[i] != '\r' {
+			return false
+		}
+	}
+	return true
+}
+
+var oracleQuoteClosers = map[byte]byte{'[': ']', '{': '}', '(': ')', '<': '>'}
+
+// skipOracleQuote skips a q'[...]' or nq'[...]' literal when the quote at
+// s.pos opens one, and reports whether it did.
+func (s *scanner) skipOracleQuote() bool {
+	t := s.text
+	if s.d != Oracle || s.pos < 1 || s.pos+1 >= len(t) {
+		return false
+	}
+	prefix := t[s.pos-1]
+	if prefix != 'q' && prefix != 'Q' {
+		return false
+	}
+	from := s.pos - 1
+	if from > 0 && (t[from-1] == 'n' || t[from-1] == 'N') {
+		from--
+	}
+	if from > 0 && isIdentPart(t[from-1]) {
+		return false
+	}
+	open := t[s.pos+1]
+	if isSpace(open) || open == '\'' {
+		return false
+	}
+	closer, paired := oracleQuoteClosers[open]
+	if !paired {
+		closer = open
+	}
+	for i := s.pos + 2; i+1 < len(t); i++ {
+		if t[i] == closer && t[i+1] == '\'' {
+			s.pos = i + 2
+			return true
+		}
+	}
+	s.pos = len(t)
 	return true
 }

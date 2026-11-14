@@ -7,6 +7,7 @@ package enginetest
 import (
 	"context"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -38,6 +39,10 @@ type Target struct {
 	NoForeignKeys bool
 	// SkipDesigner skips the DDL round trips and diagram DDL tests.
 	SkipDesigner bool
+	// Ident writes a table, column or fixture-schema name the way the server
+	// needs to see it in raw SQL; nil leaves names as they are. Oracle quotes
+	// them, as it folds unquoted names to upper case.
+	Ident func(string) string
 	// OtherSchema makes a second schema for the cross-schema relation test;
 	// nil skips it.
 	OtherSchema *SchemaFixture
@@ -59,6 +64,13 @@ func (tg Target) connect(t *testing.T) engine.Conn {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 	return c
+}
+
+func (tg Target) id(name string) string {
+	if tg.Ident == nil {
+		return name
+	}
+	return tg.Ident(name)
 }
 
 func (tg Target) ref(table string) *queravuev1.TableRef {
@@ -375,7 +387,7 @@ func editRollback(t *testing.T, tg Target) {
 	d, _ := sqldialect.Of(c)
 	count := func() int64 {
 		col, _ := exec(t, c, "SELECT COUNT(*) FROM "+d.QualifyTable(tg.Schema, "customers"))
-		return col.rows[0][0].Int
+		return whole(col.rows[0][0])
 	}
 	before := count()
 	str := func(s string) *queravuev1.Value {
@@ -412,14 +424,14 @@ func editRollback(t *testing.T, tg Target) {
 	for _, p := range plans {
 		exec(t, c, p.Statement.SQL, p.Statement.Params...)
 	}
-	col, _ := exec(t, c, "SELECT id, name FROM "+d.QualifyTable(tg.Schema, "customers")+" WHERE email = "+d.FormatLiteral(engine.Text("dana-enginetest@example.com")))
+	col, _ := exec(t, c, "SELECT "+tg.id("id")+", "+tg.id("name")+" FROM "+d.QualifyTable(tg.Schema, "customers")+" WHERE "+tg.id("email")+" = "+d.FormatLiteral(engine.Text("dana-enginetest@example.com")))
 	if col.n != 1 {
 		t.Fatalf("inserted row not found")
 	}
 	if col.rows[0][1].Str != "Dana 'Quote' \\ Slash" {
 		t.Errorf("quotes/backslashes mangled: %q", col.rows[0][1].Str)
 	}
-	key := &queravuev1.ColumnValue{Column: "id", Value: &queravuev1.Value{Kind: &queravuev1.Value_IntValue{IntValue: col.rows[0][0].Int}}}
+	key := &queravuev1.ColumnValue{Column: "id", Value: &queravuev1.Value{Kind: &queravuev1.Value_IntValue{IntValue: whole(col.rows[0][0])}}}
 	upd, _, err := sqlbuilder.BuildApplyChanges(d, tg.ref("customers"), []*queravuev1.RowChange{{
 		Type: queravuev1.RowChangeType_ROW_CHANGE_TYPE_UPDATE, Keys: []*queravuev1.ColumnValue{key},
 		Values: []*queravuev1.ColumnValue{{Column: "name", Value: str("Dana Renamed")}},
@@ -474,6 +486,16 @@ func stream1M(t *testing.T, tg Target) {
 	if peak > base.HeapAlloc+window {
 		t.Errorf("heap grew from %d MB to %d MB while streaming 1M rows", base.HeapAlloc>>20, peak>>20)
 	}
+}
+
+// whole reads an integer from a cell; engines report COUNT(*) as an exact
+// decimal when the server types it as an unconstrained number.
+func whole(v engine.Value) int64 {
+	if v.Kind == engine.VDecimal {
+		n, _ := strconv.ParseInt(v.Str, 10, 64)
+		return n
+	}
+	return v.Int
 }
 
 func contains(ss []string, s string) bool {

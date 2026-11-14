@@ -27,9 +27,9 @@ One `*ssh.Client` is opened per session and shared by all pools of that connecti
 | MongoDB family | `SetDialer` |
 | Redis, Valkey | go-redis `Dialer` |
 | ClickHouse | clickhouse-go `DialContext` |
-| Oracle | to be verified; if go-ora has no hook, a local forward on `127.0.0.1:<random>` that lives as long as the session |
+| Oracle | go-ora `OracleConnector.Dialer(configurations.DialerContext)`: `goora.NewConnector(dsn).(*goora.OracleConnector).Dialer(d)`; `WithTLSConfig` takes the TLS config. No local forward needed |
 
-Lane A records the Oracle outcome here. The target host is resolved on the bastion side.
+Oracle outcome (Lane A): go-ora v2.9.0 has a dial hook, checked in the driver source (`connection.go`, `network/session.go` dials through `connOption.Dialer`). The engine already builds its connector with `goora.NewConnector`, so Lane F only adds the dialer call. It was not exercised yet, as the tunnel is Lane F. The target host is resolved on the bastion side.
 
 ### 3. Host keys
 Keys are checked against `~/.ssh/known_hosts` and a Queravue-owned known_hosts file.
@@ -56,5 +56,5 @@ Keys, passphrases, passwords and full DSNs are never logged or put in error mess
 - `golang.org/x/crypto` (BSD-3-Clause) becomes a direct dependency, for `ssh` and `ssh/agent`.
 - One TLS config builder replaces per-engine TLS code; engines map it to their driver options.
 - Two engines of the same family behave identically on every path, which is what the CI matrix tests.
-- Not chosen: forwarding every connection through a local port. It works for all drivers, but opens listening sockets, breaks topology discovery and leaks past session close. It remains only the Oracle fallback.
+- Not chosen: forwarding every connection through a local port. It works for all drivers, but opens listening sockets, breaks topology discovery and leaks past session close. No engine needs it: every driver has a dial hook.
 - Follow-up, out of scope: HTTP and SOCKS proxies.

@@ -11,6 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/shopspring/decimal v1.6.0
+	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/zalando/go-keyring v0.2.8
 	go.mongodb.org/mongo-driver/v2 v2.9.3
 	google.golang.org/grpc v1.85.0
