@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/connections/application/connection_form_controller.dart';
 import 'package:queravue/features/connections/application/connections_controller.dart';
 import 'package:queravue/features/connections/domain/models.dart';
+import 'package:queravue/features/connections/domain/network_settings.dart';
 
 import '../../support/fake_connections_repository.dart';
 import '../../support/providers.dart';
@@ -120,6 +121,43 @@ void main() {
       expect((await f.ctrl.save())!.name, 'Mine');
     });
   });
+
+  test(
+    'persists network settings without embedding credentials in the profile',
+    () async {
+      const networkEngine = EngineSpec(
+        id: 'network',
+        displayName: 'Network database',
+        fields: [],
+        supportsSsh: true,
+        supportsTls: true,
+      );
+      final form = open(const ConnectionFormArgs(engines: [networkEngine]));
+      form.ctrl
+        ..setNetworkField('ssh.enabled', 'true')
+        ..setNetworkField('ssh.host', 'bastion.example')
+        ..setNetworkField('ssh.user', 'operator')
+        ..setNetworkField('ssh.auth', 'keyFile')
+        ..setNetworkField('ssh.key', '/tmp/key')
+        ..setNetworkField('ssh.passphrase', 'test passphrase')
+        ..setNetworkField('jump.enabled', 'true')
+        ..setNetworkField('jump.host', 'jump.example')
+        ..setNetworkField('jump.user', 'operator')
+        ..setNetworkField('jump.auth', 'agent')
+        ..setNetworkField('tls.mode', 'verifyFull')
+        ..setNetworkField('tls.ca', '/tmp/ca.pem');
+
+      await form.ctrl.test();
+      final saved = (await form.ctrl.save())!;
+      expect(saved.ssh?.bastion.keyFile, '/tmp/key');
+      expect(saved.ssh?.jump?.auth, SshAuth.agent);
+      expect(saved.tls?.mode, TlsMode.verifyFull);
+      expect(saved.tls?.caFile, '/tmp/ca.pem');
+      expect(saved.params, isEmpty);
+      expect(repo.lastTestSecrets?.sshPassphrase, 'test passphrase');
+      expect(repo.lastSavedSecrets?.sshPassphrase, 'test passphrase');
+    },
+  );
 
   test('production defaults to false for new connections', () {
     final f = open(ConnectionFormArgs(engines: repo.engines));

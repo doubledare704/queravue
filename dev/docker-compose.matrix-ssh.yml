@@ -1,0 +1,30 @@
+services:
+  postgres: {ports: !reset []}
+  cockroachdb: {ports: !reset []}
+  mysql: {ports: !reset []}
+  mariadb: {ports: !reset []}
+  tidb: {ports: !reset []}
+  mssql: {ports: !reset []}
+  oracle: {ports: !reset []}
+  clickhouse: {ports: !reset []}
+  mongo:
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports: !reset []
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          try { rs.status() } catch (e) {
+            rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]})
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+  documentdb: {ports: !reset []}
+  redis: {ports: !reset []}
+  redis-cluster:
+    ports: !reset []
+    environment:
+      MATRIX_CLUSTER_HOST: redis-cluster
+  valkey: {ports: !reset []}

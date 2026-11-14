@@ -29,12 +29,14 @@ A fast, lightweight, native desktop database workspace for SQL and NoSQL engines
 | PostgreSQL | `jackc/pgx` | also CockroachDB (wire-compatible); CockroachDB notes in [docs/engines/cockroachdb.md](docs/engines/cockroachdb.md) |
 | MySQL / MariaDB | `go-sql-driver/mysql` | also TiDB; implemented in It. 4 ([docs/engines/mysql.md](docs/engines/mysql.md)) |
 | SQL Server | `microsoft/go-mssqldb` | implemented in It. 4 ([docs/engines/mssql.md](docs/engines/mssql.md)) |
-| Oracle | `sijms/go-ora` | pure Go, no Instant Client |
-| SQLite | `modernc.org/sqlite` (pure Go) | |
-| ClickHouse | `ClickHouse/clickhouse-go` | |
-| DuckDB | `marcboeker/go-duckdb` | cgo |
+| Oracle | `sijms/go-ora/v2` | Pure Go. See [Oracle notes](docs/engines/oracle.md). |
+| SQLite | `modernc.org/sqlite` (pure Go) | Local file. TLS and SSH do not apply. |
+| ClickHouse | `ClickHouse/clickhouse-go/v2` | Native protocol. See [ClickHouse limitations](docs/engines/clickhouse.md). |
+| DuckDB | `duckdb/duckdb-go/v2` | Local file, cgo build tag. TLS and SSH do not apply. See [DuckDB limitations](docs/engines/duckdb.md). |
 | MongoDB | `go.mongodb.org/mongo-driver/v2` | implemented in It. 5 ([docs/engines/mongodb.md](docs/engines/mongodb.md)); variants: Azure Cosmos DB for MongoDB ([cosmosdb.md](docs/engines/cosmosdb.md), smoke test not yet run against a real account) and DocumentDB / Amazon DocumentDB ([documentdb.md](docs/engines/documentdb.md), verified against DocumentDB Local 7.0.0) |
-| Redis | `redis/go-redis` | |
+| Redis / Valkey | `redis/go-redis/v9` | Standalone and Redis Cluster are covered by the connectivity matrix. See [Redis limitations](docs/engines/redis.md). |
+
+See [connectivity](docs/connectivity.md) for supported paths, topology requirements and the local test matrix.
 
 ## 6. Feature scope
 Tier labels show where VisuaLeaf puts each feature. In Queravue everything is free.

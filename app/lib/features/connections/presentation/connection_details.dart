@@ -60,7 +60,7 @@ class ConnectionDetails extends ConsumerWidget {
                 label: const Text('Connect'),
                 onPressed: status is Connecting
                     ? null
-                    : () => connectTo(ref, profile),
+                    : () => connectTo(context, ref, profile),
               ),
               if (!ref.watch(hasKeyValueProvider(profile.id)) &&
                   !ref.watch(connectionIsDocumentOnlyProvider(profile.id))) ...[

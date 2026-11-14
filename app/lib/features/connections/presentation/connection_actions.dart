@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/connection_form_controller.dart';
 import '../application/connection_session.dart';
 import '../application/connections_controller.dart';
+import '../data/connections_repository.dart';
 import '../domain/models.dart';
 import 'connection_dialog.dart';
+import 'ssh_host_key_dialog.dart';
 
 /// Picks a local file; returns its path or null. Override in tests.
 final filePickerProvider = Provider<Future<String?> Function()>(
@@ -104,9 +106,28 @@ Future<void> confirmDeleteConnection(
 }
 
 /// "Connect": tests the saved connection and opens a session for schema browsing.
-Future<void> connectTo(WidgetRef ref, ConnectionProfile profile) async {
+Future<void> connectTo(
+  BuildContext context,
+  WidgetRef ref,
+  ConnectionProfile profile,
+) async {
   ref.read(selectedConnectionProvider.notifier).select(profile.id);
   ref.read(collapsedConnectionsProvider.notifier).expand(profile.id);
-  await ref.read(connectionTestsProvider.notifier).connect(profile.id);
-  await ref.read(connectionSessionProvider(profile.id).notifier).connect();
+  final tests = ref.read(connectionTestsProvider.notifier);
+  final repository = ref.read(connectionsRepositoryProvider);
+  final session = ref.read(connectionSessionProvider(profile.id).notifier);
+  var result = await tests.connect(profile.id);
+  while (result is TestFailed && result.hostKey != null) {
+    if (!context.mounted) return;
+    final trusted = await showSshHostKeyDialog(context, result);
+    if (!context.mounted || !trusted) return;
+    try {
+      await repository.trustHostKey(result.hostKey!);
+    } on ConnectionsException catch (e) {
+      if (context.mounted) _snack(context, e.message);
+      return;
+    }
+    result = await tests.connect(profile.id);
+  }
+  if (context.mounted && result is TestPassed) await session.connect();
 }
