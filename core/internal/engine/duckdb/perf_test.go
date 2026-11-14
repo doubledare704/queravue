@@ -22,15 +22,18 @@ func residentMB() float64 {
 	if err != nil {
 		return -1
 	}
-	kb, _ := strconv.Atoi(strings.TrimSpace(string(out)))
-	return float64(kb) / 1024
+	kib, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return -1
+	}
+	return float64(kib) / 1024
 }
 
-type rssSampler struct{ peak atomic.Uint64 }
+type rssSampler struct{ peak atomic.Int64 }
 
 func (s *rssSampler) run(stop <-chan struct{}) {
 	for {
-		s.peak.Store(max(s.peak.Load(), uint64(residentMB()*1024)))
+		s.peak.Store(max(s.peak.Load(), int64(residentMB()*1024)))
 		select {
 		case <-stop:
 			return
@@ -80,23 +83,32 @@ func TestPerfStreamAndIdleMemory(t *testing.T) {
 		t.Skip("set DUCKDB_PERF=1 to run the DuckDB measurements")
 	}
 	runtime.GC()
-	t.Logf("PERF resident before opening: %.1f MB", residentMB())
+	before := residentMB()
+	if before < 0 {
+		t.Fatal("ps could not read resident memory")
+	}
+	t.Logf("PERF resident before opening: %.1f MiB", before)
 	c := perfConn(t)
 	time.Sleep(2 * time.Second)
 	runtime.GC()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	t.Logf("PERF resident with a seeded 1M-row file open and idle: %.1f MB, Go heap %d MB", residentMB(), m.HeapAlloc>>20)
+	t.Logf("PERF resident with a seeded 1M-row file open and idle: %.1f MiB, Go heap %d MiB", residentMB(), m.HeapAlloc>>20)
 
 	ex, _ := engine.As[engine.Executor](c)
-	for _, tc := range []struct{ name, sql string }{
-		{"1M rows x 3 columns (million_items)", "SELECT id, val, payload FROM million_items"},
-		{"1M rows, one INTEGER column", "SELECT i FROM range(1000000) t(i)"},
-		{"10M rows x 2 columns", "SELECT i, 'row-' || i::VARCHAR FROM range(10000000) t(i)"},
+	for _, tc := range []struct {
+		name, sql string
+		rows      int64
+	}{
+		{"1M rows x 3 columns (million_items)", "SELECT id, val, payload FROM million_items", 1000000},
+		{"100k rows x 2 columns", "SELECT i, 'row-' || i::VARCHAR FROM range(100000) t(i)", 100000},
+		{"1M rows x 2 columns", "SELECT i, 'row-' || i::VARCHAR FROM range(1000000) t(i)", 1000000},
+		{"10M rows x 2 columns", "SELECT i, 'row-' || i::VARCHAR FROM range(10000000) t(i)", 10000000},
 	} {
 		runtime.GC()
 		var base runtime.MemStats
 		runtime.ReadMemStats(&base)
+		baseline := residentMB()
 		sampler := &rssSampler{}
 		stop := make(chan struct{})
 		done := make(chan struct{})
@@ -108,9 +120,12 @@ func TestPerfStreamAndIdleMemory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if sum.RowsRead != tc.rows || sink.rows != tc.rows {
+			t.Fatalf("%s: summary rows = %d, sink rows = %d, want %d", tc.name, sum.RowsRead, sink.rows, tc.rows)
+		}
 		runtime.GC()
-		t.Logf("PERF %s: %v (%.0f rows/s), Go heap %d MB -> peak %d MB, peak resident %.0f MB, resident after %.0f MB",
-			tc.name, sum.Duration.Round(time.Millisecond), float64(sum.RowsRead)/sum.Duration.Seconds(), base.HeapAlloc>>20, sink.heapPeak>>20, sampler.peakMB(), residentMB())
+		t.Logf("PERF %s: %v (%.0f rows/s), Go heap %d -> %d MiB, RSS %.1f -> %.1f MiB peak (+%.1f MiB), %.1f MiB after",
+			tc.name, sum.Duration.Round(time.Millisecond), float64(sum.RowsRead)/sum.Duration.Seconds(), base.HeapAlloc>>20, sink.heapPeak>>20, baseline, sampler.peakMB(), sampler.peakMB()-baseline, residentMB())
 	}
 
 	for _, limit := range []string{"256MB"} {
@@ -124,6 +139,12 @@ func TestPerfStreamAndIdleMemory(t *testing.T) {
 		sum, err := lex.Execute(context.Background(), engine.Statement{SQL: "SELECT i, 'row-' || i::VARCHAR || repeat('x', 40) FROM range(10000000) t(i)"}, sink)
 		close(stop)
 		<-done
-		t.Logf("PERF 10M rows x 2 columns (~600 MB result) with memory_limit=%s: err=%v, %v, peak resident %.0f MB", limit, err, sum.Duration.Round(time.Millisecond), sampler.peakMB())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sum.RowsRead != 10000000 || sink.rows != 10000000 {
+			t.Fatalf("wide result: summary rows = %d, sink rows = %d", sum.RowsRead, sink.rows)
+		}
+		t.Logf("PERF 10M rows x 2 columns (~600 MB result) with memory_limit=%s: %v, peak RSS %.1f MiB", limit, sum.Duration.Round(time.Millisecond), sampler.peakMB())
 	}
 }

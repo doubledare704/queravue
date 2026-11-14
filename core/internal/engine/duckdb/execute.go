@@ -19,8 +19,7 @@ import (
 
 var _ engine.Executor = (*Conn)(nil)
 
-// Execute implements engine.Executor. Cancelling ctx interrupts the running
-// statement (duckdb_interrupt), and between row batches.
+// Execute holds the work connection until native results have been released.
 func (c *Conn) Execute(ctx context.Context, stmt engine.Statement, sink engine.RowSink) (sum engine.Summary, err error) {
 	start := time.Now()
 	defer func() {
@@ -78,8 +77,21 @@ func run(ctx context.Context, driverConn any, sqlText string, args []driver.Name
 	if !ok {
 		return errors.New("duckdb: unexpected prepared statement type")
 	}
-	if returnsRows(st) {
-		return streamRows(ctx, st, args, sink, sum)
+	kind, _ := st.StatementType()
+	if returnsRows(st, kind) {
+		// Close may abort an unfinished stream, so row-producing writes use the complete result.
+		if kind == duckdbdriver.STATEMENT_TYPE_SELECT {
+			err := st.StreamContext(ctx, args, func(rows driver.Rows) error {
+				return streamRows(ctx, rows, sink, sum)
+			})
+			return err //nolint:wrapcheck // executeError classifies the driver error
+		}
+		rows, err := st.QueryContext(ctx, args)
+		if err != nil {
+			return err //nolint:wrapcheck // executeError classifies the driver error
+		}
+		defer func() { _ = rows.Close() }()
+		return streamRows(ctx, rows, sink, sum)
 	}
 	res, err := st.ExecContext(ctx, args)
 	if err != nil {
@@ -91,14 +103,10 @@ func run(ctx context.Context, driverConn any, sqlText string, args []driver.Name
 
 // returnsRows is false for statements whose only result is a row count or a
 // success flag, which Summary reports instead.
-func returnsRows(st *duckdbdriver.Stmt) bool {
+func returnsRows(st *duckdbdriver.Stmt, kind duckdbdriver.StmtType) bool {
 	columns, err := st.ColumnCount()
 	if err != nil || columns == 0 {
 		return false
-	}
-	kind, err := st.StatementType()
-	if err != nil {
-		return true
 	}
 	switch kind {
 	case duckdbdriver.STATEMENT_TYPE_INSERT, duckdbdriver.STATEMENT_TYPE_UPDATE, duckdbdriver.STATEMENT_TYPE_DELETE:
@@ -113,13 +121,7 @@ func returnsRows(st *duckdbdriver.Stmt) bool {
 	return true
 }
 
-func streamRows(ctx context.Context, st *duckdbdriver.Stmt, args []driver.NamedValue, sink engine.RowSink, sum *engine.Summary) error {
-	rows, err := st.QueryContext(ctx, args)
-	if err != nil {
-		return err //nolint:wrapcheck // executeError classifies the driver error
-	}
-	defer func() { _ = rows.Close() }()
-
+func streamRows(ctx context.Context, rows driver.Rows, sink engine.RowSink, sum *engine.Summary) error {
 	names := rows.Columns()
 	typeNames := make([]string, len(names))
 	cols := make([]engine.Column, len(names))
@@ -138,18 +140,24 @@ func streamRows(ctx context.Context, st *duckdbdriver.Stmt, args []driver.NamedV
 	dest := make([]driver.Value, len(names))
 	batch := make([][]engine.Value, 0, engine.MaxBatchRows)
 	flush := func() error {
-		if len(batch) == 0 {
-			return nil
-		}
 		if err := ctx.Err(); err != nil {
 			return err //nolint:wrapcheck // executeError turns it into a cancellation
+		}
+		if len(batch) == 0 {
+			return nil
 		}
 		err := sink.Batch(batch)
 		sum.RowsRead += int64(len(batch))
 		batch = batch[:0]
-		return err
+		if err != nil {
+			return err
+		}
+		return ctx.Err()
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return err //nolint:wrapcheck // executeError turns it into a cancellation
+		}
 		if err := rows.Next(dest); err != nil {
 			if errors.Is(err, io.EOF) {
 				return flush()

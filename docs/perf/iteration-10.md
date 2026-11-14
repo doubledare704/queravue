@@ -99,29 +99,25 @@ cd core && DUCKDB_PERF_FILE=/tmp/qv.duckdb DUCKDB_PERF=1 go test -count=1 -tags 
 | `-tags duckdb` | 114.2 MB (+56.5 MB) |
 
 ### Streaming and memory
-`SELECT` into a sink that only counts rows, second process (it only opened the file). The Go heap is read every 20 batches; resident memory is `ps` of the test process, sampled every 20 ms.
 
-| Result | Time | Rows/s | Go heap | Peak resident |
-|---|---|---|---|---|
-| idle, file open | | | 0 MB | 45.7 MB (19.8 MB before opening) |
-| 1M rows x 3 columns | 164 ms | 6,096,000 | 0 to 3 MB | 83 MB (+37 MB) |
-| 1M rows, one `INTEGER` | 45 ms | 22,096,000 | 0 to 3 MB | 84 MB |
-| 10M rows x 2 columns | 1.19 s | 8,435,000 | 0 to 3 MB | 296 MB (+250 MB) |
-| 10M rows x 2 (about 600 MB of result), `memory_limit=256MB` | 1.52 s | | | 796 MB |
+macOS arm64, DuckDB 2.0.0, with the already-seeded file opened in a fresh test process. The sink counts rows without retaining them and checks both the delivered count and the execution summary. RSS is sampled with `ps` about every 20 ms. The original driver measurements were reproduced on `11f16cb` before the change.
 
-The shared suite's `Stream1MMemory` grows the Go heap from 0 to 3 MB, inside its 32 MB window, and the 1M-row cancel stops after 1,000 rows.
+| Workload | Streaming time | RSS before → peak | Original driver peak RSS |
+|---|---:|---:|---:|
+| Idle after opening the seed file | | 19.8 → 46.0 MiB | 45.5 MiB |
+| 1M rows from `million_items` (3 columns) | 178 ms | 46.2 → 70.5 MiB | 83 MiB |
+| 100k rows from `range()` (integer + text) | 15 ms | 70.5 → 70.9 MiB | |
+| 1M rows, same projection | 130 ms | 72.0 → 75.1 MiB | |
+| 10M rows, same projection | 1.32 s | 75.1 → 76.4 MiB | 296 MiB |
+| 10M wider rows (about 600 MB of output), `memory_limit=256MB` | 1.56 s | 88.9 MiB peak | 798 MiB |
 
-**The Go heap is flat, the process is not.** `duckdb-go` runs a statement to completion and then reads the result in chunks, so the whole result lives in DuckDB's memory until the statement ends: resident memory grows with the result, about 12 bytes per cell, and the finished result's pages are not returned to the OS right away. `memory_limit` does not cap it (the 600 MB result went past 256 MB). The idle budget (150 MB for UI and core) holds with the engine linked and a file open (45.7 MB); the 1M-row budget of +200 MB holds (+37 MB) for narrow rows and is the thing to watch for wide ones. A streaming path through `duckdb_pending_prepared_streaming` is the fix if it matters (docs/engines/duckdb.md, Limitations).
+The measured Go heap peaked at about 3 MiB throughout the comparable 100k–10M series. The 1M-row file scan added 24.3 MiB of process RSS, within the +200 MB budget for that workload. The original driver took 1.27 s for the comparable 10M-row query. These are core engine measurements. End-to-end desktop idle RSS, startup and grid performance were outside this run.
 
-### Cancel
-A context that ends 600 ms into the statement (`TestCancelInterruptsARunningStatement`):
+### Cancellation and platforms
 
-| Statement | Stopped after |
-|---|---|
-| `SELECT count(*)` over a cross join of `range()` | 0.60 s |
-| `CREATE TABLE AS` over a cross join | 0.63 s |
+The blocking aggregate and CTAS cancel at the configured 600 ms deadline, and the session accepts the next statement. The mid-stream test cancels after 500 delivered rows and reads a temporary table on the same session. A separate test verifies that a fetch-time SQL error returns an error after delivering partial rows. Early stop on `INSERT … RETURNING` preserves the completed write.
 
-`duckdb_interrupt` works on a running statement; on a finished result the context is checked between batches. The session answers the next statement in both cases.
+DuckDB build, race tests and RSS measurements were run on macOS arm64. The existing DuckDB CI matrix covers macOS, Linux and Windows builds and engine tests. Linux and Windows were not run for this change, and RSS was measured only on macOS.
 
 ## Lane F: SSH tunnels and TLS
 
