@@ -80,6 +80,49 @@ Dev container `clickhouse/clickhouse-server:26.3.25.2`, native protocol on local
 Not measured: a wide 1M-row result (many columns, strings, arrays), the app-side grid memory, and a TLS connection.
 
 
+## Lane C: DuckDB
+
+Apple Silicon laptop, 2026-11-14, macOS, `duckdb-go` v2.20000.0 (DuckDB 2.0.0), in-process, no container. The file is `dev/seed/duckdb/01_seed.sql` (1M-row `million_items`, 16.8 MB on disk).
+
+```bash
+cd core && CGO_ENABLED=1 go test -count=1 -tags duckdb -v -run 'TestEngineSuite/(Stream|Cancel)' ./internal/engine/duckdb/
+cd core && CGO_ENABLED=1 go test -count=1 -tags duckdb -v -run TestCancel ./internal/engine/duckdb/
+cd core && DUCKDB_PERF_FILE=/tmp/qv.duckdb DUCKDB_PERF=1 go test -count=1 -tags duckdb -v -run Perf ./internal/engine/duckdb/   # run twice: the second run opens the existing file
+```
+
+### Binary size
+`CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' ./cmd/queravued` against `CGO_ENABLED=1 ... -tags duckdb` (macOS arm64):
+
+| Build | `queravued` |
+|---|---|
+| default (no tag, no cgo) | 57.7 MB |
+| `-tags duckdb` | 114.2 MB (+56.5 MB) |
+
+### Streaming and memory
+`SELECT` into a sink that only counts rows, second process (it only opened the file). The Go heap is read every 20 batches; resident memory is `ps` of the test process, sampled every 20 ms.
+
+| Result | Time | Rows/s | Go heap | Peak resident |
+|---|---|---|---|---|
+| idle, file open | | | 0 MB | 45.7 MB (19.8 MB before opening) |
+| 1M rows x 3 columns | 164 ms | 6,096,000 | 0 to 3 MB | 83 MB (+37 MB) |
+| 1M rows, one `INTEGER` | 45 ms | 22,096,000 | 0 to 3 MB | 84 MB |
+| 10M rows x 2 columns | 1.19 s | 8,435,000 | 0 to 3 MB | 296 MB (+250 MB) |
+| 10M rows x 2 (about 600 MB of result), `memory_limit=256MB` | 1.52 s | | | 796 MB |
+
+The shared suite's `Stream1MMemory` grows the Go heap from 0 to 3 MB, inside its 32 MB window, and the 1M-row cancel stops after 1,000 rows.
+
+**The Go heap is flat, the process is not.** `duckdb-go` runs a statement to completion and then reads the result in chunks, so the whole result lives in DuckDB's memory until the statement ends: resident memory grows with the result, about 12 bytes per cell, and the finished result's pages are not returned to the OS right away. `memory_limit` does not cap it (the 600 MB result went past 256 MB). The idle budget (150 MB for UI and core) holds with the engine linked and a file open (45.7 MB); the 1M-row budget of +200 MB holds (+37 MB) for narrow rows and is the thing to watch for wide ones. A streaming path through `duckdb_pending_prepared_streaming` is the fix if it matters (docs/engines/duckdb.md, Limitations).
+
+### Cancel
+A context that ends 600 ms into the statement (`TestCancelInterruptsARunningStatement`):
+
+| Statement | Stopped after |
+|---|---|
+| `SELECT count(*)` over a cross join of `range()` | 0.60 s |
+| `CREATE TABLE AS` over a cross join | 0.63 s |
+
+`duckdb_interrupt` works on a running statement; on a finished result the context is checked between batches. The session answers the next statement in both cases.
+
 ## Lane F: SSH tunnels and TLS
 
 Apple Silicon laptop, 2026-11-14, `ssh-bastion` (`linuxserver/openssh-server` 10.3) and `postgres:17.11` from `dev/docker-compose.yml`, core and containers on the same machine.

@@ -34,6 +34,7 @@ func BuildDDL(d Dialect, target Target, current *engine.TableDetails, changes []
 	if err := b.rebuildIfNeeded(changes); err != nil {
 		return Script{}, err
 	}
+	b.warnAboutDuckDBDependencies(changes)
 	for i, ch := range changes {
 		if b.rebuilt {
 			break
@@ -272,6 +273,9 @@ func (b *ddlBuilder) columnDefinition(col ColumnSpec) (string, error) {
 	if b.is("oracle") {
 		return b.oracleColumnDefinition(def, col)
 	}
+	if col.Identity && b.is("duckdb") {
+		return b.duckdbIdentityDefinition(def, col)
+	}
 	if col.Identity {
 		clause := b.identityClause()
 		if clause == "" {
@@ -380,7 +384,7 @@ func (b *ddlBuilder) alterColumn(before, after ColumnSpec) error {
 	col := b.q(after.Name)
 
 	switch b.d.ID() {
-	case "postgres":
+	case "postgres", "duckdb":
 		if identityChanged {
 			return unsupported("changing whether a column is auto-generated is not supported on this server")
 		}
@@ -526,6 +530,9 @@ func (b *ddlBuilder) referentialRules(fk ForeignKeySpec) (string, error) {
 		if text == "" {
 			continue
 		}
+		if b.is("duckdb") && !duckdbReferentialAction(rule.action) {
+			return "", unsupported("DuckDB foreign keys support only NO ACTION and RESTRICT")
+		}
 		if b.is("mssql") && (rule.action == engine.ReferentialRestrict) {
 			return "", unsupported("SQL Server has no RESTRICT; use NO ACTION")
 		}
@@ -570,6 +577,9 @@ func (b *ddlBuilder) addConstraint(kind, name string, build func() (string, erro
 	if b.is("sqlite") {
 		return unsupported("SQLite cannot add a %s to an existing table; for uniqueness add a unique index", kind)
 	}
+	if b.is("duckdb") && kind != "unique constraint" {
+		return unsupported("DuckDB cannot add a %s to an existing table; define it when creating the table", kind)
+	}
 	def, err := build()
 	if err != nil {
 		return err
@@ -585,6 +595,9 @@ func (b *ddlBuilder) addConstraint(kind, name string, build func() (string, erro
 func (b *ddlBuilder) dropConstraint(name string) error {
 	if b.is("sqlite") {
 		return unsupported("SQLite cannot drop a constraint from an existing table")
+	}
+	if b.is("duckdb") {
+		return unsupported("DuckDB cannot drop a constraint; create a new table without it, copy the rows, and swap them")
 	}
 	if name == "" {
 		return errors.New("a constraint name is required")

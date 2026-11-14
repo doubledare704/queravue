@@ -15,8 +15,13 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine/sqlite"
 )
 
-// All returns the built-in engines in display order.
+// All returns the built-in engines in display order, then those a build tag
+// enables.
 func All() []engine.Engine {
+	return append(builtIn(), taggedEngines()...)
+}
+
+func builtIn() []engine.Engine {
 	return []engine.Engine{
 		postgres.New(postgres.VariantPostgres),
 		postgres.New(postgres.VariantCockroach),

@@ -49,10 +49,42 @@ jobs:
           cache-dependency-path: core/go.sum
       - run: go build ./...
       - run: go test -race ./...
+      - name: The default build does not link DuckDB
+        run: "! go list -deps ./cmd/queravued | grep -q duckdb"
       - uses: golangci/golangci-lint-action@v8
         with:
           version: v2.15.0
           working-directory: core
+
+  core-duckdb:
+    name: Core + DuckDB (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: macos-latest, race: -race, packages: ./...}
+          - {os: ubuntu-latest, race: -race, packages: ./...}
+          - {os: windows-latest, race: "", packages: ./internal/engine/duckdb/... ./internal/engine/engines/... ./internal/sqldialect/... ./internal/sqlsplit/...}
+    env:
+      CGO_ENABLED: "1"
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - run: go build -tags duckdb ./...
+      - run: go test ${{ matrix.race }} -tags duckdb ${{ matrix.packages }}
+      - if: runner.os == 'Linux'
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15.0
+          working-directory: core
+          args: --build-tags=duckdb
 
   integration:
     name: Integration (${{ matrix.name }})

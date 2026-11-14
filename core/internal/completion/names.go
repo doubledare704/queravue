@@ -71,7 +71,7 @@ func quoteIdent(d sqlsplit.Dialect, name string) string {
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	case sqlsplit.MSSQL:
 		return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
-	case sqlsplit.SQLite, sqlsplit.Postgres, sqlsplit.Oracle:
+	case sqlsplit.SQLite, sqlsplit.Postgres, sqlsplit.Oracle, sqlsplit.DuckDB:
 	}
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

@@ -31,6 +31,11 @@ FETCH_NEXT ROWS_ONLY USE`,
 SYSDATE SYSTIMESTAMP SEQUENCE SYNONYM PACKAGE BODY PROCEDURE FUNCTION TRIGGER DECLARE EXCEPTION PRAGMA MERGE RETURNING
 FETCH_FIRST FETCH_NEXT ROWS_ONLY OFFSET TABLESPACE PURGE FLASHBACK MODEL PIVOT UNPIVOT LATERAL APPLY NOCOPY EDITIONABLE
 CONNECT_BY START_WITH ORDER_SIBLINGS_BY GENERATED_ALWAYS IDENTITY`,
+	sqlsplit.DuckDB: `QUALIFY PIVOT UNPIVOT SUMMARIZE DESCRIBE SHOW ATTACH DETACH USE INSTALL LOAD COPY EXPORT IMPORT PRAGMA CHECKPOINT
+EXCLUDE REPLACE COLUMNS ILIKE SIMILAR GLOB ASOF POSITIONAL ANTI SEMI LATERAL UNNEST STRUCT MAP LIST UNION ENUM
+HUGEINT UHUGEINT UBIGINT UINTEGER USMALLINT UTINYINT BIGINT INTEGER SMALLINT TINYINT DOUBLE FLOAT DECIMAL VARCHAR TEXT BLOB
+BOOLEAN DATE TIME TIMESTAMP TIMESTAMPTZ INTERVAL UUID JSON BIT SEQUENCE MACRO TEMPORARY TEMP OR_REPLACE IF_NOT_EXISTS
+GROUP_BY_ALL ORDER_BY_ALL ON_CONFLICT DO_NOTHING DO_UPDATE RETURNING VACUUM ANALYZE`,
 	sqlsplit.SQLite: `PRAGMA AUTOINCREMENT GLOB REPLACE VACUUM ATTACH DETACH ROWID INDEXED TRIGGER VIRTUAL RETURNING CONFLICT NOTHING
 STRICT TEXT INTEGER REAL BLOB NUMERIC WITHOUT_ROWID INSERT_OR_REPLACE INSERT_OR_IGNORE ON_CONFLICT`,
 }
@@ -62,6 +67,19 @@ SYSDATE SYSTIMESTAMP CURRENT_DATE CURRENT_TIMESTAMP LOCALTIMESTAMP ADD_MONTHS MO
 SUBSTR INSTR LENGTH LPAD RPAD LTRIM RTRIM REPLACE TRANSLATE INITCAP CHR ASCII LISTAGG REGEXP_LIKE REGEXP_SUBSTR REGEXP_REPLACE
 REGEXP_INSTR REGEXP_COUNT GREATEST LEAST CEIL FLOOR MOD POWER SQRT SIGN SYS_GUID RAWTOHEX HEXTORAW DBMS_RANDOM JSON_VALUE JSON_QUERY
 JSON_OBJECT JSON_ARRAY JSON_TABLE JSON_EXISTS XMLTYPE XMLQUERY USER SYS_CONTEXT ROWIDTOCHAR`,
+	sqlsplit.DuckDB: `read_parquet read_csv read_csv_auto read_json read_json_auto read_text read_blob glob parquet_metadata parquet_schema
+range generate_series unnest list list_aggregate list_filter list_transform list_sort list_distinct list_contains list_concat
+list_zip list_slice array_agg array_length len length struct_pack struct_extract struct_insert map map_keys map_values map_entries
+map_extract element_at union_value union_extract union_tag any_value arg_max arg_min max_by min_by first last count_if
+sum_if avg median mode quantile_cont quantile_disc approx_count_distinct approx_quantile string_agg list_aggregate histogram
+bool_and bool_or bit_and bit_or bit_xor date_trunc date_part date_diff date_add date_sub datediff dateadd strftime strptime
+epoch epoch_ms make_date make_time make_timestamp to_timestamp age time_bucket now current_date current_timestamp today
+regexp_matches regexp_replace regexp_extract regexp_extract_all regexp_split_to_array string_split string_split_regex split_part
+concat concat_ws format printf starts_with ends_with contains prefix suffix lpad rpad left right reverse repeat replace
+translate md5 sha256 hash uuid gen_random_uuid random setseed coalesce ifnull nullif greatest least typeof try_cast cast
+json_extract json_extract_string json_object json_array json_group_array json_group_object json_keys json_type json_valid
+to_json from_json duckdb_tables duckdb_columns duckdb_constraints duckdb_databases duckdb_schemas duckdb_views duckdb_indexes
+duckdb_settings duckdb_functions duckdb_extensions current_database current_schema version pg_typeof`,
 	sqlsplit.SQLite: `IFNULL IIF DATE TIME DATETIME JULIANDAY STRFTIME UNIXEPOCH SUBSTR INSTR LTRIM RTRIM RANDOM RANDOMBLOB TYPEOF
 GROUP_CONCAT TOTAL JSON JSON_EXTRACT JSON_OBJECT JSON_ARRAY JSON_GROUP_ARRAY JSON_EACH LIKELY HEX QUOTE LAST_INSERT_ROWID CHANGES`,
 }
@@ -84,6 +102,9 @@ TRUNCATE USER VIEW WHILE`,
 INCREMENT INDEX INITIAL INTEGER LEVEL LOCK LONG MAXEXTENTS MINUS MODE MODIFY NOAUDIT NOCOMPRESS NOWAIT NUMBER OF OFFLINE ONLINE OPTION
 PCTFREE PRIOR PUBLIC RAW RENAME RESOURCE REVOKE ROW ROWID ROWNUM ROWS SESSION SHARE SIZE SMALLINT START SUCCESSFUL SYNONYM SYSDATE
 TRIGGER UID USER VALIDATE VARCHAR VARCHAR2 VIEW WHENEVER`,
+	sqlsplit.DuckDB: `ANALYSE ANALYZE ARRAY ASYMMETRIC COLLATE COLUMN CONSTRAINT CURRENT_CATALOG CURRENT_DATE CURRENT_ROLE
+CURRENT_SCHEMA CURRENT_TIME CURRENT_TIMESTAMP CURRENT_USER FETCH FOR GRANT LATERAL LIMIT LOCALTIME LOCALTIMESTAMP OFFSET ONLY
+QUALIFY RETURNING SESSION_USER SOME SYMMETRIC TABLESAMPLE TRAILING LEADING USER VARIADIC WINDOW`,
 	sqlsplit.SQLite: `ABORT ACTION ADD AFTER AUTOINCREMENT BEGIN COLLATE COLUMN COMMIT CONFLICT CONSTRAINT DATABASE DEFERRED DETACH EACH
 ESCAPE EXCEPT EXCLUSIVE EXPLAIN FAIL FOR GLOB IF IGNORE IMMEDIATE INDEX INDEXED INITIALLY INSTEAD INTERSECT ISNULL LIMIT MATCH
 NATURAL NOTNULL OF PRAGMA RAISE RECURSIVE REGEXP REINDEX RELEASE RENAME REPLACE RESTRICT ROLLBACK ROW SAVEPOINT TEMP TEMPORARY
@@ -97,7 +118,7 @@ var (
 )
 
 func init() {
-	for _, d := range []sqlsplit.Dialect{sqlsplit.Postgres, sqlsplit.MySQL, sqlsplit.MSSQL, sqlsplit.Oracle, sqlsplit.SQLite, sqlsplit.ClickHouse} {
+	for _, d := range []sqlsplit.Dialect{sqlsplit.Postgres, sqlsplit.MySQL, sqlsplit.MSSQL, sqlsplit.Oracle, sqlsplit.SQLite, sqlsplit.ClickHouse, sqlsplit.DuckDB} {
 		keywordsByDialect[d] = words(commonKeywords + " " + dialectKeywords[d])
 		functionsByDialect[d] = words(commonFunctions + " " + dialectFunctions[d])
 		set := map[string]bool{}
@@ -134,7 +155,8 @@ var multiWordKeywords = map[string]bool{
 	"NULLS_FIRST": true, "NULLS_LAST": true, "FOR_UPDATE": true, "ON_DUPLICATE_KEY_UPDATE": true, "INSERT_IGNORE": true,
 	"CROSS_APPLY": true, "OUTER_APPLY": true, "FETCH_NEXT": true, "ROWS_ONLY": true, "WITHOUT_ROWID": true,
 	"INSERT_OR_REPLACE": true, "INSERT_OR_IGNORE": true, "FETCH_FIRST": true, "CONNECT_BY": true, "START_WITH": true,
-	"ORDER_SIBLINGS_BY": true, "GENERATED_ALWAYS": true,
+	"ORDER_SIBLINGS_BY": true, "GENERATED_ALWAYS": true, "OR_REPLACE": true, "IF_NOT_EXISTS": true, "GROUP_BY_ALL": true,
+	"ORDER_BY_ALL": true, "DO_NOTHING": true, "DO_UPDATE": true,
 }
 
 func keywordsOf(d sqlsplit.Dialect) []string  { return keywordsByDialect[d] }
