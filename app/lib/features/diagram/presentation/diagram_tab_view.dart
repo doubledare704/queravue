@@ -401,23 +401,16 @@ class _Loading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final known = state.tablesTotal > 0;
+    final (progress, label) = _progress(state);
     return Center(
       child: SizedBox(
         width: 280,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LinearProgressIndicator(
-              value: known ? state.tablesDone / state.tablesTotal : null,
-            ),
+            LinearProgressIndicator(value: progress),
             const SizedBox(height: 12),
-            Text(
-              known
-                  ? 'Loading tables ${state.tablesDone} / ${state.tablesTotal}'
-                  : 'Loading the schema…',
-              key: const Key('diagram-loading'),
-            ),
+            Text(label, key: const Key('diagram-loading')),
             const SizedBox(height: 8),
             TextButton(
               key: const Key('diagram-cancel'),
@@ -430,6 +423,19 @@ class _Loading extends StatelessWidget {
     );
   }
 }
+
+(double?, String) _progress(DiagramLoading s) => switch (s) {
+  _ when s.isSampling && s.collectionsSampled < s.tablesTotal => (
+    s.collectionsSampled / s.tablesTotal,
+    'Sampling collections ${s.collectionsSampled} / ${s.tablesTotal}',
+  ),
+  _ when s.isSampling => (null, 'Checking guessed relations…'),
+  _ when s.tablesTotal > 0 => (
+    s.tablesDone / s.tablesTotal,
+    'Loading tables ${s.tablesDone} / ${s.tablesTotal}',
+  ),
+  _ => (null, 'Loading the schema…'),
+};
 
 class _Message extends StatelessWidget {
   const _Message({

@@ -21,10 +21,19 @@ sealed class DiagramState {
 }
 
 class DiagramLoading extends DiagramState {
-  const DiagramLoading({this.tablesDone = 0, this.tablesTotal = 0});
+  const DiagramLoading({
+    this.tablesDone = 0,
+    this.tablesTotal = 0,
+    this.collectionsSampled = 0,
+  });
 
   final int tablesDone;
   final int tablesTotal;
+
+  /// Collections sampled so far, on document stores, before tables arrive.
+  final int collectionsSampled;
+
+  bool get isSampling => collectionsSampled > 0 && tablesDone == 0;
 }
 
 class DiagramFailed extends DiagramState {
@@ -186,6 +195,7 @@ class DiagramController extends Notifier<DiagramState> {
             state = DiagramLoading(
               tablesDone: batch.tablesDone,
               tablesTotal: batch.tablesTotal,
+              collectionsSampled: batch.collectionsSampled,
             );
           },
           onError: (Object e) {

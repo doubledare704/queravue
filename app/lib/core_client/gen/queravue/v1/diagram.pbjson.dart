@@ -186,6 +186,13 @@ const GetSchemaGraphResponse$json = {
       '6': '.queravue.v1.AdminError',
       '10': 'error'
     },
+    {
+      '1': 'collections_sampled',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '10': 'collectionsSampled'
+    },
   ],
 };
 
@@ -194,7 +201,8 @@ final $typed_data.Uint8List getSchemaGraphResponseDescriptor = $convert.base64De
     'ChZHZXRTY2hlbWFHcmFwaFJlc3BvbnNlEi8KBnRhYmxlcxgBIAMoCzIXLnF1ZXJhdnVlLnYxLk'
     'dyYXBoVGFibGVSBnRhYmxlcxIhCgx0YWJsZXNfdG90YWwYAiABKA1SC3RhYmxlc1RvdGFsEh8K'
     'C3RhYmxlc19kb25lGAMgASgNUgp0YWJsZXNEb25lEhIKBGRvbmUYBCABKAhSBGRvbmUSLQoFZX'
-    'Jyb3IYBSABKAsyFy5xdWVyYXZ1ZS52MS5BZG1pbkVycm9yUgVlcnJvcg==');
+    'Jyb3IYBSABKAsyFy5xdWVyYXZ1ZS52MS5BZG1pbkVycm9yUgVlcnJvchIvChNjb2xsZWN0aW9u'
+    'c19zYW1wbGVkGAYgASgNUhJjb2xsZWN0aW9uc1NhbXBsZWQ=');
 
 @$core.Deprecated('Use tableChangesDescriptor instead')
 const TableChanges$json = {

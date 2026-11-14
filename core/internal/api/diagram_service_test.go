@@ -205,10 +205,11 @@ func TestGetSchemaGraphOfADocumentStoreSendsInferredRelations(t *testing.T) {
 	if err := svc.GetSchemaGraph(&queravuev1.GetSchemaGraphRequest{SessionId: sess.ID, Database: "library", SampleSize: 20}, rec); err != nil {
 		t.Fatal(err)
 	}
-	if len(rec.sent) != 2 || rec.sent[1].GetError() != nil {
+	sent := rec.sent[len(rec.sent)-2:]
+	if sent[1].GetError() != nil || !sent[1].GetDone() {
 		t.Fatalf("sent = %v", rec.sent)
 	}
-	books := rec.sent[0].GetTables()[1]
+	books := sent[0].GetTables()[1]
 	if books.GetType() != queravuev1.SchemaObjectType_SCHEMA_OBJECT_TYPE_COLLECTION {
 		t.Errorf("type = %v", books.GetType())
 	}
@@ -222,5 +223,44 @@ func TestGetSchemaGraphOfADocumentStoreSendsInferredRelations(t *testing.T) {
 	}
 	if got := conn.sampleSize.Load(); got != 20 {
 		t.Errorf("sample size = %d, want 20", got)
+	}
+}
+
+func TestGetSchemaGraphOfADocumentStoreReportsSamplingBeforeTables(t *testing.T) {
+	svc, sess := diagramEnv(t, &fakeSampledConn{})
+	rec := &schemaGraphRecorder{}
+	if err := svc.GetSchemaGraph(&queravuev1.GetSchemaGraphRequest{SessionId: sess.ID}, rec); err != nil {
+		t.Fatal(err)
+	}
+	var sampled []uint32
+	for _, m := range rec.sent {
+		if len(m.GetTables()) > 0 || m.GetDone() {
+			break
+		}
+		if m.GetTablesTotal() != 2 {
+			t.Errorf("progress total = %d, want 2", m.GetTablesTotal())
+		}
+		sampled = append(sampled, m.GetCollectionsSampled())
+	}
+	if len(sampled) == 0 || sampled[len(sampled)-1] != 2 || len(sampled) == len(rec.sent) {
+		t.Errorf("progress = %v of %d messages, want counts up to 2 before the tables", sampled, len(rec.sent))
+	}
+	for i := 1; i < len(sampled); i++ {
+		if sampled[i] <= sampled[i-1] {
+			t.Errorf("progress went back: %v", sampled)
+		}
+	}
+}
+
+func TestGetSchemaGraphOfASQLEngineSendsNoSamplingProgress(t *testing.T) {
+	svc, sess := diagramEnv(t, &fakeGraphConn{tables: 3})
+	rec := &schemaGraphRecorder{}
+	if err := svc.GetSchemaGraph(&queravuev1.GetSchemaGraphRequest{SessionId: sess.ID}, rec); err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range rec.sent {
+		if m.GetCollectionsSampled() != 0 {
+			t.Errorf("message %v reports sampling", m)
+		}
 	}
 }

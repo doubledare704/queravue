@@ -499,6 +499,7 @@ class GetSchemaGraphResponse extends $pb.GeneratedMessage {
     $core.int? tablesDone,
     $core.bool? done,
     $1.AdminError? error,
+    $core.int? collectionsSampled,
   }) {
     final result = create();
     if (tables != null) result.tables.addAll(tables);
@@ -506,6 +507,8 @@ class GetSchemaGraphResponse extends $pb.GeneratedMessage {
     if (tablesDone != null) result.tablesDone = tablesDone;
     if (done != null) result.done = done;
     if (error != null) result.error = error;
+    if (collectionsSampled != null)
+      result.collectionsSampled = collectionsSampled;
     return result;
   }
 
@@ -530,6 +533,8 @@ class GetSchemaGraphResponse extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'done')
     ..aOM<$1.AdminError>(5, _omitFieldNames ? '' : 'error',
         subBuilder: $1.AdminError.create)
+    ..aI(6, _omitFieldNames ? '' : 'collectionsSampled',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -597,6 +602,17 @@ class GetSchemaGraphResponse extends $pb.GeneratedMessage {
   void clearError() => $_clearField(5);
   @$pb.TagNumber(5)
   $1.AdminError ensureError() => $_ensure(4);
+
+  /// Document stores: collections sampled so far, out of tables_total. Progress
+  /// messages carry no tables and arrive before the first batch.
+  @$pb.TagNumber(6)
+  $core.int get collectionsSampled => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set collectionsSampled($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCollectionsSampled() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCollectionsSampled() => $_clearField(6);
 }
 
 /// TableChanges is the ordered list of changes to one table.

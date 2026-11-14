@@ -400,9 +400,12 @@ type GetSchemaGraphResponse struct {
 	// True on the last message.
 	Done bool `protobuf:"varint,4,opt,name=done,proto3" json:"done,omitempty"`
 	// Set on the last message if loading failed, was cancelled or is unsupported.
-	Error         *AdminError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Error *AdminError `protobuf:"bytes,5,opt,name=error,proto3" json:"error,omitempty"`
+	// Document stores: collections sampled so far, out of tables_total. Progress
+	// messages carry no tables and arrive before the first batch.
+	CollectionsSampled uint32 `protobuf:"varint,6,opt,name=collections_sampled,json=collectionsSampled,proto3" json:"collections_sampled,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GetSchemaGraphResponse) Reset() {
@@ -468,6 +471,13 @@ func (x *GetSchemaGraphResponse) GetError() *AdminError {
 		return x.Error
 	}
 	return nil
+}
+
+func (x *GetSchemaGraphResponse) GetCollectionsSampled() uint32 {
+	if x != nil {
+		return x.CollectionsSampled
+	}
+	return 0
 }
 
 // TableChanges is the ordered list of changes to one table.
@@ -830,14 +840,15 @@ const file_queravue_v1_diagram_proto_rawDesc = "" +
 	"\x12row_count_estimate\x18\x03 \x01(\x03R\x10rowCountEstimate\x122\n" +
 	"\acolumns\x18\x04 \x03(\v2\x18.queravue.v1.GraphColumnR\acolumns\x128\n" +
 	"\trelations\x18\x05 \x03(\v2\x1a.queravue.v1.GraphRelationR\trelations\x12+\n" +
-	"\x11columns_truncated\x18\x06 \x01(\bR\x10columnsTruncated\"\xd0\x01\n" +
+	"\x11columns_truncated\x18\x06 \x01(\bR\x10columnsTruncated\"\x81\x02\n" +
 	"\x16GetSchemaGraphResponse\x12/\n" +
 	"\x06tables\x18\x01 \x03(\v2\x17.queravue.v1.GraphTableR\x06tables\x12!\n" +
 	"\ftables_total\x18\x02 \x01(\rR\vtablesTotal\x12\x1f\n" +
 	"\vtables_done\x18\x03 \x01(\rR\n" +
 	"tablesDone\x12\x12\n" +
 	"\x04done\x18\x04 \x01(\bR\x04done\x12-\n" +
-	"\x05error\x18\x05 \x01(\v2\x17.queravue.v1.AdminErrorR\x05error\"w\n" +
+	"\x05error\x18\x05 \x01(\v2\x17.queravue.v1.AdminErrorR\x05error\x12/\n" +
+	"\x13collections_sampled\x18\x06 \x01(\rR\x12collectionsSampled\"w\n" +
 	"\fTableChanges\x122\n" +
 	"\ttable_ref\x18\x01 \x01(\v2\x15.queravue.v1.TableRefR\btableRef\x123\n" +
 	"\achanges\x18\x02 \x03(\v2\x19.queravue.v1.SchemaChangeR\achanges\"l\n" +

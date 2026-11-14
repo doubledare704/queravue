@@ -54,6 +54,10 @@ class FakeDiagramRepository implements DiagramRepository {
 
   /// When set, the stream sends its batches and then waits for this.
   Completer<void>? hold;
+
+  /// Sent before any table; with [holdProgress] set, the stream then waits.
+  List<GraphBatch> progress = const [];
+  Completer<void>? holdProgress;
   final requests = <({String database, String schema, bool refresh})>[];
   int cancelled = 0;
 
@@ -172,6 +176,8 @@ class FakeDiagramRepository implements DiagramRepository {
         out.addError(DiagramFailure(failure!));
         return out.close();
       }
+      progress.forEach(out.add);
+      await holdProgress?.future;
       final all = graph.tables;
       for (var at = 0; at < all.length; at += batchSize) {
         final end = at + batchSize > all.length ? all.length : at + batchSize;

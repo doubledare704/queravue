@@ -39,20 +39,24 @@ func SampleSizeOf(requested uint32) uint32 {
 func loadSampled(ctx context.Context, sess *session.Session, inspector engine.SchemaInspector, store engine.DocumentStore, scope Scope) (*Graph, error) {
 	var objects []engine.SchemaObject
 	var samples map[string]engine.FieldPathSample
+	var graph *Graph
 	err := sess.RunWhenFree(ctx, func(ctx context.Context) (err error) {
 		if objects, err = inspector.ListObjects(ctx, scope.Database, scope.Schema); err != nil {
 			return fmt.Errorf("diagram: list collections: %w", err)
 		}
-		samples, err = sampleAll(ctx, store, scope.Database, objects, SampleSizeOf(scope.SampleSize))
-		return err
+		if samples, err = sampleAll(ctx, store, scope.Database, objects, SampleSizeOf(scope.SampleSize), scope.OnSampled); err != nil {
+			return err
+		}
+		graph = Infer(objects, samples)
+		return checkGuesses(ctx, store, scope.Database, graph)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return Infer(objects, samples), nil
+	return graph, nil
 }
 
-func sampleAll(ctx context.Context, store engine.DocumentStore, database string, objects []engine.SchemaObject, size uint32) (map[string]engine.FieldPathSample, error) {
+func sampleAll(ctx context.Context, store engine.DocumentStore, database string, objects []engine.SchemaObject, size uint32, onSampled func(sampled, total int)) (map[string]engine.FieldPathSample, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var mu sync.Mutex
@@ -80,6 +84,9 @@ func sampleAll(ctx context.Context, store engine.DocumentStore, database string,
 				}
 				mu.Lock()
 				samples[name] = sample
+				if onSampled != nil {
+					onSampled(len(samples), len(objects))
+				}
 				mu.Unlock()
 			}
 		}()
