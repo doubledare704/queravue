@@ -92,6 +92,9 @@ func clauseStart(nodes []node, i int) (int, clauseKind) {
 		if at(1) == "BY" {
 			return 2, kindList
 		}
+		if at(1) == "SIBLINGS" && at(2) == "BY" {
+			return 3, kindList
+		}
 	case "LIMIT", "OFFSET":
 		return 1, kindPlain
 	case "FETCH":
@@ -100,7 +103,15 @@ func clauseStart(nodes []node, i int) (int, clauseKind) {
 		}
 	case "FOR":
 		return lockHeadLength(nodes, i), kindPlain
-	case "UNION", "INTERSECT", "EXCEPT":
+	case "CONNECT":
+		if at(1) == "BY" {
+			return 2, kindCond
+		}
+	case "START":
+		if at(1) == "WITH" {
+			return 2, kindCond
+		}
+	case "UNION", "INTERSECT", "EXCEPT", "MINUS":
 		if at(1) == "ALL" || at(1) == "DISTINCT" {
 			return 2, kindSetOp
 		}

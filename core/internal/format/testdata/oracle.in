@@ -1,0 +1,28 @@
+=== or quoted identifiers
+select "Order"."id", "user name" from "HR"."Order" where "user name"='x'
+=== or fetch first
+select * from t order by id fetch first 10 rows only
+=== or offset fetch
+select * from t order by id offset 20 rows fetch next 10 rows only
+=== or bind variables
+select * from t where id=:1 and name=:name
+=== or minus
+select a from t1 minus select a from t2
+=== or connect by
+select employee_id, level from employees start with manager_id is null connect by prior employee_id=manager_id order siblings by last_name
+=== or outer join operator
+select * from a, b where a.id=b.id(+) and a.x=1
+=== or q quote
+select q'[it's here]' as s, 'x' as t from dual
+=== or nvl decode
+select nvl(a,0), decode(b,1,'one','other'), to_char(sysdate,'YYYY-MM-DD') from dual
+=== or rownum
+select * from t where rownum<=10 order by id
+=== or dual
+select 1 from dual
+=== or merge
+merge into t using s on (t.id=s.id) when matched then update set t.a=s.a when not matched then insert (id,a) values (s.id,s.a)
+=== or returning
+insert into t (a) values (1) returning id into :id
+=== not formatted plsql block
+begin null; end;

@@ -59,6 +59,9 @@ func (s *scanner) next() TokenKind {
 		return TokenComment
 	case c == '\'':
 		from := s.pos
+		if s.skipOracleQuote() {
+			return TokenString
+		}
 		escapes := s.d == MySQL || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 			(from < 2 || !isIdentPart(text[from-2])))
 		s.skipQuoted('\'', escapes)

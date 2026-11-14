@@ -22,6 +22,7 @@ var dialects = []struct {
 	{"postgres", sqlsplit.Postgres},
 	{"mysql", sqlsplit.MySQL},
 	{"mssql", sqlsplit.MSSQL},
+	{"oracle", sqlsplit.Oracle},
 	{"sqlite", sqlsplit.SQLite},
 }
 

@@ -4,10 +4,12 @@ go 1.26.0
 
 require (
 	github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/microsoft/go-mssqldb v1.11.2
+	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/zalando/go-keyring v0.2.8
 	go.mongodb.org/mongo-driver/v2 v2.9.3
 	google.golang.org/grpc v1.85.0
@@ -20,7 +22,6 @@ require (
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
-	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 // indirect
