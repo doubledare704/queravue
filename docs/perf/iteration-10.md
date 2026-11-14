@@ -78,3 +78,22 @@ Dev container `clickhouse/clickhouse-server:26.3.25.2`, native protocol on local
 | Cancel reaches the server (`sleepEachRow` query gone from `system.processes`) | within 150 ms of the cancel | n/a |
 
 Not measured: a wide 1M-row result (many columns, strings, arrays), the app-side grid memory, and a TLS connection.
+
+
+## Lane F: SSH tunnels and TLS
+
+Apple Silicon laptop, 2026-11-14, `ssh-bastion` (`linuxserver/openssh-server` 10.3) and `postgres:17.11` from `dev/docker-compose.yml`, core and containers on the same machine.
+
+```bash
+cd core && NETCELLS_PERF=1 go test -count=1 -tags=integration -v -run TestIdleMemoryWithTunnelOpen ./internal/netcells/
+```
+
+| Measurement | Result | Budget |
+|---|---|---|
+| Resident memory of the test process (core code, all drivers linked) before opening | 22.6 MB | |
+| Same, with a tunnel and a PostgreSQL session open and idle for 2 s | 23.6 MB | idle ≤ 150 MB (UI + core) |
+| Go heap in use at that point | 2.4 MB | |
+| Dial through the tunnel (password auth, local bastion) | 15 to 35 ms | |
+| Key, encrypted key (scrypt-style KDF) | 40 ms, 360 ms | |
+
+The encrypted OpenSSH key costs its KDF time on every open, since the passphrase is read from the keychain and the key is parsed each time. Not measured: throughput of a large result over a tunnel (the SSH channel window is 2 MB by default in `x/crypto`), and a bastion across a real network.
