@@ -109,6 +109,9 @@ message GetSchemaGraphResponse {
   bool done = 4;
   // Set on the last message if loading failed, was cancelled or is unsupported.
   AdminError error = 5;
+  // Document stores: collections sampled so far, out of tables_total. Progress
+  // messages carry no tables and arrive before the first batch.
+  uint32 collections_sampled = 6;
 }
 
 // TableChanges is the ordered list of changes to one table.

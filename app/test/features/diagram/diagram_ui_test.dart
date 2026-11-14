@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/diagram/application/diagram_controller.dart';
+import 'package:queravue/features/diagram/domain/diagram_models.dart';
 import 'package:queravue/features/diagram/presentation/diagram_canvas.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/keybindings/application/keybindings_controller.dart';
@@ -149,6 +150,27 @@ void main() {
     expect(find.byType(DiagramCanvas), findsOneWidget);
     expect(repo.requests.last.refresh, isTrue);
   });
+
+  for (final (sampled, text, value) in [
+    (12, 'Sampling collections 12 / 40', 0.3),
+    (40, 'Checking guessed relations…', null),
+  ]) {
+    testWidgets('a document store with $sampled of 40 collections sampled '
+        'shows "$text"', (tester) async {
+      final repo = FakeDiagramRepository(shop)
+        ..progress = [GraphBatch(tablesTotal: 40, collectionsSampled: sampled)]
+        ..holdProgress = Completer<void>();
+      await openDiagram(tester, repo, settle: false);
+      expect(find.text(text), findsOneWidget);
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, value == null ? isNull : closeTo(value, 1e-9));
+      repo.holdProgress!.complete();
+      await tester.pumpAndSettle();
+      expect(find.byType(DiagramCanvas), findsOneWidget);
+    });
+  }
 
   testWidgets('loading shows progress and can be cancelled', (tester) async {
     final repo = FakeDiagramRepository(generatedGraph(120))

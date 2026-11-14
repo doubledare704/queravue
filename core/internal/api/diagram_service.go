@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,7 +15,10 @@ import (
 	"github.com/doubledare704/queravue/core/internal/session"
 )
 
-const graphBatchTables = 50
+const (
+	graphBatchTables      = 50
+	samplingProgressEvery = 100 * time.Millisecond
+)
 
 // DiagramService implements queravuev1.DiagramServiceServer.
 type DiagramService struct {
@@ -65,7 +69,8 @@ func (d *DiagramService) GetSchemaGraph(req *queravuev1.GetSchemaGraphRequest, s
 		}
 		return nil
 	}
-	graph, err := d.graphs.Get(ctx, sess, diagram.Scope{Database: req.GetDatabase(), Schema: req.GetSchema(), SampleSize: req.GetSampleSize()}, req.GetRefresh())
+	scope := diagram.Scope{Database: req.GetDatabase(), Schema: req.GetSchema(), SampleSize: req.GetSampleSize(), OnSampled: samplingProgress(send)}
+	graph, err := d.graphs.Get(ctx, sess, scope, req.GetRefresh())
 	if err != nil {
 		return send(&queravuev1.GetSchemaGraphResponse{Done: true, Error: graphError(ctx, err)})
 	}
@@ -85,6 +90,23 @@ func (d *DiagramService) GetSchemaGraph(req *queravuev1.GetSchemaGraphRequest, s
 		}
 	}
 	return send(&queravuev1.GetSchemaGraphResponse{Done: true, TablesTotal: total, TablesDone: total})
+}
+
+// samplingProgress sends at most one progress message per
+// samplingProgressEvery, and always the last one.
+func samplingProgress(send func(*queravuev1.GetSchemaGraphResponse) error) func(sampled, total int) {
+	var last time.Time
+	return func(sampled, total int) {
+		if sampled < total && time.Since(last) < samplingProgressEvery {
+			return
+		}
+		last = time.Now()
+		// A failed send means the stream is gone; the load stops with its context.
+		_ = send(&queravuev1.GetSchemaGraphResponse{
+			TablesTotal:        uint32(total),   //nolint:gosec // collections per database are far fewer than 2^32
+			CollectionsSampled: uint32(sampled), //nolint:gosec // as above
+		})
+	}
 }
 
 func filterSystemTables(tables []diagram.Table) []diagram.Table {

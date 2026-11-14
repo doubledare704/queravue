@@ -212,11 +212,13 @@ class GraphBatch {
     this.tables = const [],
     this.tablesDone = 0,
     this.tablesTotal = 0,
+    this.collectionsSampled = 0,
   });
 
   final List<DiagramTable> tables;
   final int tablesDone;
   final int tablesTotal;
+  final int collectionsSampled;
 }
 
 /// Why a graph could not be loaded, in words for the user.

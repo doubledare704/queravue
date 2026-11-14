@@ -53,13 +53,13 @@ func seedLibrary(ctx context.Context, t *testing.T, store engine.DocumentStore) 
 	}
 	insert("authors",
 		`{"_id":{"$oid":"660000000000000000000001"},"name":"Le Guin"}`,
-		`{"_id":{"$oid":"660000000000000000000002"},"name":"Lem","born":{"$numberInt":"1921"}}`)
+		`{"_id":{"$oid":"660000000000000000000002"},"name":"Lem","born":{"$numberInt":"1921"},"bookIds":["isbn-7","isbn-8"]}`)
 	insert("books",
 		`{"_id":"isbn-1","title":"The Dispossessed","authorId":{"$oid":"660000000000000000000001"}}`,
 		`{"_id":"isbn-2","title":"Solaris","authorId":{"$oid":"660000000000000000000002"},"tags":["sf"]}`)
 	insert("reviews",
 		`{"book_id":"isbn-1","stars":{"$numberInt":"5"},"reviewer":{"_id":{"$oid":"660000000000000000000002"}}}`,
-		`{"book_id":"isbn-2","stars":{"$numberInt":"4"},"authorId":"not-an-oid"}`)
+		`{"book_id":"isbn-9","stars":{"$numberInt":"4"},"authorId":"not-an-oid"}`)
 }
 
 func TestIntegrationMongoGraphIsInferredFromSamples(t *testing.T) {
@@ -97,18 +97,18 @@ func TestIntegrationMongoGraphIsInferredFromSamples(t *testing.T) {
 		}
 		return out
 	}
-	if got := relations(books); len(got) != 1 || got[edge{"authorId", "authors"}] != 0.9 {
-		t.Errorf("books relations = %v", got)
+	if got := relations(books); len(got) != 1 || got[edge{"authorId", "authors"}] != 0.95 {
+		t.Errorf("books relations = %v, want authorId checked against every author", got)
 	}
 	reviews := relations(byName["reviews"])
-	if reviews[edge{"book_id", "books"}] != 0.6 {
-		t.Errorf("reviews.book_id (string to string _id) = %v", reviews)
+	if reviews[edge{"book_id", "books"}] != 0.3 {
+		t.Errorf("reviews.book_id, one of two books found = %v, want 0.6 * 0.5", reviews)
 	}
 	if _, ok := reviews[edge{"authorId", "authors"}]; ok {
 		t.Error("a string authorId must not point at objectId _ids")
 	}
 	if len(byName["authors"].Relations) != 0 {
-		t.Errorf("authors relations = %+v", byName["authors"].Relations)
+		t.Errorf("authors relations = %+v, want bookIds dropped: no such book", byName["authors"].Relations)
 	}
 }
 

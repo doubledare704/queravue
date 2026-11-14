@@ -27,6 +27,9 @@ type Scope struct {
 	Database   string
 	Schema     string
 	SampleSize uint32
+	// OnSampled is told, on document stores, how many collections are sampled
+	// after each one; calls never overlap. It is not part of the cache key.
+	OnSampled func(sampled, total int)
 }
 
 // Relation is a foreign key, or a reference guessed from sampled documents.

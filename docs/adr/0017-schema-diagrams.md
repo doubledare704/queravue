@@ -48,6 +48,8 @@ On document stores `GetSchemaGraph` samples each collection (bounded by `sample_
 
 As built (PR 6): the inference runs in core (`internal/diagram`), not in the Mongo engine, from `ListObjects` and `DocumentStore.SampleFieldPaths`; the engine stays a data source. `schema_graph` is therefore backed by `RelationLister` or by `DocumentStore`, recorded in `engine.CapabilityAlternatives`. Progress is coarser than first planned: a relation needs the `_id` type of the collection it points at, so every collection is sampled before the first table is sent, and the UI shows an indeterminate bar until then. Keeping `tables_done` meaning "tables sent" avoided a contract change. The naming and type rules and their confidences are in `docs/diagrams.md`.
 
+As built (follow-up PR 5): `GetSchemaGraphResponse.collections_sampled` (field 6, additive; protocol version unchanged, older apps ignore it) reports sampling progress in messages without tables, at most every 100 ms. After the name-and-type pass, core checks each guess against the data with `DocumentStore.Find` and `Count` only, raising, scaling or dropping it by the share of sampled values found in the target (`docs/diagrams.md`). A checked guess is still `inferred`; only its confidence changes.
+
 ### 8. Contract
 `proto/queravue/v1/diagram.proto` adds `DiagramService` with `GetSchemaGraph` (server stream), `PreviewDiagramDDL` and `ApplyDiagramDDL`. It is additive; protocol version 9.
 

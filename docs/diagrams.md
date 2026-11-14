@@ -62,7 +62,7 @@ The core receives the changes per table and orders them (`core/internal/sqldiale
 - Each collection is a box with the field paths of a sample: `_id` first (marked `PK`), then by how many sampled documents have the field. A field missing from some documents, or holding `null`, is nullable (`?`). The type shown is the most frequent one other than `null`. Array elements use the segment `[]`, as in the field list (`items.[].sku`).
 - There is no schema to read, so the relations are guesses, drawn dashed and fainter the less sure they are. The summary counts them ("n inferred"). "Hide inferred" in the toolbar, or the palette entry "Show or hide inferred relations", removes them from the view; the choice is saved with the diagram (`"hideInferred": true`).
 - Design mode is not offered: Mongo connections have no `execute` capability.
-- Each collection is sampled with `$sample` (100 documents by default, `sample_size` up to 1000), four at a time. Loading shows an indeterminate bar until every collection is sampled, because a relation needs the `_id` type of the collection it points at; the tables then stream as on SQL engines. Cancel stops the sampling. The seeded dev database (6 collections, one of 1M documents) loads in about 3 ms p50, 29 ms p95.
+- Each collection is sampled with `$sample` (100 documents by default, `sample_size` up to 1000), four at a time. Every collection is sampled before the first table is sent, because a relation needs the `_id` type of the collection it points at. Meanwhile loading reads "Sampling collections 12 / 40" with a filling bar (`collections_sampled`, at most one update per 100 ms), then "Checking guessed relations…" while the guesses are checked (below); the tables then stream as on SQL engines. Cancel stops either step. The seeded dev database (6 collections, one of 1M documents) loads in about 3 ms p50, 6 ms p95 warm; the check adds under 1 ms there.
 
 ### How a relation is guessed
 `core/internal/diagram/infer.go`. For every sampled field other than `_id`:
@@ -79,7 +79,19 @@ The core receives the changes per table and orders them (`core/internal/sqldiale
 | matched only by its last words | | 0.2 less |
 | type differs, or no suffix and not `objectId` | | no relation |
 
-The guesses will include wrong edges (a `userId` that holds an external id) and miss references named unlike their collection. They are never offered as constraints.
+### How a guess is checked
+`core/internal/diagram/check.go`. Each guess (at most 200, four at a time, 500 ms each) is looked up in the data:
+1. Up to 20 distinct values are read from the referencing collection: `find` with the field existing and not null, projecting the field. The `[]` segments are left out of the path, since dot notation reaches into arrays, and the values of arrays are taken one by one.
+2. The target is counted on `{_id: {$in: [values]}}`.
+
+| Share of values found | Confidence |
+|---|---|
+| all | at least 0.95 |
+| half or more | name-and-type confidence × share |
+| under half | the guess is dropped |
+| the check failed, timed out or found no values | unchanged |
+
+The guesses can still include wrong edges (a `userId` holding external ids that happen to match) and miss references named unlike their collection. They are never offered as constraints.
 
 ## Contract
 `proto/queravue/v1/diagram.proto`:

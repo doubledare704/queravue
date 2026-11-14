@@ -148,6 +148,7 @@ class GrpcDiagramRepository implements DiagramRepository {
           tables: [for (final t in r.tables) _table(t)],
           tablesDone: r.tablesDone,
           tablesTotal: r.tablesTotal,
+          collectionsSampled: r.collectionsSampled,
         );
       }
     } on GrpcError catch (e) {
