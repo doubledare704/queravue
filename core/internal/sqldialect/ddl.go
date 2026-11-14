@@ -34,6 +34,7 @@ func BuildDDL(d Dialect, target Target, current *engine.TableDetails, changes []
 	if err := b.rebuildIfNeeded(changes); err != nil {
 		return Script{}, err
 	}
+	b.warnAboutDuckDBDependencies(changes)
 	for i, ch := range changes {
 		if b.rebuilt {
 			break

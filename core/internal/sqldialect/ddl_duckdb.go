@@ -28,3 +28,18 @@ func duckdbReferentialAction(a engine.ReferentialAction) bool {
 	}
 	return false
 }
+
+// DuckDB refuses most ALTERs on a table that an index, or a foreign key of
+// another table, depends on. It says so only when the statement runs.
+func (b *ddlBuilder) warnAboutDuckDBDependencies(changes []Change) {
+	if !b.is("duckdb") {
+		return
+	}
+	for _, ch := range changes {
+		switch ch.(type) {
+		case AlterColumn, DropColumn, RenameColumn, RenameTable, AddUnique:
+			b.warn("DuckDB refuses this change on a table that an index or another table's foreign key depends on. Drop the index first, or create a new table, copy the rows, and swap them.")
+			return
+		}
+	}
+}

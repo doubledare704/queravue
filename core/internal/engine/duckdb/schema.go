@@ -257,7 +257,7 @@ func isNullableColumn(d *engine.TableDetails, name string) bool {
 // indexColumns reads the key list of a stored CREATE INDEX statement, which
 // DuckDB does not expose any other way.
 func indexColumns(ddl string) []string {
-	open := strings.Index(ddl, "(")
+	open := firstOutsideQuotes(ddl, '(')
 	closing := strings.LastIndex(ddl, ")")
 	if open < 0 || closing <= open {
 		return nil
@@ -267,6 +267,19 @@ func indexColumns(ddl string) []string {
 		out = append(out, unquoteIdent(strings.TrimSpace(part)))
 	}
 	return out
+}
+
+func firstOutsideQuotes(s string, target rune) int {
+	quoted := false
+	for i, r := range s {
+		switch {
+		case r == '"':
+			quoted = !quoted
+		case r == target && !quoted:
+			return i
+		}
+	}
+	return -1
 }
 
 func splitTopLevel(s string) []string {
