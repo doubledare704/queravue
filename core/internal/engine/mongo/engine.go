@@ -90,7 +90,9 @@ func New(v Variant) *Engine {
 		caPH = "global-bundle.pem"
 	}
 	return &Engine{variant: v, desc: engine.Descriptor{
-		ID: id, DisplayName: name, Family: ID, SupportsURI: true, URIExample: uriEx,
+		ID: id, DisplayName: name, Family: ID, SupportsURI: true,
+		SupportsSSH: true,
+		SupportsTLS: true, URIExample: uriEx,
 		Fields: []engine.FieldSpec{
 			{Key: ParamHosts, Label: "Hosts", Kind: engine.FieldText, Required: true, Default: hosts, Placeholder: hostPH},
 			{Key: ParamSRV, Label: "SRV (mongodb+srv)", Kind: engine.FieldBoolean, Default: "false"},
@@ -153,7 +155,7 @@ func (e *Engine) buildURI(cfg engine.Config, secret engine.Secret) string {
 	case src != "":
 		q.Set("authSource", src)
 	}
-	if cfg.Param(ParamTLS, "false") == "true" {
+	if !cfg.Net.HasTLSSettings() && cfg.Param(ParamTLS, "false") == "true" {
 		q.Set("tls", "true")
 		if f := cfg.Param(ParamTLSCAFile, ""); f != "" {
 			q.Set("tlsCAFile", f)
@@ -187,6 +189,9 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	if err := opts.Validate(); err != nil {
 		return nil, &engine.Error{Kind: engine.KindInvalidConfig, Engine: e.desc.ID, Op: "config",
 			Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	if err := applyNetwork(opts, cfg, secret, e.desc.ID); err != nil {
+		return nil, err
 	}
 	client, err := mongo.Connect(opts)
 	if err != nil {
@@ -271,5 +276,23 @@ func (c *Conn) Close() error {
 	if err := cl.Disconnect(ctx); err != nil {
 		return fmt.Errorf("%s: close: %w", c.id, err)
 	}
+	return nil
+}
+
+// applyNetwork routes every member socket, replica set members included,
+// through the session dialer and sets TLS from TLSSettings.
+func applyNetwork(opts *options.ClientOptions, cfg engine.Config, secret engine.Secret, id string) error {
+	if cfg.Net.Tunneled() {
+		opts.SetDialer(cfg.Net.Dial)
+	}
+	if !cfg.Net.HasTLSSettings() || !cfg.Net.TLS.Enabled() {
+		return nil
+	}
+	// An empty host lets the driver verify each member against its own name.
+	tlsCfg, err := cfg.Net.TLS.Build("")
+	if err != nil {
+		return &engine.Error{Kind: engine.KindInvalidConfig, Engine: id, Op: "config", Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	opts.SetTLSConfig(tlsCfg)
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/netpath"
 	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
@@ -69,6 +70,8 @@ func New(v Variant) *Engine {
 			DisplayName: name,
 			Family:      IDPostgres,
 			SupportsURI: true,
+			SupportsSSH: true,
+			SupportsTLS: true,
 			URIExample:  example,
 			Fields: []engine.FieldSpec{
 				{Key: ParamHost, Label: "Host", Kind: engine.FieldText, Required: true, Default: "localhost", Placeholder: "localhost"},
@@ -121,7 +124,7 @@ func (e *Engine) connConfig(cfg engine.Config, secret engine.Secret) (*pgx.ConnC
 	kv := []string{
 		kvPair("host", cfg.Param(ParamHost, "")),
 		kvPair("port", cfg.Param(ParamPort, "")),
-		kvPair("sslmode", cfg.Param(ParamSSLMode, "prefer")),
+		kvPair("sslmode", sslModeFor(cfg)),
 		kvPair("application_name", "Queravue"),
 	}
 	if db := cfg.Param(ParamDatabase, ""); db != "" {
@@ -140,6 +143,9 @@ func (e *Engine) connConfig(cfg engine.Config, secret engine.Secret) (*pgx.ConnC
 		}
 	}
 	connCfg.Password = secret.Reveal()
+	if err := applyNetwork(connCfg, cfg.Net, e.desc.ID, secret); err != nil {
+		return nil, err
+	}
 	// Each connection is short-lived in It. 1; skip the statement cache.
 	connCfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	// A cancelled context sends a native cancel request instead of killing
@@ -225,3 +231,49 @@ func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.Postgres }
 
 // TransactionalDDL is false on CockroachDB, which limits schema changes inside a transaction.
 func (c *Conn) TransactionalDDL() bool { return c.variant != VariantCockroach }
+
+func sslModeFor(cfg engine.Config) string {
+	modes := map[netpath.TLSMode]string{
+		netpath.TLSDisable: "disable", netpath.TLSPrefer: "prefer", netpath.TLSRequire: "require",
+		netpath.TLSVerifyCA: "verify-ca", netpath.TLSVerifyFull: "verify-full",
+	}
+	if m, ok := modes[cfg.Net.TLS.Mode]; ok {
+		return m
+	}
+	return cfg.Param(ParamSSLMode, "prefer")
+}
+
+// applyNetwork routes sockets through the session dialer and replaces pgx's
+// TLS configs with the shared builder's.
+func applyNetwork(connCfg *pgx.ConnConfig, n engine.NetworkPath, id string, secret engine.Secret) error {
+	if n.Tunneled() {
+		connCfg.DialFunc = pgconn.DialFunc(n.Dial)
+		// The bastion resolves the host name; pgx must not resolve it locally.
+		connCfg.LookupFunc = func(_ context.Context, host string) ([]string, error) { return []string{host}, nil }
+	}
+	if !n.HasTLSSettings() || !n.TLS.Enabled() {
+		return nil
+	}
+	tlsCfg, err := n.TLS.Build(connCfg.Host)
+	if err != nil {
+		return &engine.Error{Kind: engine.KindInvalidConfig, Engine: id, Op: "config", Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	if connCfg.TLSConfig != nil {
+		connCfg.TLSConfig = tlsCfg
+	}
+	for _, fb := range connCfg.Fallbacks {
+		if fb.TLSConfig != nil {
+			fbCfg := tlsCfg.Clone()
+			fbCfg.ServerName = serverNameFor(n.TLS, fb.Host)
+			fb.TLSConfig = fbCfg
+		}
+	}
+	return nil
+}
+
+func serverNameFor(t netpath.TLSSettings, host string) string {
+	if t.ServerName != "" {
+		return t.ServerName
+	}
+	return host
+}

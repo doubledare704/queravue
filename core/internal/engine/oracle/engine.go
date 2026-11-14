@@ -13,6 +13,7 @@ import (
 	goora "github.com/sijms/go-ora/v2"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/netpath"
 	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
@@ -56,6 +57,8 @@ func New() *Engine {
 		DisplayName: "Oracle",
 		Family:      ID,
 		SupportsURI: true,
+		SupportsSSH: true,
+		SupportsTLS: true,
 		URIExample:  "oracle://system@localhost:1521/FREEPDB1",
 		Fields: []engine.FieldSpec{
 			{Key: ParamHost, Label: "Host", Kind: engine.FieldText, Required: true, Default: "localhost", Placeholder: "localhost"},
@@ -97,7 +100,14 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	if err != nil {
 		return nil, err
 	}
-	db := sql.OpenDB(goora.NewConnector(dsn))
+	connector, ok := goora.NewConnector(dsn).(*goora.OracleConnector)
+	if !ok {
+		return nil, engine.Errorf(engine.KindUnknown, ID, "config", "unexpected go-ora connector type")
+	}
+	if err := applyNetwork(connector, cfg, secret); err != nil {
+		return nil, err
+	}
+	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(1) // one pinned session; cancel sends a break to it
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -122,7 +132,13 @@ func dataSourceName(cfg engine.Config, secret engine.Secret) (string, error) {
 	if cfg.Param(ParamRole, RoleNormal) == RoleSysDBA {
 		options["DBA PRIVILEGE"] = "SYSDBA"
 	}
-	if cfg.Param(ParamSSL, "false") == "true" {
+	switch {
+	case cfg.Net.HasTLSSettings():
+		if cfg.Net.TLS.Enabled() {
+			options["SSL"] = "true"
+			options["SSL VERIFY"] = strconv.FormatBool(cfg.Net.TLS.Mode >= netpath.TLSVerifyCA)
+		}
+	case cfg.Param(ParamSSL, "false") == "true":
 		options["SSL"] = "true"
 		options["SSL VERIFY"] = cfg.Param(ParamSSLVerify, "true")
 	}
@@ -218,3 +234,20 @@ func (c *Conn) Close() error {
 
 // Dialect implements sqldialect.Provider.
 func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.Oracle }
+
+// applyNetwork sets the dialer and, for TLSSettings, the TLS config. go-ora
+// has no "prefer" mode, so prefer behaves as require.
+func applyNetwork(c *goora.OracleConnector, cfg engine.Config, secret engine.Secret) error {
+	if cfg.Net.Tunneled() {
+		c.Dialer(cfg.Net.Dial)
+	}
+	if !cfg.Net.HasTLSSettings() || !cfg.Net.TLS.Enabled() {
+		return nil
+	}
+	tlsCfg, err := cfg.Net.TLS.Build(cfg.Param(ParamHost, "localhost"))
+	if err != nil {
+		return &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "config", Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	c.WithTLSConfig(tlsCfg)
+	return nil
+}

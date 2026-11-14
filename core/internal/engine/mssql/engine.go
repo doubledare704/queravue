@@ -5,6 +5,7 @@ package mssql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	mssqldb "github.com/microsoft/go-mssqldb"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/netpath"
 	"github.com/doubledare704/queravue/core/internal/sqldialect"
 )
 
@@ -51,6 +53,8 @@ func New() *Engine {
 		DisplayName: "SQL Server",
 		Family:      ID,
 		SupportsURI: true,
+		SupportsSSH: true,
+		SupportsTLS: true,
 		URIExample:  "sqlserver://sa@localhost:1433?database=master&encrypt=required",
 		Fields: []engine.FieldSpec{
 			{Key: ParamHost, Label: "Host", Kind: engine.FieldText, Required: true, Default: "localhost", Placeholder: "localhost"},
@@ -85,8 +89,9 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	}
 	q := url.Values{}
 	q.Set("app name", "Queravue")
-	q.Set("encrypt", driverEncrypt[cfg.Param(ParamEncrypt, "required")])
-	q.Set("TrustServerCertificate", cfg.Param(ParamTrust, "false"))
+	if err := setEncryption(q, cfg); err != nil {
+		return nil, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "config", Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
 	q.Set("connection timeout", "10")
 	if db := cfg.Param(ParamDatabase, ""); db != "" {
 		q.Set("database", db)
@@ -101,6 +106,9 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 	if err != nil {
 		return nil, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "config",
 			Msg: engine.Redact(err.Error(), secret), Err: err}
+	}
+	if cfg.Net.Tunneled() {
+		connector.Dialer = remoteResolvingDialer{cfg.Net.Dial}
 	}
 	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(1) // one pinned connection; cancel uses the TDS attention signal
@@ -181,3 +189,46 @@ func (c *Conn) Close() error {
 
 // Dialect implements sqldialect.Provider.
 func (c *Conn) Dialect() sqldialect.Dialect { return sqldialect.MSSQL }
+
+// setEncryption maps TLSSettings, or the legacy params, to the driver's DSN.
+// The driver builds its own TLS config: it takes a CA file and a host name to
+// check, has no client certificate, and checks the host name whenever it
+// verifies at all, so verify-ca behaves as verify-full.
+func setEncryption(q url.Values, cfg engine.Config) error {
+	if !cfg.Net.HasTLSSettings() {
+		q.Set("encrypt", driverEncrypt[cfg.Param(ParamEncrypt, "required")])
+		q.Set("TrustServerCertificate", cfg.Param(ParamTrust, "false"))
+		return nil
+	}
+	t := cfg.Net.TLS
+	switch t.Mode {
+	case netpath.TLSDisable:
+		q.Set("encrypt", "disable")
+	case netpath.TLSPrefer:
+		q.Set("encrypt", "false")
+		q.Set("TrustServerCertificate", "true")
+	case netpath.TLSRequire:
+		q.Set("encrypt", "true")
+		q.Set("TrustServerCertificate", "true")
+	default:
+		q.Set("encrypt", "true")
+		q.Set("TrustServerCertificate", "false")
+		if t.CAFile != "" {
+			q.Set("certificate", t.CAFile)
+		}
+		if t.ServerName != "" {
+			q.Set("hostname in certificate", t.ServerName)
+		}
+	}
+	if t.ClientCert != "" || t.ClientKey != "" {
+		return errors.New("SQL Server does not use client certificates")
+	}
+	return nil
+}
+
+// remoteResolvingDialer marks the dialer as a mssqldb.HostDialer, so the
+// driver leaves host name resolution to the far end of the tunnel.
+type remoteResolvingDialer struct{ netpath.DialFunc }
+
+// HostName implements mssqldb.HostDialer.
+func (remoteResolvingDialer) HostName() string { return "" }

@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"syscall"
+
+	"github.com/doubledare704/queravue/core/internal/netpath"
 )
 
 // Kind classifies an engine error so the UI can show a friendly message.
@@ -42,6 +44,14 @@ const (
 	// KindServer: the server rejected an operation that is not a statement
 	// (document engines: duplicate key, validation failure, ...).
 	KindServer
+	// KindSSHHostKeyUnknown: the bastion's host key is not trusted yet.
+	KindSSHHostKeyUnknown
+	// KindSSHHostKeyChanged: the bastion's host key differs from the trusted one.
+	KindSSHHostKeyChanged
+	// KindSSHAuth: the bastion rejected the credentials.
+	KindSSHAuth
+	// KindTunnelLost: the SSH tunnel dropped after it was established.
+	KindTunnelLost
 )
 
 // String implements fmt.Stringer.
@@ -75,6 +85,14 @@ func (k Kind) String() string {
 		return "unsupported"
 	case KindServer:
 		return "server"
+	case KindSSHHostKeyUnknown:
+		return "ssh_host_key_unknown"
+	case KindSSHHostKeyChanged:
+		return "ssh_host_key_changed"
+	case KindSSHAuth:
+		return "ssh_auth"
+	case KindTunnelLost:
+		return "tunnel_lost"
 	default:
 		return "unknown"
 	}
@@ -162,6 +180,8 @@ func ClassifyCommon(err error) Kind {
 	switch {
 	case err == nil:
 		return KindUnknown
+	case kindOfNetpath(err) != KindUnknown:
+		return kindOfNetpath(err)
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, os.ErrDeadlineExceeded):
 		return KindTimeout
 	case isTLS(err):
@@ -183,6 +203,29 @@ func ClassifyCommon(err error) Kind {
 		errors.Is(err, syscall.EHOSTUNREACH),
 		errors.Is(err, syscall.ENETUNREACH):
 		return KindNetwork
+	}
+	return KindUnknown
+}
+
+func kindOfNetpath(err error) Kind {
+	var (
+		unknown *netpath.HostKeyUnknownError
+		changed *netpath.HostKeyChangedError
+		auth    *netpath.AuthError
+		lost    *netpath.TunnelLostError
+		cfg     *netpath.ConfigError
+	)
+	switch {
+	case errors.As(err, &unknown):
+		return KindSSHHostKeyUnknown
+	case errors.As(err, &changed):
+		return KindSSHHostKeyChanged
+	case errors.As(err, &auth):
+		return KindSSHAuth
+	case errors.As(err, &lost):
+		return KindTunnelLost
+	case errors.As(err, &cfg):
+		return KindInvalidConfig
 	}
 	return KindUnknown
 }

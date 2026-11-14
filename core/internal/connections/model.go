@@ -57,9 +57,13 @@ type Connection struct {
 	Color      Color             `json:"color,omitempty"`
 	Production bool              `json:"production,omitempty"`
 	// SecretRef is the keychain account holding the password; empty if none.
-	SecretRef string    `json:"secretRef,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	SecretRef string `json:"secretRef,omitempty"`
+	// SSH is the tunnel, nil for a direct connection.
+	SSH *SSHTunnel `json:"ssh,omitempty"`
+	// TLS replaces the engine-specific TLS params; nil means the engine default.
+	TLS       *TLSSettings `json:"tls,omitempty"`
+	CreatedAt time.Time    `json:"createdAt"`
+	UpdatedAt time.Time    `json:"updatedAt"`
 }
 
 // HasPassword reports whether a password is stored for c.

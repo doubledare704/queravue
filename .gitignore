@@ -43,3 +43,6 @@ spikes/**/*.log
 
 !core/internal/shell/testdata/corpus/*.out
 dev/demo.sqlite
+
+# Dev TLS/SSH material (dev/tls/gen.sh)
+dev/tls/out/

@@ -6,6 +6,8 @@ package engine
 import (
 	"context"
 	"fmt"
+
+	"github.com/doubledare704/queravue/core/internal/netpath"
 )
 
 // Engine is a stateless driver for one database product (or wire-compatible
@@ -48,7 +50,25 @@ type Config struct {
 	EngineID string
 	// Params holds values keyed by FieldSpec.Key. Never secrets.
 	Params map[string]string
+	// Net is how to reach the server. Its zero value means a direct connection
+	// with the TLS params in Params.
+	Net NetworkPath
 }
+
+// NetworkPath is the connection-level routing every network engine honours.
+type NetworkPath struct {
+	// Dial opens every socket the engine needs; nil dials directly. Engines
+	// must route all connections through it, including replica set members.
+	Dial netpath.DialFunc
+	// TLS overrides the engine's own TLS params when its Mode is set.
+	TLS netpath.TLSSettings
+}
+
+// Tunneled reports whether sockets go through a dialer other than the default.
+func (n NetworkPath) Tunneled() bool { return n.Dial != nil }
+
+// HasTLSSettings reports whether TLS comes from TLSSettings, not engine params.
+func (n NetworkPath) HasTLSSettings() bool { return n.TLS.Mode != netpath.TLSUnset }
 
 // Param returns Params[key], or def if missing or empty.
 func (c Config) Param(key, def string) string {

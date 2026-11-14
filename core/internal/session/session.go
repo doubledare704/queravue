@@ -32,6 +32,12 @@ type Opener interface {
 	Open(ctx context.Context, connectionID string) (engine.Conn, engine.Descriptor, error)
 }
 
+// ReleasingOpener is an Opener whose connections hold more than the Conn, such
+// as an SSH tunnel. The release function runs after the Conn is closed.
+type ReleasingOpener interface {
+	OpenReleasing(ctx context.Context, connectionID string) (engine.Conn, engine.Descriptor, func(), error)
+}
+
 // Session is one live connection.
 type Session struct {
 	// ID identifies the session on the wire.
@@ -45,7 +51,8 @@ type Session struct {
 	// Dialect is the SQL dialect of the engine; nil if it is not a SQL engine.
 	Dialect sqldialect.Dialect
 
-	now func() time.Time
+	now     func() time.Time
+	release func()
 
 	runMu sync.Mutex // held while a statement runs
 
@@ -106,7 +113,11 @@ func (s *Session) shutdown() error {
 	s.Cancel()
 	s.runMu.Lock()
 	defer s.runMu.Unlock()
-	return s.Conn.Close()
+	err := s.Conn.Close()
+	if s.release != nil {
+		s.release()
+	}
+	return err
 }
 
 // Manager owns all open sessions.
@@ -166,16 +177,29 @@ func NewManager(opener Opener, opts ...Option) *Manager {
 
 // Open connects and registers a session.
 func (m *Manager) Open(ctx context.Context, connectionID string) (*Session, error) {
-	conn, desc, err := m.opener.Open(ctx, connectionID)
+	var (
+		conn    engine.Conn
+		desc    engine.Descriptor
+		release func()
+		err     error
+	)
+	if ro, ok := m.opener.(ReleasingOpener); ok {
+		conn, desc, release, err = ro.OpenReleasing(ctx, connectionID)
+	} else {
+		conn, desc, err = m.opener.Open(ctx, connectionID)
+	}
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{ID: uuid.NewString(), ConnectionID: connectionID, Conn: conn, Desc: desc, now: m.now, lastUsed: m.now()}
+	s := &Session{ID: uuid.NewString(), ConnectionID: connectionID, Conn: conn, Desc: desc, now: m.now, lastUsed: m.now(), release: release}
 	s.Dialect, _ = sqldialect.Of(conn)
 	m.mu.Lock()
 	if m.stopped {
 		m.mu.Unlock()
 		_ = conn.Close()
+		if release != nil {
+			release()
+		}
 		return nil, fmt.Errorf("session: manager is shut down")
 	}
 	m.sessions[s.ID] = s
