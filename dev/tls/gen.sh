@@ -9,7 +9,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 out="$here/out"
 days=3650
-servers=(postgres-tls mysql-tls mongo-tls clickhouse-tls)
+servers=(postgres-tls mysql-tls mongo-tls clickhouse-tls mariadb tidb mssql documentdb redis valkey oracle)
 
 [[ "${1:-}" == "--force" ]] && rm -rf "$out"
 mkdir -p "$out/ssh"
@@ -23,8 +23,14 @@ fi
 issue() {
   local name="$1" usage="$2" san="$3"
   [[ -f "$out/$name.pem" ]] && return
-  openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out "$out/$name.key"
-  openssl req -new -key "$out/$name.key" -subj "/CN=$name" -out "$out/$name.csr"
+  if [[ "$name" == mssql || "$name" == oracle ]]; then
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$out/$name.key"
+  else
+    openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt -out "$out/$name.key"
+  fi
+  local cn="$name"
+  [[ "$name" == cockroachdb ]] && cn=node
+  openssl req -new -key "$out/$name.key" -subj "/CN=$cn" -out "$out/$name.csr"
   printf 'subjectAltName=%s\nextendedKeyUsage=%s\nbasicConstraints=CA:FALSE\n' "$san" "$usage" >"$out/$name.ext"
   openssl x509 -req -in "$out/$name.csr" -CA "$out/ca.pem" -CAkey "$out/ca.key" -CAcreateserial \
     -sha256 -days "$days" -extfile "$out/$name.ext" -out "$out/$name.crt"
@@ -35,7 +41,22 @@ issue() {
 for s in "${servers[@]}"; do
   issue "$s" serverAuth "DNS:$s,DNS:localhost,IP:127.0.0.1"
 done
+issue redis-cluster serverAuth,clientAuth "DNS:redis-cluster,DNS:localhost,IP:127.0.0.1"
 issue client clientAuth "DNS:queravue-client"
+mkdir -p "$out/cockroach"
+cp "$out/ca.pem" "$out/cockroach/ca.crt"
+issue cockroachdb serverAuth,clientAuth "DNS:cockroachdb,DNS:localhost,IP:127.0.0.1"
+cp "$out/cockroachdb.crt" "$out/cockroach/node.crt"
+cp "$out/cockroachdb.key" "$out/cockroach/node.key"
+issue root clientAuth "DNS:root"
+cp "$out/root.crt" "$out/cockroach/client.root.crt"
+cp "$out/root.key" "$out/cockroach/client.root.key"
+chmod 600 "$out/cockroach/"*.key
+if [[ ! -f "$out/oracle-wallet.p12" ]]; then
+  openssl pkcs12 -export -legacy -inkey "$out/oracle.key" -in "$out/oracle.crt" \
+    -certfile "$out/ca.pem" -passout pass:MatrixWallet1 -out "$out/oracle-wallet.p12"
+fi
+chmod 644 "$out/oracle-wallet.p12"
 
 if [[ ! -f "$out/ssh/id_ed25519" ]]; then
   ssh-keygen -q -t ed25519 -N "" -C queravue-dev -f "$out/ssh/id_ed25519"

@@ -164,7 +164,7 @@ class _ConnectionTile extends ConsumerWidget {
     final p = row.profile;
     switch (a) {
       case _MenuAction.connect:
-        await connectTo(ref, p);
+        await connectTo(context, ref, p);
       case _MenuAction.disconnect:
         await ref.read(connectionSessionProvider(p.id).notifier).disconnect();
       case _MenuAction.refresh:
@@ -259,7 +259,7 @@ class _ConnectionTile extends ConsumerWidget {
                               .toggle(p.id);
                         }
                       },
-                      onDoubleTap: () => connectTo(ref, p),
+                      onDoubleTap: () => connectTo(context, ref, p),
                       child: Padding(
                         padding: EdgeInsets.only(left: 12 + row.depth * 16.0),
                         child: Row(

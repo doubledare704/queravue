@@ -8,6 +8,7 @@ const (
 	FamilyMongo      = "mongodb"
 	FamilyClickHouse = "clickhouse"
 	FamilyOracle     = "oracle"
+	FamilyRedis      = "redis"
 )
 
 // LegacyTLSKeys lists the params MigrateLegacyTLS consumes for a family.
@@ -21,6 +22,8 @@ func LegacyTLSKeys(family string) []string {
 		return []string{"encrypt", "trust_server_certificate"}
 	case FamilyMongo:
 		return []string{"tls", "tls_ca_file", "tls_cert_key_file", "tls_insecure"}
+	case FamilyRedis:
+		return []string{"tls", "tls_ca_file", "tls_insecure"}
 	case FamilyOracle:
 		return []string{"ssl", "ssl_verify"}
 	}
@@ -62,8 +65,8 @@ func legacySettings(family string, p map[string]string) (TLSSettings, bool) {
 		return TLSSettings{Mode: m}, ok
 	case FamilyMSSQL:
 		return legacyMSSQL(p)
-	case FamilyMongo:
-		return legacyMongo(p)
+	case FamilyMongo, FamilyRedis:
+		return legacyBooleanTLS(p)
 	case FamilyOracle:
 		return legacyOracle(p)
 	}
@@ -85,7 +88,7 @@ func legacyMSSQL(p map[string]string) (TLSSettings, bool) {
 	return TLSSettings{}, false
 }
 
-func legacyMongo(p map[string]string) (TLSSettings, bool) {
+func legacyBooleanTLS(p map[string]string) (TLSSettings, bool) {
 	enabled, ok := p["tls"]
 	if !ok {
 		return TLSSettings{}, false

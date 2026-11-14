@@ -16,6 +16,7 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
 	"github.com/doubledare704/queravue/core/internal/history"
+	"github.com/doubledare704/queravue/core/internal/netpath"
 	"github.com/doubledare704/queravue/core/internal/results"
 	"github.com/doubledare704/queravue/core/internal/session"
 	"github.com/doubledare704/queravue/core/internal/sqlsplit"
@@ -178,10 +179,14 @@ func (h *QueryService) runStatement(ctx context.Context, stream queravuev1.Query
 		var ee *engine.Error
 		kind, msg := queravuev1.QueryErrorKind_QUERY_ERROR_KIND_UNSPECIFIED, "the statement failed"
 		var pos *uint32
-		if errors.As(execErr, &ee) {
+		var lost *netpath.TunnelLostError
+		switch {
+		case errors.As(execErr, &lost):
+			kind, msg = queryKind(engine.KindTunnelLost), lost.Error()
+		case errors.As(execErr, &ee):
 			kind, msg = queryKind(ee.Kind), ee.Msg
 			pos = errPosition(text, r, ee.Position, om)
-		} else {
+		default:
 			h.log.Error("execute", "err", execErr)
 		}
 		return false, send(errEvent(idx, kind, msg, pos, sum.Duration))
@@ -279,7 +284,7 @@ func queryKind(k engine.Kind) queravuev1.QueryErrorKind {
 		return queravuev1.QueryErrorKind_QUERY_ERROR_KIND_SQL
 	case engine.KindCanceled:
 		return queravuev1.QueryErrorKind_QUERY_ERROR_KIND_CANCELED
-	case engine.KindConnectionLost, engine.KindNetwork:
+	case engine.KindConnectionLost, engine.KindNetwork, engine.KindTunnelLost:
 		return queravuev1.QueryErrorKind_QUERY_ERROR_KIND_CONNECTION
 	}
 	return queravuev1.QueryErrorKind_QUERY_ERROR_KIND_UNSPECIFIED

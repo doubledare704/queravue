@@ -59,7 +59,7 @@ class ConnectionDetails extends ConsumerWidget {
                 label: const Text('Connect'),
                 onPressed: status is Connecting
                     ? null
-                    : () => connectTo(ref, profile),
+                    : () => connectTo(context, ref, profile),
               ),
               if (!ref.watch(connectionIsDocumentOnlyProvider(profile.id))) ...[
                 const SizedBox(width: 8),

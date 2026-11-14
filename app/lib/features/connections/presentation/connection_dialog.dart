@@ -3,8 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/connection_form_controller.dart';
+import '../application/connection_network_form.dart';
 import '../domain/models.dart';
+import '../domain/network_settings.dart';
 import 'connection_actions.dart';
+import 'connection_network_fields.dart';
+import 'ssh_host_key_dialog.dart';
 
 /// New / edit / duplicate connection dialog. The form is built entirely from
 /// the engine's [FieldSpec]s.
@@ -69,7 +73,21 @@ class _ConnectionDialogState extends ConsumerState<ConnectionDialog> {
 
   Future<void> _applyUri() async {
     await _ctrl.applyUri(_uri.text);
-    if (ref.read(_provider).error == null) _uri.clear();
+    if (mounted && ref.read(_provider).error == null) _uri.clear();
+  }
+
+  Future<void> _test() async {
+    await _ctrl.test();
+    while (true) {
+      if (!mounted) return;
+      final test = ref.read(_provider).test;
+      if (test is! FormTested || test.result is! TestFailed) return;
+      final error = test.result as TestFailed;
+      if (error.hostKey == null) return;
+      final trusted = await showSshHostKeyDialog(context, error);
+      if (!mounted || !trusted) return;
+      await _ctrl.trustAndRetry(error);
+    }
   }
 
   @override
@@ -113,13 +131,39 @@ class _ConnectionDialogState extends ConsumerState<ConnectionDialog> {
                   _uriRow(s),
                   const SizedBox(height: 12),
                 ],
-                for (final f in s.engine.fields) ...[
-                  _field(s, f),
-                  const SizedBox(height: 12),
-                ],
+                for (final f in s.engine.fields)
+                  if (!legacyTlsField(s.engine, f.key)) ...[
+                    _field(s, f),
+                    const SizedBox(height: 12),
+                  ],
+                ConnectionNetworkFields(
+                  key: ValueKey(s.engine.id),
+                  args: widget.args,
+                ),
                 _organizeRow(s),
                 const SizedBox(height: 12),
                 _testRow(s),
+                if (s.test case FormTested(:final result))
+                  for (final step in result.steps)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        step.ok
+                            ? Icons.check_circle_outline
+                            : Icons.error_outline,
+                      ),
+                      title: Text(switch (step.stage) {
+                        ConnectionTestStage.ssh => 'SSH',
+                        ConnectionTestStage.tls => 'TLS',
+                        ConnectionTestStage.auth => 'Authentication',
+                        ConnectionTestStage.ping => 'Ping',
+                      }),
+                      subtitle: step.message.isEmpty
+                          ? null
+                          : Text(step.message),
+                      trailing: Text('${step.elapsedMs} ms'),
+                    ),
                 if (s.error != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -372,7 +416,7 @@ class _ConnectionDialogState extends ConsumerState<ConnectionDialog> {
           key: const Key('test-connection'),
           icon: Icon(testing ? Icons.close : Icons.bolt, size: 18),
           label: Text(testing ? 'Cancel test' : 'Test'),
-          onPressed: testing ? _ctrl.cancelTest : _ctrl.test,
+          onPressed: testing ? _ctrl.cancelTest : _test,
         ),
         const SizedBox(width: 12),
         status,

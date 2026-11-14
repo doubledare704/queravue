@@ -1,0 +1,59 @@
+services:
+  cockroachdb:
+    command: ["start-single-node", "--certs-dir=/tls/out/cockroach", "--store=type=mem,size=2GiB"]
+    volumes: ["./tls/out:/tls/out:ro"]
+    healthcheck:
+      test: ["CMD", "./cockroach", "sql", "--certs-dir=/tls/out/cockroach", "--host=localhost", "-e", "SELECT 1"]
+  mariadb:
+    command: ["--ssl-ca=/tls/ca.pem", "--ssl-cert=/tls/mariadb.crt", "--ssl-key=/tls/mariadb.key", "--require-secure-transport=ON"]
+    volumes: ["./tls/out:/tls:ro"]
+  tidb:
+    command: ["--store=unistore", "--path=", "--host=0.0.0.0", "-P", "4000", "--config=/matrix-tidb.toml"]
+    volumes: ["./tls/out:/tls:ro", "./tls/tidb.toml:/matrix-tidb.toml:ro"]
+  mssql:
+    volumes: ["./tls/out:/tls:ro", "./tls/mssql.conf:/var/opt/mssql/mssql.conf:ro"]
+  redis:
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-queravue}", "--port", "0", "--tls-port", "6379", "--tls-auth-clients", "no", "--tls-cert-file", "/tls/redis.crt", "--tls-key-file", "/tls/redis.key", "--tls-ca-cert-file", "/tls/ca.pem"]
+    volumes: ["./tls/out:/tls:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /tls/ca.pem -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+  valkey:
+    command: ["valkey-server", "--requirepass", "${REDIS_PASSWORD:-queravue}", "--port", "0", "--tls-port", "6379", "--tls-auth-clients", "no", "--tls-cert-file", "/tls/valkey.crt", "--tls-key-file", "/tls/valkey.key", "--tls-ca-cert-file", "/tls/ca.pem"]
+    volumes: ["./tls/out:/tls:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli --tls --cacert /tls/ca.pem -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep -q PONG"]
+  documentdb:
+    environment:
+      TLS_MODE: requireTLS
+      CERT_PATH: /tls/documentdb.crt
+      KEY_FILE: /tls/documentdb.key
+    volumes: ["./tls/out:/tls:ro"]
+  redis-cluster:
+    environment:
+      MATRIX_TLS: "1"
+    volumes: ["./tls/out:/tls:ro", "./tls/redis-cluster.sh:/matrix-cluster.sh:ro"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /tls/ca.pem -p 7100 cluster info | grep -q cluster_state:ok"]
+  mongo-tls:
+    command: ["--port", "27019", "--replSet", "rs0", "--bind_ip_all", "--tlsMode", "requireTLS", "--tlsCertificateKeyFile", "/tls/mongo-tls.pem", "--tlsCAFile", "/tls/ca.pem", "--tlsAllowConnectionsWithoutCertificates"]
+    ports: !override ["127.0.0.1:27019:27019"]
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --tls
+        - --tlsCAFile
+        - /tls/ca.pem
+        - --port
+        - "27019"
+        - --eval
+        - >-
+          try { rs.status() } catch (e) {
+            rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27019'}]})
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+  oracle:
+    entrypoint: ["bash", "/matrix-oracle.sh"]
+    ports: !override ["127.0.0.1:2484:2484"]
+    volumes: ["./tls/out:/tls:ro", "./tls/oracle/start.sh:/matrix-oracle.sh:ro"]

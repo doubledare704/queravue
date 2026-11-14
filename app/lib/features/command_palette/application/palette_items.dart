@@ -48,7 +48,7 @@ final paletteItemsProvider = Provider<List<PaletteItem>>((ref) {
         title: 'Connect: ${c.name}',
         subtitle: [c.engineId, if (c.folder.isNotEmpty) c.folder].join(' · '),
         group: PaletteGroup.connection,
-        run: (context, ref) => connectTo(ref, c),
+        run: (context, ref) => connectTo(context, ref, c),
       ),
     if (selected != null)
       ..._objectItems(ref, selected, nameOf[selected] ?? ''),

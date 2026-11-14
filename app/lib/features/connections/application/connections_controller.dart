@@ -4,6 +4,7 @@ import '../../../core_client/core_supervisor.dart';
 import '../../core_status/core_status_controller.dart';
 import '../data/connections_repository.dart';
 import '../domain/models.dart';
+import '../domain/network_settings.dart';
 
 /// Whether a core is connected and can serve requests. Override in tests.
 final coreReadyProvider = Provider<bool>(
@@ -44,15 +45,17 @@ class ConnectionsController extends AsyncNotifier<List<ConnectionProfile>> {
   Future<ConnectionProfile> save(
     ConnectionProfile profile, {
     String? password,
+    NetworkSecrets secrets = const NetworkSecrets(),
     bool clearPassword = false,
   }) async {
     final saved = profile.isSaved
         ? await _repo.update(
             profile,
             password: password,
+            secrets: secrets,
             clearPassword: clearPassword,
           )
-        : await _repo.create(profile, password: password);
+        : await _repo.create(profile, password: password, secrets: secrets);
     await reload();
     return saved;
   }

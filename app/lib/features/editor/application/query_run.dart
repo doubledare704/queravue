@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../connections/application/connection_session.dart';
 import '../../grid/application/result_window.dart';
 import '../data/query_repository.dart';
 import '../domain/query_models.dart';
@@ -317,6 +318,18 @@ class QueryRun extends Notifier<QueryRunState> {
             ?.onProgress(e.rowsSpooled, done: true, truncated: e.truncated);
       case ErrorEvent():
         final cancelled = e.kind == QueryErrorKind.canceled;
+        if (e.kind == QueryErrorKind.connection &&
+            e.message.startsWith('ssh tunnel to ') &&
+            e.message.endsWith(' was lost')) {
+          ref
+              .read(connectionSessionProvider(connectionId).notifier)
+              .markTunnelLost();
+          final lost = _session;
+          _session = null;
+          if (lost != null) {
+            unawaited(_repo.closeSession(lost.id).catchError((_) {}));
+          }
+        }
         _update(
           e.statementIndex,
           (r) => r.copyWith(

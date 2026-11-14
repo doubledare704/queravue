@@ -12,11 +12,13 @@ class ConnectionSessionState {
     this.isConnecting = false,
     this.session,
     this.error,
+    this.tunnelLost = false,
   });
 
   final bool isConnecting;
   final SessionInfo? session;
   final String? error;
+  final bool tunnelLost;
 
   String? get sessionId => session?.id;
   bool get isConnected => session != null;
@@ -29,12 +31,14 @@ class ConnectionSessionController extends Notifier<ConnectionSessionState> {
   final String connectionId;
   QueryRepository? _repo;
   SessionInfo? _session;
+  int _generation = 0;
 
   @override
   ConnectionSessionState build() {
     _repo = null;
     _session = null;
     ref.onDispose(() {
+      _generation++;
       final s = _session;
       final repo = _repo;
       if (s != null && repo != null) {
@@ -48,25 +52,59 @@ class ConnectionSessionController extends Notifier<ConnectionSessionState> {
     if (state.isConnecting) return null;
     if (state.session != null) return state.session;
 
-    state = const ConnectionSessionState(isConnecting: true);
+    final generation = ++_generation;
+    state = ConnectionSessionState(
+      isConnecting: true,
+      tunnelLost: state.tunnelLost,
+    );
     try {
       final repo = ref.read(queryRepositoryProvider);
       _repo = repo;
       final session = await repo.openSession(connectionId);
-      _session = session;
-      if (ref.mounted) {
-        state = ConnectionSessionState(session: session);
+      if (!ref.mounted || generation != _generation) {
+        await repo.closeSession(session.id);
+        return null;
       }
+      _session = session;
+      state = ConnectionSessionState(session: session);
       return session;
     } catch (e) {
-      if (ref.mounted) {
-        state = ConnectionSessionState(error: e.toString());
+      if (ref.mounted && generation == _generation) {
+        state = ConnectionSessionState(
+          error: e.toString(),
+          tunnelLost: state.tunnelLost,
+        );
       }
       return null;
     }
   }
 
+  void markTunnelLost() {
+    if (state.isConnecting) return;
+    state = ConnectionSessionState(session: state.session, tunnelLost: true);
+  }
+
+  Future<void> reconnect() async {
+    if (state.isConnecting) return;
+    final generation = ++_generation;
+    final old = _session;
+    final repo = _repo;
+    _session = null;
+    state = const ConnectionSessionState(isConnecting: true, tunnelLost: true);
+    if (old != null && repo != null) {
+      try {
+        await repo.closeSession(old.id);
+      } on QueryException {
+        // The core may already have closed the lost session.
+      }
+    }
+    if (!ref.mounted || generation != _generation) return;
+    state = const ConnectionSessionState(tunnelLost: true);
+    await connect();
+  }
+
   Future<void> disconnect() async {
+    _generation++;
     final s = _session;
     final repo = _repo;
     _session = null;

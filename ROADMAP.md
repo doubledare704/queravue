@@ -98,8 +98,10 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 ### It. 10 — Remaining engines + connectivity
 - Oracle (go-ora), ClickHouse, DuckDB.
 - Redis: key browser (SCAN), all types, TTL, CLI, pub/sub viewer.
-- SSH tunnels (password/key/agent) for all engines.
-- **Done when:** every engine in the PRD connects via direct, TLS and SSH paths.
+- SSH tunnels (password/key/agent) and TLS for network engines. SQLite and DuckDB use local files.
+- Lane G adds descriptor-driven connection settings, host-key dialogs, staged test outcomes, and the connectivity matrix.
+- **Acceptance pending.** Verify the hosted direct/TLS/SSH matrix, Redis UI (Lane E), and bounded native DuckDB streaming. Cosmos DB retains its opt-in smoke test.
+- The status bar reacts to tunnel loss reported by SQL execution. Idle tunnel loss and loss reported only through document or key-value RPCs still need session-health reporting.
 
 ### It. 11 — Visual builders
 - Aggregation pipeline builder: stage cards, per-stage preview, export to code.

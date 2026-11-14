@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:queravue/features/connections/data/connections_repository.dart';
 import 'package:queravue/features/connections/domain/cancellation.dart';
 import 'package:queravue/features/connections/domain/models.dart';
+import 'package:queravue/features/connections/domain/network_settings.dart';
 
 const pgEngine = EngineSpec(
   id: 'postgres',
@@ -75,9 +76,12 @@ class FakeConnectionsRepository implements ConnectionsRepository {
   final _items = <String, ConnectionProfile>{};
   final passwords = <String, String>{};
   final testCalls = <TestCall>[];
+  NetworkSecrets? lastTestSecrets;
+  NetworkSecrets? lastSavedSecrets;
   var _next = 1;
 
   List<EngineSpec> engines = [pgEngine, sqliteEngine];
+  final queuedResults = <TestResult>[];
   TestResult nextResult = const TestPassed(
     product: 'PostgreSQL',
     version: '17.11',
@@ -101,11 +105,13 @@ class FakeConnectionsRepository implements ConnectionsRepository {
   Future<ConnectionProfile> create(
     ConnectionProfile draft, {
     String? password,
+    NetworkSecrets secrets = const NetworkSecrets(),
   }) async {
     if (failNextSave case final e?) {
       failNextSave = null;
       throw e;
     }
+    lastSavedSecrets = secrets;
     final id = 'c${_next++}';
     if (password != null && password.isNotEmpty) passwords[id] = password;
     return _items[id] = draft.copyWith(
@@ -118,6 +124,7 @@ class FakeConnectionsRepository implements ConnectionsRepository {
   Future<ConnectionProfile> update(
     ConnectionProfile profile, {
     String? password,
+    NetworkSecrets secrets = const NetworkSecrets(),
     bool clearPassword = false,
   }) async {
     if (!_items.containsKey(profile.id)) {
@@ -133,6 +140,11 @@ class FakeConnectionsRepository implements ConnectionsRepository {
     );
   }
 
+  final trustedKeys = <SshHostKey>[];
+
+  @override
+  Future<void> trustHostKey(SshHostKey key) async => trustedKeys.add(key);
+
   @override
   Future<void> delete(String id) async {
     _items.remove(id);
@@ -144,15 +156,17 @@ class FakeConnectionsRepository implements ConnectionsRepository {
     String? id,
     ConnectionProfile? draft,
     String? password,
+    NetworkSecrets secrets = const NetworkSecrets(),
     Duration? timeout,
     CancellationToken? cancel,
   }) async {
+    lastTestSecrets = secrets;
     testCalls.add((id: id, draft: draft, password: password));
     if (testGate case final gate?) {
       await Future.any([gate.future, ?cancel?.whenCancelled]);
       if (cancel?.isCancelled ?? false) throw const OperationCancelled();
     }
-    return nextResult;
+    return queuedResults.isEmpty ? nextResult : queuedResults.removeAt(0);
   }
 
   @override
