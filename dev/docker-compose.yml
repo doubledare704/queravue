@@ -356,7 +356,9 @@ services:
       PUBLIC_KEY_FILE: /keys/authorized_keys
       LOG_STDOUT: "true"
     ports: ["127.0.0.1:${SSH_BASTION_PORT:-2222}:2222"]
-    volumes: ["./tls/out/ssh:/keys:ro"]
+    volumes:
+      - ./tls/out/ssh:/keys:ro
+      - ./tls/bastion/10-allow-forwarding.sh:/custom-cont-init.d/10-allow-forwarding.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 2222"]
       interval: 5s

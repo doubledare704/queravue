@@ -173,7 +173,9 @@ func classifyHandshake(ctx context.Context, cfg SSHConfig, err error) error {
 		return cfgErr
 	case ctx.Err() != nil:
 		return fmt.Errorf("netpath: ssh handshake with %s: %w", cfg.Addr(), ctx.Err())
-	case strings.Contains(err.Error(), "unable to authenticate"), strings.Contains(err.Error(), "no supported methods remain"):
+	// A wrong password that falls through to keyboard-interactive ends with a bare failure message.
+	case strings.Contains(err.Error(), "unable to authenticate"), strings.Contains(err.Error(), "no supported methods remain"),
+		strings.Contains(err.Error(), "unexpected message type 51"):
 		return &AuthError{Host: cfg.Addr(), Method: cfg.methodName(), Err: err}
 	}
 	return fmt.Errorf("netpath: ssh handshake with %s: %w", cfg.Addr(), err)
@@ -322,7 +324,7 @@ func (t *Tunnel) DialContext(ctx context.Context, network, addr string) (net.Con
 			}
 			return nil, fmt.Errorf("netpath: open channel to %s: %w", addr, r.err)
 		}
-		return &channelConn{Conn: r.conn, tunnel: t}, nil
+		return &channelConn{Conn: newDeadlineConn(r.conn), tunnel: t}, nil
 	case <-ctx.Done():
 		go func() {
 			if r := <-res; r.conn != nil {

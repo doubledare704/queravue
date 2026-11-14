@@ -168,7 +168,7 @@ func (d Descriptor) Validate(cfg Config) error {
 
 // WithDefaults returns a copy of cfg with empty fields set to their defaults.
 func (d Descriptor) WithDefaults(cfg Config) Config {
-	out := Config{EngineID: cfg.EngineID, Params: make(map[string]string, len(cfg.Params))}
+	out := Config{EngineID: cfg.EngineID, Params: make(map[string]string, len(cfg.Params)), Net: cfg.Net}
 	for k, v := range cfg.Params {
 		out.Params[k] = v
 	}
