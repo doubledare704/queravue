@@ -63,3 +63,18 @@ The owner filter is what keeps these cheap. The same views without it, on a data
 | `COUNT(*)` of `ALL_CONS_COLUMNS`, all owners | 169 ms | 1,206 |
 
 Cold `DescribeTable` is the slowest first-use cost (744 ms): opening a table for the first time after connecting pays for parsing the constraint and index views. Not measured: a database with tens of thousands of objects, and a connection that lacks `SELECT` on the `DBA_` views (core uses only `ALL_` views).
+
+
+## Lane B: ClickHouse
+
+Dev container `clickhouse/clickhouse-server:26.3.25.2`, native protocol on localhost, Apple Silicon, `go test -tags=integration ./internal/engine/clickhouse/` (three runs).
+
+| Measurement | Result | Budget |
+|---|---|---|
+| Stream 1M rows (`million_items`, `id` as int): time | 130–160 ms | n/a |
+| Heap during the 1M-row stream | 1 MB before, 3 MB peak | ≤ +200 MB |
+| Stream 100k rows | 20–50 ms | n/a |
+| Cancel mid-stream (1M-row query, cancelled after 2 batches) | stopped after 1,000 rows | stops promptly |
+| Cancel reaches the server (`sleepEachRow` query gone from `system.processes`) | within 150 ms of the cancel | n/a |
+
+Not measured: a wide 1M-row result (many columns, strings, arrays), the app-side grid memory, and a TLS connection.

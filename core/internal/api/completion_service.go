@@ -276,6 +276,8 @@ func lexerByName(name string) (sqlsplit.Dialect, bool) {
 		return sqlsplit.Oracle, true
 	case "sqlite":
 		return sqlsplit.SQLite, true
+	case "clickhouse":
+		return sqlsplit.ClickHouse, true
 	}
 	return 0, false
 }

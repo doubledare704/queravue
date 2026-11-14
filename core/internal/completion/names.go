@@ -67,7 +67,7 @@ func needsQuoting(d sqlsplit.Dialect, name string) bool {
 
 func quoteIdent(d sqlsplit.Dialect, name string) string {
 	switch d {
-	case sqlsplit.MySQL:
+	case sqlsplit.MySQL, sqlsplit.ClickHouse:
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	case sqlsplit.MSSQL:
 		return "[" + strings.ReplaceAll(name, "]", "]]") + "]"

@@ -5,6 +5,7 @@ package engines
 
 import (
 	"github.com/doubledare704/queravue/core/internal/engine"
+	"github.com/doubledare704/queravue/core/internal/engine/clickhouse"
 	"github.com/doubledare704/queravue/core/internal/engine/mongo"
 	"github.com/doubledare704/queravue/core/internal/engine/mssql"
 	"github.com/doubledare704/queravue/core/internal/engine/mysql"
@@ -23,6 +24,7 @@ func All() []engine.Engine {
 		mysql.New(mysql.VariantTiDB),
 		mssql.New(),
 		oracle.New(),
+		clickhouse.New(),
 		mongo.New(mongo.VariantMongoDB),
 		mongo.New(mongo.VariantCosmos),
 		mongo.New(mongo.VariantDocumentDB),

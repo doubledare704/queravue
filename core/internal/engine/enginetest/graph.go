@@ -96,7 +96,7 @@ func schemaGraph(t *testing.T, tg Target) {
 			}
 		}
 	}
-	if !sawRelation {
+	if !sawRelation && !tg.NoForeignKeys {
 		t.Error("the seed has foreign keys, but none was listed or described")
 	}
 }

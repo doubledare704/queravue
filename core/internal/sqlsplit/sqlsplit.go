@@ -30,11 +30,20 @@ const (
 	// count), and CREATE/ALTER PROCEDURE, FUNCTION, TRIGGER and VIEW bodies,
 	// which run to the end of the batch.
 	MSSQL
+	// ClickHouse: backslash escapes in '...', backtick and "..." identifiers,
+	// # and -- line comments, no DELIMITER command.
+	ClickHouse
 	// Oracle: q'[...]' alternative quoting, and PL/SQL blocks (BEGIN, DECLARE,
 	// CREATE PROCEDURE, FUNCTION, PACKAGE, TRIGGER, TYPE BODY), which run to a
 	// "/" on a line of its own. The slash ends any statement.
 	Oracle
 )
+
+func (d Dialect) backslashEscapes() bool { return d == MySQL || d == ClickHouse }
+
+func (d Dialect) hashComments() bool { return d == MySQL || d == ClickHouse }
+
+func (d Dialect) backtickIdents() bool { return d == MySQL || d == ClickHouse || d == SQLite }
 
 // Range locates one statement as byte offsets into the scanned text.
 type Range struct {
@@ -339,7 +348,7 @@ func (s *scanner) run() []Range {
 		case c == '-' && s.pos+1 < n && text[s.pos+1] == '-' && (s.d != MySQL || mysqlDashComment(text, s.pos)):
 			flushWord(s.pos)
 			s.skipLine()
-		case c == '#' && s.d == MySQL:
+		case c == '#' && s.d.hashComments():
 			flushWord(s.pos)
 			s.skipLine()
 		case c == '/' && s.pos+1 < n && text[s.pos+1] == '*':
@@ -353,12 +362,12 @@ func (s *scanner) run() []Range {
 				st.prevWord = ""
 				continue
 			}
-			escapes := s.d == MySQL || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
+			escapes := s.d.backslashEscapes() || (s.d == Postgres && from > 0 && (text[from-1] == 'E' || text[from-1] == 'e') &&
 				(from < 2 || !isIdentPart(text[from-2])))
 			s.skipQuoted('\'', escapes)
 			markTok(from, s.pos)
 			st.prevWord = ""
-		case c == '"' || ((s.d == SQLite || s.d == MySQL) && c == '`'):
+		case c == '"' || (s.d.backtickIdents() && c == '`'):
 			flushWord(s.pos)
 			from := s.pos
 			s.skipQuoted(c, s.d == MySQL && c == '"')
