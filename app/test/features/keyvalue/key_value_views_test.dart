@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,28 @@ import 'package:queravue/core_client/gen/queravue/v1/keyvalue.pb.dart';
 import 'package:queravue/features/keyvalue/application/key_scan_controller.dart';
 import 'package:queravue/features/keyvalue/presentation/key_tree.dart';
 import 'package:queravue/features/keyvalue/presentation/key_value_view.dart';
+
+const _keyTreeSize = Size(420, 300);
+
+class _KeyTreeGoldenComparator extends LocalFileComparator {
+  _KeyTreeGoldenComparator(super.testFile);
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    try {
+      // The macOS CI runner renders two pixels differently from the baseline.
+      final tolerance = 2 / (_keyTreeSize.width * _keyTreeSize.height);
+      if (result.passed || result.diffPercent <= tolerance) return true;
+      throw FlutterError(await generateFailureOutput(result, golden, basedir));
+    } finally {
+      result.dispose();
+    }
+  }
+}
 
 void main() {
   final examples = <(ReadValueResponse, String)>[
@@ -81,7 +104,14 @@ void main() {
 
   for (final brightness in Brightness.values) {
     testWidgets('key tree ${brightness.name} golden', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(420, 300));
+      final comparator = goldenFileComparator;
+      if (comparator is LocalFileComparator) {
+        goldenFileComparator = _KeyTreeGoldenComparator(
+          comparator.basedir.resolve('key_value_views_test.dart'),
+        );
+        addTearDown(() => goldenFileComparator = comparator);
+      }
+      await tester.binding.setSurfaceSize(_keyTreeSize);
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         ProviderScope(
