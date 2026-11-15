@@ -13,6 +13,8 @@ import '../../designer/presentation/designer_tab_view.dart';
 import '../../diagram/presentation/diagram_tab_view.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
+import '../../keyvalue/application/key_value_actions.dart';
+import '../../keyvalue/presentation/key_value_workspace.dart';
 import '../../workspace/application/tab_files.dart';
 import '../../workspace/presentation/file_banner.dart';
 import '../application/editor_actions.dart';
@@ -32,6 +34,11 @@ class Workspace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final id = ref.watch(selectedConnectionProvider);
+    if (id != null && ref.watch(hasKeyValueProvider(id))) {
+      final session = ref.watch(connectionSessionProvider(id)).sessionId;
+      if (session == null) return const ConnectionDetails();
+      return KeyValueWorkspace(key: ValueKey(session), session: session);
+    }
     final tabs = id == null
         ? const <EditorTab>[]
         : ref.watch(editorTabsProvider).tabsFor(id);

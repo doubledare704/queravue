@@ -12,6 +12,7 @@ import 'gen/queravue/v1/design.pbgrpc.dart';
 import 'gen/queravue/v1/document.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/index.pbgrpc.dart';
+import 'gen/queravue/v1/keyvalue.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
 import 'gen/queravue/v1/schema.pbgrpc.dart';
 import 'gen/queravue/v1/session.pbgrpc.dart';
@@ -69,6 +70,10 @@ abstract interface class CoreConnection {
   /// Client for the Mongo shell.
   ShellServiceClient get shellService;
 
+  KeyValueServiceClient get keyValueService;
+
+  Stream<ScanKeysResponse> scanKeyValues(ScanKeysRequest request);
+
   /// Client for the workspace of saved queries and scripts.
   WorkspaceServiceClient get workspaceService;
 
@@ -99,7 +104,7 @@ typedef CoreConnector = Future<CoreConnection> Function(CoreHandle handle);
 
 /// gRPC implementation over the core's Unix socket.
 class GrpcCoreConnection implements CoreConnection {
-  GrpcCoreConnection._(this._channel, String token)
+  GrpcCoreConnection._(this._channel, this._openChannel, String token)
     : _client = CoreServiceClient(_channel),
       _auth = CallOptions(metadata: {'authorization': 'Bearer $token'}) {
     connectionService = ConnectionServiceClient(_channel, options: _auth);
@@ -109,6 +114,7 @@ class GrpcCoreConnection implements CoreConnection {
     tableService = TableServiceClient(_channel, options: _auth);
     historyService = HistoryServiceClient(_channel, options: _auth);
     documentService = DocumentServiceClient(_channel, options: _auth);
+    keyValueService = KeyValueServiceClient(_channel, options: _auth);
     shellService = ShellServiceClient(_channel, options: _auth);
     workspaceService = WorkspaceServiceClient(_channel, options: _auth);
     indexService = IndexServiceClient(_channel, options: _auth);
@@ -122,7 +128,7 @@ class GrpcCoreConnection implements CoreConnection {
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
   /// establishes it.
   static Future<CoreConnection> connect(CoreHandle handle) async {
-    final channel = ClientChannel(
+    ClientChannel openChannel() => ClientChannel(
       InternetAddress(handle.socketPath, type: InternetAddressType.unix),
       port: 0,
       options: const ChannelOptions(
@@ -132,12 +138,14 @@ class GrpcCoreConnection implements CoreConnection {
         connectionTimeout: Duration(seconds: 2),
       ),
     );
-    return GrpcCoreConnection._(channel, handle.token);
+    return GrpcCoreConnection._(openChannel(), openChannel, handle.token);
   }
 
   static const _clientVersion = '0.1.0';
 
   final ClientChannel _channel;
+  final ClientChannel Function() _openChannel;
+  final _scanChannels = <ClientChannel>{};
   final CoreServiceClient _client;
   final CallOptions _auth;
 
@@ -164,6 +172,51 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final ShellServiceClient shellService;
+
+  @override
+  late final KeyValueServiceClient keyValueService;
+
+  @override
+  Stream<ScanKeysResponse> scanKeyValues(ScanKeysRequest request) {
+    // A paused scan can consume its entire HTTP/2 connection window.
+    final channel = _openChannel();
+    final output = StreamController<ScanKeysResponse>();
+    StreamSubscription<ScanKeysResponse>? subscription;
+    final drained = Completer<void>();
+    var cancelled = false;
+    output.onListen = () {
+      _scanChannels.add(channel);
+      subscription = KeyValueServiceClient(channel, options: _auth)
+          .scanKeys(request)
+          .listen(
+            (page) {
+              if (!cancelled) output.add(page);
+            },
+            onError: (Object error, StackTrace stack) {
+              if (!cancelled) output.addError(error, stack);
+            },
+            onDone: () {
+              drained.complete();
+              unawaited(output.close());
+            },
+          );
+    };
+    output.onPause = () => subscription?.pause();
+    output.onResume = () => subscription?.resume();
+    output.onCancel = () async {
+      cancelled = true;
+      // Let queued trailers pass before resetting an already closed stream.
+      subscription?.resume();
+      await drained.future.timeout(
+        const Duration(milliseconds: 50),
+        onTimeout: () {},
+      );
+      await subscription?.cancel();
+      _scanChannels.remove(channel);
+      await channel.shutdown();
+    };
+    return output.stream;
+  }
 
   @override
   late final WorkspaceServiceClient workspaceService;
@@ -206,5 +259,10 @@ class GrpcCoreConnection implements CoreConnection {
       _client.health(HealthRequest(intervalMs: intervalMs), options: _auth);
 
   @override
-  Future<void> close() => _channel.terminate();
+  Future<void> close() async {
+    await Future.wait([
+      _channel.terminate(),
+      for (final channel in _scanChannels.toList()) channel.shutdown(),
+    ]);
+  }
 }

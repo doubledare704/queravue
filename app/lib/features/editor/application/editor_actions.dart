@@ -1,6 +1,7 @@
 import 'package:flutter/painting.dart' show Axis;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../keyvalue/application/key_value_actions.dart';
 import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../domain/query_models.dart';
@@ -13,7 +14,9 @@ import 'editor_tabs.dart';
 /// Opens an editor tab for the selected connection (⌘T).
 void openQueryTab(WidgetRef ref) {
   final id = ref.read(selectedConnectionProvider);
-  if (id != null && !ref.read(connectionIsDocumentOnlyProvider(id))) {
+  if (id != null &&
+      !ref.read(hasKeyValueProvider(id)) &&
+      !ref.read(connectionIsDocumentOnlyProvider(id))) {
     ref.read(editorTabsProvider.notifier).open(id);
   }
 }
