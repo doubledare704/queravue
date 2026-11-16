@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -85,6 +86,42 @@ jobs:
           version: v2.15.0
           working-directory: core
           args: --build-tags=duckdb
+
+  connectivity:
+    name: Connectivity (${{ matrix.engine }} / ${{ matrix.path }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [postgres, cockroachdb, mysql, mariadb, tidb, mssql, oracle, clickhouse, mongo, documentdb, redis, redis-cluster, valkey, sqlite, duckdb]
+        path: [direct, tls, ssh]
+    env:
+      MONGO_IMAGE: mongo:7.0.45
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - run: dev/run-connectivity-cell.sh "${{ matrix.engine }}" "${{ matrix.path }}"
+
+  cosmos:
+    name: Cosmos DB smoke test
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - name: Run when a Cosmos Mongo API URI is configured
+        working-directory: core
+        env:
+          QV_COSMOS_URI: ${{ secrets.QV_COSMOS_URI }}
+        run: go test -count=1 -v -tags integration -run '^TestSmokeCosmosDB$' ./internal/engine/mongo
 
   integration:
     name: Integration (${{ matrix.name }})

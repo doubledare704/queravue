@@ -183,3 +183,11 @@ The macOS UI integration test passed with the million-key fixture present,
 including a filtered rescan after rename and delete. App RSS while paging
 through the full keyspace and retention under high-volume pub/sub remain
 unmeasured.
+
+## Lane G verification
+
+On Apple Silicon, a macOS release build used 139.4 MiB combined RSS (app plus sidecar, measured 30 seconds after launch with a temporary, empty config directory). Five launches reached the sidecar socket in 1,095, 252, 217, 236 and 233 ms (236 ms median). These samples measure socket readiness. The app's gRPC Hello completion and first frame were not timed.
+
+The Go integration test process went from 25.5 MiB RSS to 26.4 MiB with the PostgreSQL SSH session open, using 2.4 MiB of Go heap. This is a separate measurement from the release app's idle result. Combined app and sidecar RSS with the UI holding a live tunnel was not measured.
+
+All 41 applicable Lane G matrix cells passed locally against disposable Docker fixtures or temporary database files. Four file-engine cells are marked n/a. The hosted run and the optional Cosmos DB account check are pending. The matrix streams and cancels at 10,000 items per cell. A fresh Redis fixture scanned 1,000,000 keys in 1,999 pages in 877 ms. The test process peaked at 43.3 MiB RSS from 43.2 MiB idle. Whole-app 1M-row memory and DuckDB's native buffering acceptance remain open.

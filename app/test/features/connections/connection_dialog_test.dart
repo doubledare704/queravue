@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/connections/application/connection_form_controller.dart';
 import 'package:queravue/features/connections/domain/models.dart';
+import 'package:queravue/features/connections/domain/network_settings.dart';
 import 'package:queravue/features/connections/presentation/connection_actions.dart';
 import 'package:queravue/features/connections/presentation/connection_dialog.dart';
 
@@ -51,6 +52,112 @@ String fieldText(WidgetTester tester, String key) =>
     tester.widget<TextField>(find.byKey(Key('field-$key'))).controller!.text;
 
 void main() {
+  const networkEngine = EngineSpec(
+    id: 'network',
+    displayName: 'Network database',
+    fields: [],
+    supportsSsh: true,
+    supportsTls: true,
+  );
+
+  const hostKey = (
+    host: 'bastion.example',
+    port: 2222,
+    presented: 'SHA256:presented',
+    trusted: '',
+  );
+
+  testWidgets('unknown SSH key can be trusted and stages render on retry', (
+    tester,
+  ) async {
+    final repo = FakeConnectionsRepository()
+      ..engines = [networkEngine]
+      ..queuedResults.addAll([
+        const TestFailed(
+          ConnectionErrorKind.sshUnknownKey,
+          'Unknown key',
+          hostKey: hostKey,
+        ),
+        const TestPassed(
+          product: 'Database',
+          version: '1',
+          connectMs: 4,
+          latencyMs: 2,
+          steps: [
+            (
+              stage: ConnectionTestStage.ssh,
+              ok: true,
+              elapsedMs: 3,
+              message: '',
+            ),
+            (
+              stage: ConnectionTestStage.tls,
+              ok: true,
+              elapsedMs: 4,
+              message: '',
+            ),
+            (
+              stage: ConnectionTestStage.auth,
+              ok: true,
+              elapsedMs: 4,
+              message: '',
+            ),
+            (
+              stage: ConnectionTestStage.ping,
+              ok: true,
+              elapsedMs: 2,
+              message: '',
+            ),
+          ],
+        ),
+      ]);
+    await pumpDialog(tester, repo);
+    expect(find.byKey(const Key('ssh-settings')), findsOneWidget);
+    expect(find.byKey(const Key('tls-settings')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('test-connection')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(hostKey.presented, findRichText: true),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Trust host key'));
+    await tester.pumpAndSettle();
+    expect(repo.trustedKeys, [hostKey]);
+    expect(repo.testCalls, hasLength(2));
+    expect(find.text('Authentication'), findsOneWidget);
+    expect(find.text('Ping'), findsOneWidget);
+  });
+
+  testWidgets('changed SSH key displays both fingerprints without trust', (
+    tester,
+  ) async {
+    final repo = FakeConnectionsRepository()
+      ..engines = [networkEngine]
+      ..nextResult = const TestFailed(
+        ConnectionErrorKind.sshChangedKey,
+        'The key differs',
+        hostKey: (
+          host: 'bastion.example',
+          port: 2222,
+          presented: 'SHA256:presented',
+          trusted: 'SHA256:trusted',
+        ),
+      );
+    await pumpDialog(tester, repo);
+    await tester.tap(find.byKey(const Key('test-connection')));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('SHA256:trusted', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('SHA256:presented', findRichText: true),
+      findsOneWidget,
+    );
+    expect(find.text('Trust host key'), findsNothing);
+    expect(repo.trustedKeys, isEmpty);
+  });
+
   testWidgets('renders fields from the engine spec', (tester) async {
     await pumpDialog(tester, FakeConnectionsRepository());
     expect(find.text('New connection'), findsOneWidget);

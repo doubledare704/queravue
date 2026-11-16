@@ -1,0 +1,30 @@
+services:
+  mongo:
+    command: ["--port", "${QV_MATRIX_MONGO_PORT:-27017}", "--replSet", "rs0", "--bind_ip_all"]
+    ports: !override ["127.0.0.1:${QV_MATRIX_MONGO_PORT:-27017}:${QV_MATRIX_MONGO_PORT:-27017}"]
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --port
+        - "${QV_MATRIX_MONGO_PORT:-27017}"
+        - --eval
+        - >-
+          try { rs.status() } catch (e) {
+            rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:${QV_MATRIX_MONGO_PORT:-27017}'}]})
+          }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+  documentdb:
+    environment:
+      ALLOW_EXTERNAL_CONNECTIONS: "true"
+  redis-cluster:
+    image: redis:7.4.12
+    platform: !reset null
+    entrypoint: ["bash", "/matrix-cluster.sh"]
+    environment:
+      MATRIX_CLUSTER_HOST: localhost
+    ports: !override ["127.0.0.1:7100-7102:7100-7102"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -p 7100 cluster info | grep -q cluster_state:ok"]
+    volumes: ["./tls/redis-cluster.sh:/matrix-cluster.sh:ro"]

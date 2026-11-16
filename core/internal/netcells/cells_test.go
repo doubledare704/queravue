@@ -60,6 +60,9 @@ func newService(t *testing.T) *connections.Service {
 
 func bastion(auth netpath.SSHAuth) *connections.SSHTunnel {
 	host, port, _ := net.SplitHostPort(bastionAddr)
+	if published := os.Getenv("QV_MATRIX_SSH_PORT"); published != "" {
+		port = published
+	}
 	p, _ := strconv.Atoi(port)
 	return &connections.SSHTunnel{Host: host, Port: p, User: bastionUser, Auth: auth, KeepAliveSeconds: 5}
 }
@@ -99,14 +102,15 @@ type cell struct {
 	tls    *connections.TLSSettings
 	ssh    *connections.SSHTunnel
 	sec    connections.Secrets
-	want   netpath.TLSMode
 }
 
 func (c cell) run(t *testing.T) {
 	t.Helper()
-	reachable(t, c.probe)
+	if c.probe != "" {
+		reachable(t, c.probe)
+	}
 	if c.ssh != nil {
-		reachable(t, bastionAddr)
+		reachable(t, net.JoinHostPort(c.ssh.Host, strconv.Itoa(c.ssh.Port)))
 	}
 	svc := newService(t)
 	d := connections.Connection{Name: c.name, EngineID: c.engine, Params: c.params, SSH: c.ssh, TLS: c.tls}
@@ -217,7 +221,7 @@ func startAgent(t *testing.T) {
 				return
 			}
 			go func() {
-				defer c.Close()
+				defer func() { _ = c.Close() }()
 				_ = agent.ServeAgent(keyring, c)
 			}()
 		}
@@ -225,13 +229,35 @@ func startAgent(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", sock)
 }
 
-func TestSSHAgentAuth(t *testing.T) {
+func TestSSHKeyAndAgentAuth(t *testing.T) {
 	startAgent(t)
-	cell{
-		name: "postgres ssh agent", engine: "postgres", pw: "queravue", probe: "127.0.0.1:5432",
-		params: map[string]string{"host": "postgres", "port": "5432", "database": "queravue", "user": "queravue"},
-		ssh:    bastion(netpath.SSHAuthAgent),
-	}.run(t)
+	probe := "127.0.0.1:5432"
+	if os.Getenv("QV_MATRIX_SSH_PORT") != "" {
+		probe = ""
+	}
+	for _, auth := range []struct {
+		name       string
+		method     netpath.SSHAuth
+		key        string
+		passphrase *string
+	}{
+		{name: "agent", method: netpath.SSHAuthAgent},
+		{name: "key file", method: netpath.SSHAuthKeyFile, key: "id_ed25519"},
+		{name: "encrypted key", method: netpath.SSHAuthKeyFile, key: "id_ed25519_encrypted", passphrase: str(devPassphase)},
+	} {
+		t.Run(auth.name, func(t *testing.T) {
+			tunnel := bastion(auth.method)
+			if auth.key != "" {
+				tunnel.KeyFile = filepath.Join(tlsDir, "ssh", auth.key)
+			}
+			cell{
+				name: "postgres ssh " + auth.name, engine: "postgres", pw: "queravue", probe: probe,
+				params: map[string]string{"host": "postgres", "port": "5432", "database": "queravue", "user": "queravue"},
+				ssh:    tunnel,
+				sec:    connections.Secrets{SSH: connections.SSHSecrets{KeyPassphrase: auth.passphrase}},
+			}.run(t)
+		})
+	}
 }
 
 func TestTLSFailuresAreTyped(t *testing.T) {

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/connections_repository.dart';
 import '../domain/cancellation.dart';
 import '../domain/models.dart';
+import '../domain/network_settings.dart';
+import 'connection_network_form.dart';
 import 'connections_controller.dart';
 
 /// How the connection dialog was opened.
@@ -60,6 +62,7 @@ class ConnectionFormState {
     this.saving = false,
     this.error,
     this.revision = 0,
+    this.network = const {},
   });
 
   final EngineSpec engine;
@@ -89,6 +92,7 @@ class ConnectionFormState {
   /// Bumped when values change from outside the text fields (engine switch,
   /// URI import), so the view can resync its controllers.
   final int revision;
+  final Map<String, String> network;
 
   ConnectionFormState copyWith({
     EngineSpec? engine,
@@ -105,6 +109,7 @@ class ConnectionFormState {
     bool? saving,
     String? Function()? error,
     int? revision,
+    Map<String, String>? network,
   }) => ConnectionFormState(
     engine: engine ?? this.engine,
     name: name ?? this.name,
@@ -120,6 +125,7 @@ class ConnectionFormState {
     saving: saving ?? this.saving,
     error: error != null ? error() : this.error,
     revision: revision ?? this.revision,
+    network: network ?? this.network,
   );
 }
 
@@ -160,6 +166,10 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
       production: args.duplicate ? false : initial.production,
       values: {...engine.defaults, ...initial.params},
       hasStoredPassword: args.isEdit && initial.hasPassword,
+      network: {
+        ...importedTls(engine, initial.params),
+        ...networkFormValues(initial),
+      },
     );
   }
 
@@ -168,6 +178,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
   void selectEngine(String id) {
     final next = args.engines.firstWhere((e) => e.id == id);
     if (next.id == state.engine.id) return;
+    cancelTest();
     final old = state.engine.defaults;
     final values = next.defaults;
     for (final f in next.paramFields) {
@@ -176,6 +187,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
     }
     state = state.copyWith(
       engine: next,
+      network: const {},
       values: values,
       test: const FormTestIdle(),
       error: () => null,
@@ -191,33 +203,47 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
 
   void setProduction(bool v) => state = state.copyWith(production: v);
 
-  void setField(String key, String value) => state = state.copyWith(
-    values: {...state.values, key: value},
-    test: const FormTestIdle(),
-  );
+  void setField(String key, String value) {
+    cancelTest();
+    state = state.copyWith(values: {...state.values, key: value});
+  }
 
-  void setPassword(String v) => state = state.copyWith(
-    password: v,
-    passwordDirty: true,
-    clearStoredPassword: false,
-    test: const FormTestIdle(),
-  );
+  void setNetworkField(String key, String value) {
+    cancelTest();
+    state = state.copyWith(network: {...state.network, key: value});
+  }
+
+  void setPassword(String v) {
+    cancelTest();
+    state = state.copyWith(
+      password: v,
+      passwordDirty: true,
+      clearStoredPassword: false,
+    );
+  }
 
   /// Marks the stored password for removal on save.
-  void clearStoredPassword() => state = state.copyWith(
-    clearStoredPassword: true,
-    password: '',
-    passwordDirty: true,
-    test: const FormTestIdle(),
-  );
+  void clearStoredPassword() {
+    cancelTest();
+    state = state.copyWith(
+      clearStoredPassword: true,
+      password: '',
+      passwordDirty: true,
+    );
+  }
 
   /// Fills fields from a pasted URI or DSN.
   Future<void> applyUri(String uri) async {
     if (uri.trim().isEmpty) return;
+    cancelTest();
+    final engine = state.engine;
     try {
       final parsed = await _repo.parseUri(state.engine.id, uri.trim());
+      if (!ref.mounted || state.engine != engine) return;
+      cancelTest();
       state = state.copyWith(
         values: {...state.engine.defaults, ...parsed.params},
+        network: {...state.network, ...importedTls(engine, parsed.params)},
         password: parsed.password ?? state.password,
         passwordDirty: parsed.password != null || state.passwordDirty,
         test: const FormTestIdle(),
@@ -225,6 +251,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
         revision: state.revision + 1,
       );
     } on ConnectionsException catch (e) {
+      if (!ref.mounted || state.engine != engine) return;
       state = state.copyWith(error: () => "Couldn't parse URI: ${e.message}");
     }
   }
@@ -236,12 +263,16 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
     engineId: state.engine.id,
     params: {
       for (final f in state.engine.paramFields)
-        if ((state.values[f.key] ?? '').trim().isNotEmpty)
+        if ((state.values[f.key] ?? '').trim().isNotEmpty &&
+            (!legacyTlsField(state.engine, f.key) ||
+                (f.key == 'encrypt' && state.values[f.key] == 'strict')))
           f.key: state.values[f.key]!.trim(),
     },
     folder: state.folder.trim(),
     color: state.color,
     production: state.production,
+    ssh: state.engine.supportsSsh ? sshFromForm(state.network) : null,
+    tls: state.engine.supportsTls ? tlsFromForm(state.network) : null,
   );
 
   /// `<Engine> @ host:port/db` (SQLite: the file name), built only from the
@@ -268,7 +299,53 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
         return '${f.label} is required';
       }
     }
+    final ssh = draft.ssh;
+    if (ssh != null) {
+      for (final key in ['ssh.keepalive', 'ssh.timeout']) {
+        final value = state.network[key] ?? '';
+        final seconds = value.isEmpty ? 0 : int.tryParse(value);
+        if (seconds == null || seconds < 0 || seconds > 0xffffffff) {
+          return 'SSH timing is out of range';
+        }
+      }
+      for (final endpoint in [ssh.bastion, ?ssh.jump]) {
+        if (endpoint.host.isEmpty || endpoint.user.isEmpty) {
+          return 'SSH host and user are required';
+        }
+        if (endpoint.port < 0 || endpoint.port > 65535) {
+          return 'SSH port must be between 1 and 65535';
+        }
+        if (endpoint.auth == SshAuth.keyFile && endpoint.keyFile.isEmpty) {
+          return 'Choose an SSH private key file';
+        }
+      }
+    }
     return null;
+  }
+
+  NetworkSecrets get _secrets => networkSecrets(state.network, draft);
+
+  Future<void> trustAndRetry(TestFailed failure) async {
+    final result = state.test;
+    final key = failure.hostKey;
+    if (result is! FormTested ||
+        result.result != failure ||
+        failure.kind != ConnectionErrorKind.sshUnknownKey ||
+        key == null) {
+      return;
+    }
+    final token = _testToken = CancellationToken();
+    state = state.copyWith(test: const FormTesting());
+    try {
+      await _repo.trustHostKey(key);
+      if (ref.mounted && !token.isCancelled) await test();
+    } on ConnectionsException catch (e) {
+      if (ref.mounted && !token.isCancelled) {
+        state = state.copyWith(
+          test: FormTested(TestFailed(ConnectionErrorKind.unknown, e.message)),
+        );
+      }
+    }
   }
 
   /// Tests the current settings. For edits and duplicates, an untouched
@@ -289,6 +366,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
         draft: draft,
         password: state.passwordDirty ? state.password : null,
         cancel: token,
+        secrets: _secrets,
       );
     } on OperationCancelled {
       return;
@@ -310,6 +388,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
   /// failed (see [ConnectionFormState.error]).
   Future<ConnectionProfile?> save() async {
     final invalid = validate();
+    if (state.saving) return null;
     if (invalid != null) {
       state = state.copyWith(error: () => invalid);
       return null;
@@ -324,6 +403,7 @@ class ConnectionFormController extends Notifier<ConnectionFormState> {
           .save(
             draft,
             password: pw,
+            secrets: _secrets,
             clearPassword: args.isEdit && state.clearStoredPassword,
           );
       if (ref.mounted) state = state.copyWith(saving: false);
