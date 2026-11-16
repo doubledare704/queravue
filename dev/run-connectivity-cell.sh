@@ -46,7 +46,19 @@ else
     exit "$code"
   }
   trap cleanup EXIT
-  "${compose[@]}" up -d --wait --wait-timeout 300 "${services[@]}"
+  if [[ "${CI:-}" == true ]]; then
+    # Concurrent matrix jobs can hit transient registry rate limits.
+    for delay in 5 15 0; do
+      if "${compose[@]}" pull "${services[@]}"; then
+        break
+      fi
+      if ((delay == 0)); then exit 1; fi
+      sleep "$delay"
+    done
+    "${compose[@]}" up --pull never -d --wait --wait-timeout 300 "${services[@]}"
+  else
+    "${compose[@]}" up -d --wait --wait-timeout 300 "${services[@]}"
+  fi
   if [[ "$path" == ssh ]]; then
     published="$("${compose[@]}" ps --format json "$service" | jq -r '.Publishers[]? | select(.PublishedPort > 0) | .PublishedPort')"
     if [[ -n "$published" ]]; then
