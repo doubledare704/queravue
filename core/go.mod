@@ -2,6 +2,8 @@ module github.com/doubledare704/queravue/core
 
 go 1.26.0
 
+replace github.com/duckdb/duckdb-go/v2 => github.com/doubledare704/duckdb-go/v2 v2.0.0-20261117125949-9b093010a5df
+
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.51.0
 	github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8

@@ -214,10 +214,68 @@ func TestStopEarlyKeepsSessionUsable(t *testing.T) {
 	}
 }
 
+func TestCancelMidStreamKeepsSessionUsable(t *testing.T) {
+	c := connectTo(t, map[string]string{ParamPath: MemoryPath})
+	query(t, c, "CREATE TEMP TABLE scratch AS SELECT 42 AS a")
+	ex, _ := engine.As[engine.Executor](c)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sum, err := ex.Execute(ctx, engine.Statement{
+		SQL: "SELECT i FROM range(10000000) t(i)",
+	}, &cancelAfterFirstBatch{cancel: cancel})
+	if engine.KindOf(err) != engine.KindCanceled || !sum.HasRows || sum.RowsRead != engine.MaxBatchRows {
+		t.Fatalf("summary = %+v, error = %v", sum, err)
+	}
+	if got, _ := query(t, c, "SELECT a FROM scratch"); got.rows[0][0].Int != 42 {
+		t.Errorf("session temp table = %+v", got.rows)
+	}
+}
+
+type cancelAfterFirstBatch struct{ cancel context.CancelFunc }
+
+func (s *cancelAfterFirstBatch) Columns([]engine.Column) error { return nil }
+
+func (s *cancelAfterFirstBatch) Batch([][]engine.Value) error {
+	s.cancel()
+	return nil
+}
+
+func TestStreamReportsFetchError(t *testing.T) {
+	c := connectTo(t, map[string]string{ParamPath: MemoryPath})
+	query(t, c, "SET threads = 1")
+	ex, _ := engine.As[engine.Executor](c)
+	sum, err := ex.Execute(context.Background(), engine.Statement{
+		SQL: "SELECT CASE WHEN i = 5000000 THEN error('fetch failed') ELSE i END FROM range(10000000) t(i)",
+	}, &discardSink{})
+	if engine.KindOf(err) != engine.KindSQL || !strings.Contains(err.Error(), "fetch failed") || sum.RowsRead == 0 || sum.RowsRead >= 5000000 {
+		t.Fatalf("summary = %+v, error = %v", sum, err)
+	}
+}
+
+type discardSink struct{}
+
+func (*discardSink) Columns([]engine.Column) error { return nil }
+func (*discardSink) Batch([][]engine.Value) error  { return nil }
+
 type stopAfterFirstBatch struct{ batches int }
 
 func (s *stopAfterFirstBatch) Columns([]engine.Column) error { return nil }
 func (s *stopAfterFirstBatch) Batch([][]engine.Value) error {
 	s.batches++
 	return engine.ErrStop
+}
+
+func TestStopEarlyAfterReturningKeepsWrites(t *testing.T) {
+	c := connectTo(t, map[string]string{ParamPath: MemoryPath})
+	query(t, c, "CREATE TEMP TABLE written (i BIGINT)")
+	ex, _ := engine.As[engine.Executor](c)
+	sum, err := ex.Execute(context.Background(), engine.Statement{
+		SQL: "INSERT INTO written SELECT * FROM range(10000) RETURNING i",
+	}, &stopAfterFirstBatch{})
+	if err != nil || !sum.HasRows || sum.RowsRead != engine.MaxBatchRows {
+		t.Fatalf("summary = %+v, error = %v", sum, err)
+	}
+	if got, _ := query(t, c, "SELECT count(*) FROM written"); got.rows[0][0].Int != 10000 {
+		t.Errorf("count after RETURNING stopped early = %+v", got.rows)
+	}
 }
