@@ -22,8 +22,8 @@ func TestHello(t *testing.T) {
 	if resp.GetCoreVersion() != version.Version {
 		t.Errorf("core_version = %q, want %q", resp.GetCoreVersion(), version.Version)
 	}
-	if resp.GetProtocolVersion() != version.ProtocolVersion {
-		t.Errorf("protocol_version = %d, want %d", resp.GetProtocolVersion(), version.ProtocolVersion)
+	if resp.GetProtocolVersion() != 11 || resp.GetProtocolVersion() != version.ProtocolVersion {
+		t.Errorf("protocol_version = %d, want 11 (%d)", resp.GetProtocolVersion(), version.ProtocolVersion)
 	}
 	if got := resp.GetCapabilities(); !slices.Equal(got, []string{CapabilityHealth, CapabilityConnections, CapabilityQuery}) {
 		t.Errorf("capabilities = %v, want [%s %s %s]", got, CapabilityHealth, CapabilityConnections, CapabilityQuery)
