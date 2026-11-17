@@ -120,10 +120,28 @@ func TestQueryBuilderServiceErrors(t *testing.T) {
 		t.Errorf("kind = %v, want NOT_SQL", parseNonSQL.GetError().GetKind())
 	}
 
-	if _, err := sqlSvc.GenerateMongoQuery(context.Background(), &queravuev1.GenerateMongoQueryRequest{}); status.Code(err) != codes.Unimplemented {
-		t.Errorf("GenerateMongoQuery code = %v, want Unimplemented", status.Code(err))
+	generated, err := sqlSvc.GenerateMongoQuery(context.Background(), &queravuev1.GenerateMongoQueryRequest{Model: &queravuev1.MongoFindModel{}})
+	if err != nil || generated.GetFilterEjson() != "{}" {
+		t.Fatalf("GenerateMongoQuery = %v, %v", generated, err)
 	}
-	if _, err := sqlSvc.ParseMongoQuery(context.Background(), &queravuev1.ParseMongoQueryRequest{}); status.Code(err) != codes.Unimplemented {
-		t.Errorf("ParseMongoQuery code = %v, want Unimplemented", status.Code(err))
+	parsed, err := sqlSvc.ParseMongoQuery(context.Background(), &queravuev1.ParseMongoQueryRequest{FilterEjson: generated.GetFilterEjson()})
+	if err != nil || parsed.GetModel() == nil {
+		t.Fatalf("ParseMongoQuery = %v, %v", parsed, err)
+	}
+	for _, tc := range []struct {
+		name    string
+		request *queravuev1.ParseMongoQueryRequest
+		kind    queravuev1.QueryBuilderErrorKind
+	}{
+		{"invalid JSON", &queravuev1.ParseMongoQueryRequest{FilterEjson: `{"x":}`}, queravuev1.QueryBuilderErrorKind_QUERY_BUILDER_ERROR_KIND_PARSE},
+		{"unsupported projection", &queravuev1.ParseMongoQueryRequest{ProjectionEjson: `{"x":{"$slice":2}}`}, queravuev1.QueryBuilderErrorKind_QUERY_BUILDER_ERROR_KIND_UNSUPPORTED_CONSTRUCT},
+		{"unsupported sort", &queravuev1.ParseMongoQueryRequest{SortEjson: `{"x":{"$meta":"textScore"}}`}, queravuev1.QueryBuilderErrorKind_QUERY_BUILDER_ERROR_KIND_UNSUPPORTED_CONSTRUCT},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			response, err := sqlSvc.ParseMongoQuery(context.Background(), tc.request)
+			if err != nil || response.GetError().GetKind() != tc.kind {
+				t.Fatalf("ParseMongoQuery = %v, %v", response, err)
+			}
+		})
 	}
 }
