@@ -95,13 +95,22 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 **Known gaps (carry forward):**
 - Mongo relations are guesses checked against sampled values: they still miss references named unlike their collection.
 
-### It. 10 — Remaining engines + connectivity
+### It. 10 — Remaining engines + connectivity ✅ done
 - Oracle (go-ora), ClickHouse, DuckDB.
 - Redis: key browser (SCAN), all types, TTL, CLI, pub/sub viewer.
 - SSH tunnels (password/key/agent) and TLS for network engines. SQLite and DuckDB use local files.
-- Lane G adds descriptor-driven connection settings, host-key dialogs, staged test outcomes, and the connectivity matrix.
-- **Acceptance pending.** Verify the hosted direct/TLS/SSH matrix, Redis UI (Lane E), and bounded native DuckDB streaming. Cosmos DB retains its opt-in smoke test.
+- **Done when:** a CI matrix connects every engine in PRD §5 over direct, TLS and SSH, and each new engine passes the shared `enginetest` suites.
+
+**Status:** done in PRs #51 to #59 (protocol version 10): ADRs 0018 (tunnels and TLS), 0019 (DuckDB behind the `duckdb` build tag) and 0020 (key-value model) with the additive contract (#51); Oracle (#53) and ClickHouse (#52); the SSH tunnel and shared TLS core with host-key checking (#54); the Redis and Valkey engine with `KeyValueService` (#55) and DuckDB behind its tag (#56); the Redis workspace in the app (#57); descriptor-driven connection settings, host-key dialogs, staged test results, a tunnel indicator in the status bar and the connectivity matrix (#58); and native bounded DuckDB streaming on a pinned driver fork (#59). On #59 every hosted check passed: the full direct/TLS/SSH matrix (Cosmos DB skipped, as it needs an account), DuckDB on macOS, Linux and Windows, and the Flutter and end-to-end jobs. Measurements are in `docs/perf/iteration-10.md`: a 1M-row or 1M-key stream keeps live heap flat on Oracle, ClickHouse and Redis, a DuckDB 10M-row `SELECT` peaks at 76 MiB RSS (296 MiB on the upstream driver), idle core memory with a tunnel open is 23.6 MB, and the release build used 139.4 MiB combined RSS idle (116.5 MiB in the Lane E measurement; budget 150 MB).
+
+**Known gaps (carry forward):**
+- DuckDB uses a pinned personal fork of the driver (`replace` in `core/go.mod`) for native streaming; it must go back to the upstream module when streaming lands there. A C++ crash in the library still takes core down (ADR 0019 keeps the helper process as the fallback).
+- Oracle: TCPS and wallets are passed through but untested (no TCPS listener in the dev image); cancel does not interrupt `DBMS_SESSION.SLEEP`; LOB cells are cut to 1 MiB.
+- ClickHouse: the designer and schema plan report `UNSUPPORTED` (table engine clauses need their own design); engine, sorting key and partition key are not shown in the UI because the proto has no field for them.
+- Redis: Sentinel is covered by configuration tests only; on Cluster only database 0 exists and `Subscribe` uses one node; only ReJSON is supported among modules, untested against a server with the module; no keyspace notifications.
 - The status bar reacts to tunnel loss reported by SQL execution. Idle tunnel loss and loss reported only through document or key-value RPCs still need session-health reporting.
+- Cosmos DB for MongoDB keeps its opt-in smoke test; it has not run against a real account.
+- Not measured: app-side memory while paging a full Redis keyspace or under high-volume pub/sub, combined app and core memory with a live tunnel, a cold-start time to the completed Hello, and DuckDB RSS on Linux and Windows.
 
 ### It. 11 — Visual builders
 - Aggregation pipeline builder: stage cards, per-stage preview, export to code.
