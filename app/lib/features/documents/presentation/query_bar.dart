@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/shortcuts.dart';
+import '../../connections/application/connection_session.dart';
+import '../filter_builder/filter_builder_controller.dart';
+import '../filter_builder/filter_builder_view.dart';
 import '../../completion/presentation/completion_field.dart';
 import '../application/document_tab_controller.dart';
 import '../domain/models.dart';
@@ -42,15 +45,22 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
     super.dispose();
   }
 
-  void _changed() => _c.setDraft(
-    FindQuery(
-      filter: _filter.text,
-      sort: _sort.text,
-      projection: _projection.text,
-      skip: int.tryParse(_skip.text.trim()) ?? 0,
-      limit: int.tryParse(_limit.text.trim()) ?? 0,
-    ),
-  );
+  void _changed({bool parse = true}) {
+    _c.setDraft(
+      FindQuery(
+        filter: _filter.text,
+        sort: _sort.text,
+        projection: _projection.text,
+        skip: int.tryParse(_skip.text.trim()) ?? 0,
+        limit: int.tryParse(_limit.text.trim()) ?? 0,
+      ),
+    );
+    if (parse && ref.read(filterBuilderProvider(widget.tabId)).open) {
+      ref
+          .read(filterBuilderProvider(widget.tabId).notifier)
+          .parse(_filter.text, _projection.text, _sort.text);
+    }
+  }
 
   void _run() {
     _changed();
@@ -101,6 +111,37 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
     });
     final state = ref.watch(documentTabProvider(widget.tabId));
     final err = state.queryError;
+    final builder = ref.watch(filterBuilderProvider(widget.tabId));
+    final enabled =
+        ref
+            .watch(connectionCapabilitiesProvider(state.connectionId))
+            ?.contains('document_store') ??
+        false;
+    ref.listen(filterBuilderProvider(widget.tabId).select((s) => s.output), (
+      previous,
+      output,
+    ) {
+      if (output == null || identical(previous, output)) return;
+      _filter.text = output.filterEjson;
+      _projection.text = output.projectionEjson;
+      _sort.text = output.sortEjson;
+      _changed(parse: false);
+    });
+    void toggleBuilder() {
+      final c = ref.read(filterBuilderProvider(widget.tabId).notifier);
+      if (builder.open) {
+        c.close();
+      } else {
+        c.open(
+          _filter.text,
+          _projection.text,
+          _sort.text,
+          state.sessionId,
+          state.database,
+          state.collection,
+        );
+      }
+    }
 
     InputDecoration deco(String label, String hint, DocInput input) =>
         InputDecoration(
@@ -117,110 +158,131 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
         primaryShortcut(LogicalKeyboardKey.enter): _run,
         const SingleActivator(LogicalKeyboardKey.escape): () => _c.cancel(),
       },
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 5,
-              child: _completing(
-                _filter,
-                _filterFocus,
-                state,
-                TextField(
-                  key: const Key('doc-filter'),
-                  controller: _filter,
-                  focusNode: _filterFocus,
-                  onChanged: (_) => _changed(),
-                  decoration: deco(
-                    'Filter',
-                    '{ "status": "paid" }',
-                    DocInput.filter,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: _completing(
+                    _filter,
+                    _filterFocus,
+                    state,
+                    TextField(
+                      key: const Key('doc-filter'),
+                      controller: _filter,
+                      focusNode: _filterFocus,
+                      onChanged: (_) => _changed(),
+                      decoration: deco(
+                        'Filter',
+                        '{ "status": "paid" }',
+                        DocInput.filter,
+                      ),
+                      style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+                    ),
                   ),
-                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: _completing(
-                _sort,
-                _sortFocus,
-                state,
-                TextField(
-                  key: const Key('doc-sort'),
-                  controller: _sort,
-                  focusNode: _sortFocus,
-                  onChanged: (_) => _changed(),
-                  decoration: deco('Sort', '{ "_id": -1 }', DocInput.sort),
-                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 3,
-              child: _completing(
-                _projection,
-                _projectionFocus,
-                state,
-                TextField(
-                  key: const Key('doc-projection'),
-                  controller: _projection,
-                  focusNode: _projectionFocus,
-                  onChanged: (_) => _changed(),
-                  decoration: deco(
-                    'Projection',
-                    '{ "name": 1 }',
-                    DocInput.projection,
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _completing(
+                    _sort,
+                    _sortFocus,
+                    state,
+                    TextField(
+                      key: const Key('doc-sort'),
+                      controller: _sort,
+                      focusNode: _sortFocus,
+                      onChanged: (_) => _changed(),
+                      decoration: deco('Sort', '{ "_id": -1 }', DocInput.sort),
+                      style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+                    ),
                   ),
-                  style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _completing(
+                    _projection,
+                    _projectionFocus,
+                    state,
+                    TextField(
+                      key: const Key('doc-projection'),
+                      controller: _projection,
+                      focusNode: _projectionFocus,
+                      onChanged: (_) => _changed(),
+                      decoration: deco(
+                        'Projection',
+                        '{ "name": 1 }',
+                        DocInput.projection,
+                      ),
+                      style: const TextStyle(fontFamily: 'Menlo', fontSize: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 72,
+                  child: TextField(
+                    key: const Key('doc-skip'),
+                    controller: _skip,
+                    onChanged: (_) => _changed(parse: false),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: deco('Skip', '0', DocInput.none),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 72,
+                  child: TextField(
+                    key: const Key('doc-limit'),
+                    controller: _limit,
+                    onChanged: (_) => _changed(parse: false),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: deco('Limit', 'all', DocInput.none),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (enabled)
+                  IconButton(
+                    onPressed: toggleBuilder,
+                    icon: const Icon(Icons.tune),
+                    tooltip: 'Visual filter builder',
+                  ),
+                if (state.isLoading && state.showCancel)
+                  OutlinedButton.icon(
+                    key: const Key('doc-cancel'),
+                    onPressed: () => _c.cancel(),
+                    icon: const Icon(Icons.stop, size: 16),
+                    label: const Text('Cancel'),
+                  )
+                else
+                  FilledButton.icon(
+                    key: const Key('doc-run'),
+                    onPressed: _run,
+                    icon: const Icon(Icons.play_arrow, size: 18),
+                    label: Text('Run  $primaryLabel↵'),
+                  ),
+              ],
+            ),
+          ),
+          if (enabled && builder.open)
+            SizedBox(
+              height: 300,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: FilterBuilderView(
+                  key: ValueKey(builder.revision),
+                  tabId: widget.tabId,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 72,
-              child: TextField(
-                key: const Key('doc-skip'),
-                controller: _skip,
-                onChanged: (_) => _changed(),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: deco('Skip', '0', DocInput.none),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 72,
-              child: TextField(
-                key: const Key('doc-limit'),
-                controller: _limit,
-                onChanged: (_) => _changed(),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: deco('Limit', 'all', DocInput.none),
-              ),
-            ),
-            const SizedBox(width: 8),
-            if (state.isLoading && state.showCancel)
-              OutlinedButton.icon(
-                key: const Key('doc-cancel'),
-                onPressed: () => _c.cancel(),
-                icon: const Icon(Icons.stop, size: 16),
-                label: const Text('Cancel'),
-              )
-            else
-              FilledButton.icon(
-                key: const Key('doc-run'),
-                onPressed: _run,
-                icon: const Icon(Icons.play_arrow, size: 18),
-                label: Text('Run  $primaryLabel↵'),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }

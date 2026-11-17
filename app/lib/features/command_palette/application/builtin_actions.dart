@@ -10,6 +10,7 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/presentation/connection_actions.dart';
 import '../../documents/application/document_actions.dart';
+import '../../documents/filter_builder/filter_builder_actions.dart';
 import '../../documents/pipeline_builder/application/pipeline_actions.dart';
 import '../../diagram/application/diagram_controller.dart';
 import '../../diagram/data/export_target.dart';
@@ -296,6 +297,15 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       subtitle: 'Collection tab',
       category: ActionCategory.documents,
       run: (context, ref) async => insertDocument(context, ref),
+    ),
+    AppAction(
+      id: 'documents.filterBuilder',
+      enabledWhen: canBuildPipelineForActiveTab,
+      title: 'Toggle visual filter builder',
+      subtitle: 'Collection tab',
+      category: ActionCategory.documents,
+      defaultChord: _primary(LogicalKeyboardKey.keyL, shift: true),
+      run: toggleFilterBuilder,
     ),
     AppAction(
       id: 'documents.pipelineBuilder',

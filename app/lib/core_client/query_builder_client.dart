@@ -18,6 +18,22 @@ class QueryBuilderClient {
     return conn;
   }
 
+  ResponseFuture<GenerateMongoQueryResponse> generateMongoQuery(
+    GenerateMongoQueryRequest request, {
+    Duration timeout = _defaultTimeout,
+  }) => _conn.queryBuilderService.generateMongoQuery(
+    request,
+    options: CallOptions(timeout: timeout),
+  );
+
+  ResponseFuture<ParseMongoQueryResponse> parseMongoQuery(
+    ParseMongoQueryRequest request, {
+    Duration timeout = _defaultTimeout,
+  }) => _conn.queryBuilderService.parseMongoQuery(
+    request,
+    options: CallOptions(timeout: timeout),
+  );
+
   Future<GenerateSqlResponse> generateSql(
     GenerateSqlRequest request, {
     Duration timeout = _defaultTimeout,
