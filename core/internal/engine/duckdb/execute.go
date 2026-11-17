@@ -81,10 +81,7 @@ func run(ctx context.Context, driverConn any, sqlText string, args []driver.Name
 	if returnsRows(st, kind) {
 		// Close may abort an unfinished stream, so row-producing writes use the complete result.
 		if kind == duckdbdriver.STATEMENT_TYPE_SELECT {
-			err := st.StreamContext(ctx, args, func(rows driver.Rows) error {
-				return streamRows(ctx, rows, sink, sum)
-			})
-			return err //nolint:wrapcheck // executeError classifies the driver error
+			ctx = duckdbdriver.WithStreamingResults(ctx)
 		}
 		rows, err := st.QueryContext(ctx, args)
 		if err != nil {

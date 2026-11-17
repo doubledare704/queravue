@@ -113,6 +113,8 @@ macOS arm64, DuckDB 2.0.0, with the already-seeded file opened in a fresh test p
 
 The measured Go heap peaked at about 3 MiB throughout the comparable 100k–10M series. The 1M-row file scan added 24.3 MiB of process RSS, within the +200 MB budget for that workload. The original driver took 1.27 s for the comparable 10M-row query. These are core engine measurements. End-to-end desktop idle RSS, startup and grid performance were outside this run.
 
+The pinned driver fork at `9b093010a5df` was rechecked on macOS arm64 on 2026-11-17. Peak RSS was 70.2, 75.6, and 76.2 MiB at 100k, 1M, and 10M rows for the same two-column projection. The 10M-row query took 1.57 s in that run. The wider 10M-row query peaked at 89.1 MiB. Both the sink and execution summary reported every row.
+
 ### Cancellation and platforms
 
 The blocking aggregate and CTAS cancel at the configured 600 ms deadline, and the session accepts the next statement. The mid-stream test cancels after 500 delivered rows and reads a temporary table on the same session. A separate test verifies that a fetch-time SQL error returns an error after delivering partial rows. Early stop on `INSERT … RETURNING` preserves the completed write.

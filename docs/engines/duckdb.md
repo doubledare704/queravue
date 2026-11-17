@@ -72,7 +72,7 @@ Supported: create table (columns, primary key, unique, check, foreign keys), add
 
 ## Driver maintenance
 
-Core uses a local copy of the MIT-licensed [duckdb-go v2.20000.0](https://github.com/duckdb/duckdb-go/tree/v2.20000.0), with the same DuckDB 2.0.0 native archives. Its public Go API has no streaming option. The local extension uses the [DuckDB pending streaming API](https://duckdb.org/docs/2.0/clients/c/api#duckdb_pending_prepared_streaming) and keeps the driver's interrupt handler active through native fetch and cleanup. DuckDB marks that entry point deprecated. Recheck the [upstream streaming work](https://github.com/duckdb/duckdb-go/pull/227) before updating the driver. A replacement needs to interrupt blocked fetches, report fetch-time errors and leave the session reusable after early close.
+Core pins an MIT-licensed [duckdb-go fork](https://github.com/doubledare704/duckdb-go/commit/9b093010a5dfed25084b308f1f5c76a5d064905c) based on v2.20000.0, using the same DuckDB 2.0.0 native archives. The fork combines [upstream PR #227](https://github.com/duckdb/duckdb-go/pull/227) with cancellation during native fetch and cleanup. It uses the deprecated [DuckDB pending streaming API](https://duckdb.org/docs/2.0/clients/c/api#duckdb_pending_prepared_streaming). Remove the Go module replacement once a tagged upstream driver provides equivalent streaming, fetch-time cancellation, and early-close behavior.
 
 ## Testing
 ```bash
