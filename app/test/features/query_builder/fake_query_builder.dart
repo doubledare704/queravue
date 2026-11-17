@@ -80,7 +80,12 @@ class FakeQueryBuilderRepository implements QueryBuilderRepository {
   }
 
   static String _renderCond(SqlConditionNode node) => switch (node) {
-    SqlComparisonModel(:final left, :final op, :final operands, :final negated) =>
+    SqlComparisonModel(
+      :final left,
+      :final op,
+      :final operands,
+      :final negated,
+    ) =>
       '${negated ? 'NOT ' : ''}${_renderOperand(left)} ${op.label}${operands.isEmpty ? '' : ' ${operands.map(_renderOperand).join(', ')}'}',
     SqlConditionGroupModel(:final op, :final children, :final negated) =>
       '${negated ? 'NOT (' : ''}${children.map(_renderCond).join(' ${op.label} ')}${negated ? ')' : ''}',

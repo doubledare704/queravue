@@ -140,7 +140,8 @@ class SqlQueryBuilderView extends ConsumerWidget {
             output: QueryResultArea(
               tabId: tab.id,
               run: run,
-              idleHint: 'Click Preview to run (capped at ${state.previewLimit} rows)',
+              idleHint:
+                  'Click Preview to run (capped at ${state.previewLimit} rows)',
             ),
           ),
         ),
@@ -296,9 +297,7 @@ class _GeneratedSqlCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(
-                  child: Text('Generated SQL', style: text.titleSmall),
-                ),
+                Expanded(child: Text('Generated SQL', style: text.titleSmall)),
                 IconButton(
                   key: const Key('qb-copy-sql-button'),
                   tooltip: 'Copy SQL',

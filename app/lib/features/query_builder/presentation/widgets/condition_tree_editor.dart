@@ -271,9 +271,7 @@ class _ComparisonRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Wrap(
@@ -357,14 +355,16 @@ class _ComparisonRow extends StatelessWidget {
             keyPrefix: '$keyPrefix-rhs-0',
             operand: first,
             columns: columns,
-            onChanged: (v) => onChanged(comparison.copyWith(operands: [v, second])),
+            onChanged: (v) =>
+                onChanged(comparison.copyWith(operands: [v, second])),
           ),
           const Text('AND'),
           _ValueOperandEditor(
             keyPrefix: '$keyPrefix-rhs-1',
             operand: second,
             columns: columns,
-            onChanged: (v) => onChanged(comparison.copyWith(operands: [first, v])),
+            onChanged: (v) =>
+                onChanged(comparison.copyWith(operands: [first, v])),
           ),
         ];
       case SqlOperatorKind.inList:
@@ -411,7 +411,11 @@ class _LeftOperandEditor extends StatelessWidget {
     final isAgg = operand is SqlAggregateOperand;
     if (isAgg) {
       final agg = (operand as SqlAggregateOperand).aggregate;
-      final colItems = _columnChoices(columns, agg.column, includeWildcard: agg.function == SqlAggregateFn.count);
+      final colItems = _columnChoices(
+        columns,
+        agg.column,
+        includeWildcard: agg.function == SqlAggregateFn.count,
+      );
       return Wrap(
         spacing: 6,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -606,9 +610,8 @@ class _ValueOperandEditor extends StatelessWidget {
               fieldKey: Key('$keyPrefix-input'),
               value: _literalText(lit),
               hintText: 'value',
-              onChanged: (raw) => onChanged(
-                SqlLiteralOperand(_parseLiteralForKind(raw, kind)),
-              ),
+              onChanged: (raw) =>
+                  onChanged(SqlLiteralOperand(_parseLiteralForKind(raw, kind))),
             ),
           ),
       ],
@@ -766,12 +769,13 @@ String _literalText(SqlLiteralModel lit) => switch (lit) {
 SqlLiteralModel _convertLiteral(SqlLiteralModel lit, LiteralKind kind) =>
     _parseLiteralForKind(_literalText(lit), kind);
 
-SqlLiteralModel _parseLiteralForKind(String raw, LiteralKind kind) => switch (
-  kind
-) {
-  LiteralKind.nullValue => const SqlNullLiteral(),
-  LiteralKind.boolean => SqlBoolLiteral(raw.toLowerCase() == 'true'),
-  LiteralKind.integer => SqlIntLiteral(int.tryParse(raw.trim()) ?? 0),
-  LiteralKind.decimal => SqlDoubleLiteral(double.tryParse(raw.trim()) ?? 0.0),
-  LiteralKind.text => SqlStringLiteral(raw),
-};
+SqlLiteralModel _parseLiteralForKind(String raw, LiteralKind kind) =>
+    switch (kind) {
+      LiteralKind.nullValue => const SqlNullLiteral(),
+      LiteralKind.boolean => SqlBoolLiteral(raw.toLowerCase() == 'true'),
+      LiteralKind.integer => SqlIntLiteral(int.tryParse(raw.trim()) ?? 0),
+      LiteralKind.decimal => SqlDoubleLiteral(
+        double.tryParse(raw.trim()) ?? 0.0,
+      ),
+      LiteralKind.text => SqlStringLiteral(raw),
+    };

@@ -87,22 +87,21 @@ class GrpcQueryBuilderRepository implements QueryBuilderRepository {
     coreUnavailable: e.code == StatusCode.unavailable,
   );
 
-  QueryBuilderException _mapError(pb.QueryBuilderError err) =>
-      QueryBuilderException(
-        kind: switch (err.kind) {
-          pb.QueryBuilderErrorKind.QUERY_BUILDER_ERROR_KIND_PARSE =>
-            QueryBuilderErrorKindModel.parse,
-          pb
-              .QueryBuilderErrorKind
-              .QUERY_BUILDER_ERROR_KIND_UNSUPPORTED_CONSTRUCT =>
-            QueryBuilderErrorKindModel.unsupportedConstruct,
-          pb.QueryBuilderErrorKind.QUERY_BUILDER_ERROR_KIND_NOT_SQL =>
-            QueryBuilderErrorKindModel.notSql,
-          _ => QueryBuilderErrorKindModel.invalidModel,
-        },
-        message: err.message,
-        offset: err.hasOffset() ? err.offset : null,
-      );
+  QueryBuilderException _mapError(
+    pb.QueryBuilderError err,
+  ) => QueryBuilderException(
+    kind: switch (err.kind) {
+      pb.QueryBuilderErrorKind.QUERY_BUILDER_ERROR_KIND_PARSE =>
+        QueryBuilderErrorKindModel.parse,
+      pb.QueryBuilderErrorKind.QUERY_BUILDER_ERROR_KIND_UNSUPPORTED_CONSTRUCT =>
+        QueryBuilderErrorKindModel.unsupportedConstruct,
+      pb.QueryBuilderErrorKind.QUERY_BUILDER_ERROR_KIND_NOT_SQL =>
+        QueryBuilderErrorKindModel.notSql,
+      _ => QueryBuilderErrorKindModel.invalidModel,
+    },
+    message: err.message,
+    offset: err.hasOffset() ? err.offset : null,
+  );
 }
 
 pb.SqlQueryModel sqlModelToProto(SqlQueryDraft draft) {
@@ -183,7 +182,10 @@ SqlAggregateExprModel _aggFromProto(pb.SqlAggregateExpr a) =>
 
 pb.SqlSelectItem _selectItemToProto(SqlSelectItemModel s) {
   if (s.aggregate != null) {
-    return pb.SqlSelectItem(aggregate: _aggToProto(s.aggregate!), alias: s.alias);
+    return pb.SqlSelectItem(
+      aggregate: _aggToProto(s.aggregate!),
+      alias: s.alias,
+    );
   }
   return pb.SqlSelectItem(
     column: _columnToProto(s.column ?? const SqlColumnRefModel()),
@@ -319,14 +321,15 @@ pb.SqlLiteral _literalToProto(SqlLiteralModel lit) => switch (lit) {
   SqlStringLiteral(:final value) => pb.SqlLiteral(stringValue: value),
 };
 
-SqlLiteralModel _literalFromProto(pb.SqlLiteral lit) => switch (lit.whichValue()) {
-  pb.SqlLiteral_Value.nullValue => const SqlNullLiteral(),
-  pb.SqlLiteral_Value.boolValue => SqlBoolLiteral(lit.boolValue),
-  pb.SqlLiteral_Value.intValue => SqlIntLiteral(lit.intValue.toInt()),
-  pb.SqlLiteral_Value.doubleValue => SqlDoubleLiteral(lit.doubleValue),
-  pb.SqlLiteral_Value.stringValue => SqlStringLiteral(lit.stringValue),
-  pb.SqlLiteral_Value.notSet => const SqlNullLiteral(),
-};
+SqlLiteralModel _literalFromProto(pb.SqlLiteral lit) =>
+    switch (lit.whichValue()) {
+      pb.SqlLiteral_Value.nullValue => const SqlNullLiteral(),
+      pb.SqlLiteral_Value.boolValue => SqlBoolLiteral(lit.boolValue),
+      pb.SqlLiteral_Value.intValue => SqlIntLiteral(lit.intValue.toInt()),
+      pb.SqlLiteral_Value.doubleValue => SqlDoubleLiteral(lit.doubleValue),
+      pb.SqlLiteral_Value.stringValue => SqlStringLiteral(lit.stringValue),
+      pb.SqlLiteral_Value.notSet => const SqlNullLiteral(),
+    };
 
 pb.SqlOrderTerm _orderToProto(SqlOrderTermModel t) => pb.SqlOrderTerm(
   expression: _operandToProto(t.expression),

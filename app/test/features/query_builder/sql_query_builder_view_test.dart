@@ -259,10 +259,7 @@ void main() {
         find.textContaining('only single SELECT statements are supported'),
         findsOneWidget,
       );
-      expect(
-        tab.controller.text,
-        'WITH cte AS (SELECT 1) SELECT * FROM cte',
-      );
+      expect(tab.controller.text, 'WITH cte AS (SELECT 1) SELECT * FROM cte');
 
       // Supported SQL with comments opens builder and warns comments were dropped.
       env.qbRepo.parseError = null;

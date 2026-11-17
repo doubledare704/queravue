@@ -193,9 +193,7 @@ class _JoinCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -351,7 +349,9 @@ class SelectSection extends StatelessWidget {
                   FilterChip(
                     key: Key('qb-col-chip-${col.display}'),
                     label: Text(col.display),
-                    selected: items.any((s) => !s.isAggregate && s.column == col),
+                    selected: items.any(
+                      (s) => !s.isAggregate && s.column == col,
+                    ),
                     visualDensity: VisualDensity.compact,
                     onSelected: (_) => controller.toggleColumnSelect(col),
                   ),
@@ -468,8 +468,9 @@ class _SelectItemRow extends StatelessWidget {
               label: const Text('DISTINCT'),
               selected: agg.distinct,
               visualDensity: VisualDensity.compact,
-              onSelected: (v) =>
-                  onChanged(item.copyWith(aggregate: agg.copyWith(distinct: v))),
+              onSelected: (v) => onChanged(
+                item.copyWith(aggregate: agg.copyWith(distinct: v)),
+              ),
             ),
           SizedBox(
             width: 130,
@@ -834,11 +835,7 @@ class _NumericFieldState extends State<_NumericField> {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.child,
-    this.trailing,
-  });
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   final String title;
   final Widget child;

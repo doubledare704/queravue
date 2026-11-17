@@ -352,7 +352,11 @@ class SqlQueryBuilderController extends Notifier<SqlQueryBuilderState> {
   Future<void> setFromTable(TableRef ref) async {
     final alias = _uniqueAlias(ref.table, const []);
     final next = state.draft.copyWith(
-      from: SqlTableRefModel(schema: ref.schema, table: ref.table, alias: alias),
+      from: SqlTableRefModel(
+        schema: ref.schema,
+        table: ref.table,
+        alias: alias,
+      ),
     );
     await _updateDraft(next);
   }
@@ -422,9 +426,8 @@ class SqlQueryBuilderController extends Notifier<SqlQueryBuilderState> {
     await _updateDraft(state.draft.copyWith(joins: next));
   }
 
-  Future<void> addSelectItem(SqlSelectItemModel item) => _updateDraft(
-    state.draft.copyWith(select: [...state.draft.select, item]),
-  );
+  Future<void> addSelectItem(SqlSelectItemModel item) =>
+      _updateDraft(state.draft.copyWith(select: [...state.draft.select, item]));
 
   Future<void> toggleColumnSelect(SqlColumnRefModel col) async {
     final list = [...state.draft.select];
@@ -517,7 +520,9 @@ class SqlQueryBuilderController extends Notifier<SqlQueryBuilderState> {
     if (_disposed || sessionId == null) return;
 
     final capped =
-        draft.limit != null && draft.limit! > 0 && draft.limit! <= state.previewLimit
+        draft.limit != null &&
+            draft.limit! > 0 &&
+            draft.limit! <= state.previewLimit
         ? draft
         : draft.copyWith(limit: state.previewLimit);
     try {
