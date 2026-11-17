@@ -1,0 +1,467 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+// QueryBuilderService turns visual builder models into query text and parses
+// query text back into models (ADR 0021). Generation always succeeds for a
+// valid model; parsing covers a documented subset and reports the rest as
+// UNSUPPORTED_CONSTRUCT. Failures the user can act on are returned in-band in
+// `error`.
+service QueryBuilderService {
+  // GenerateSql renders a SQL model as one SELECT statement in the dialect of
+  // the session's engine.
+  rpc GenerateSql(GenerateSqlRequest) returns (GenerateSqlResponse);
+
+  // ParseSql reads one SELECT statement into a SQL model. Statements outside
+  // the supported subset fail with UNSUPPORTED_CONSTRUCT.
+  rpc ParseSql(ParseSqlRequest) returns (ParseSqlResponse);
+
+  // GenerateMongoQuery renders a find model as EJSON filter, projection and
+  // sort documents.
+  rpc GenerateMongoQuery(GenerateMongoQueryRequest) returns (GenerateMongoQueryResponse);
+
+  // ParseMongoQuery reads EJSON filter, projection and sort documents into a
+  // find model. Operators without a visual form are kept as raw EJSON leaves.
+  rpc ParseMongoQuery(ParseMongoQueryRequest) returns (ParseMongoQueryResponse);
+}
+
+// QueryBuilderErrorKind classifies a failed builder call.
+enum QueryBuilderErrorKind {
+  // Unspecified. Never sent.
+  QUERY_BUILDER_ERROR_KIND_UNSPECIFIED = 0;
+  // The model is not valid, for example a join without a condition or an
+  // empty select list. `message` says which part.
+  QUERY_BUILDER_ERROR_KIND_INVALID_MODEL = 1;
+  // The text is not valid SQL or EJSON. `offset` points at the problem.
+  QUERY_BUILDER_ERROR_KIND_PARSE = 2;
+  // The text is valid but outside the supported subset. The caller keeps the
+  // text in the editor. `offset` points at the first unsupported construct.
+  QUERY_BUILDER_ERROR_KIND_UNSUPPORTED_CONSTRUCT = 3;
+  // The session's engine has no SQL dialect.
+  QUERY_BUILDER_ERROR_KIND_NOT_SQL = 4;
+}
+
+// QueryBuilderError describes why a builder call produced nothing.
+message QueryBuilderError {
+  // Failure category.
+  QueryBuilderErrorKind kind = 1;
+  // Human-readable explanation, safe to show to the user.
+  string message = 2;
+  // Zero-based UTF-8 byte offset into the input text for PARSE and
+  // UNSUPPORTED_CONSTRUCT. Unset for other kinds.
+  optional uint32 offset = 3;
+}
+
+// ---------------------------------------------------------------- SQL
+
+// GenerateSqlRequest is the input of GenerateSql.
+message GenerateSqlRequest {
+  // Session id. Its engine decides quoting, qualification and pagination.
+  string session_id = 1;
+  // The model to render.
+  SqlQueryModel model = 2;
+}
+
+// GenerateSqlResponse holds the statement or the failure.
+message GenerateSqlResponse {
+  // One SELECT statement without a terminator. Literals are inlined, so the
+  // text can be shown and executed as is.
+  string sql = 1;
+  // Set when generation failed.
+  QueryBuilderError error = 2;
+}
+
+// ParseSqlRequest is the input of ParseSql.
+message ParseSqlRequest {
+  // Session id. Its engine decides the lexer and quoting rules.
+  string session_id = 1;
+  // One SELECT statement.
+  string sql = 2;
+}
+
+// ParseSqlResponse holds the model or the failure.
+message ParseSqlResponse {
+  // The parsed model.
+  SqlQueryModel model = 1;
+  // True if the text had comments that the model cannot hold.
+  bool comments_dropped = 2;
+  // Set when parsing failed.
+  QueryBuilderError error = 3;
+}
+
+// SqlQueryModel is one SELECT statement in visual form.
+message SqlQueryModel {
+  // The first table. Required.
+  SqlTableRef from = 1;
+  // Joins in order of appearance.
+  repeated SqlJoin joins = 2;
+  // Select list. Empty means all columns of every table.
+  repeated SqlSelectItem select = 3;
+  // SELECT DISTINCT.
+  bool distinct = 4;
+  // WHERE condition. Unset means no filter.
+  SqlCondition where = 5;
+  // GROUP BY columns.
+  repeated SqlColumnRef group_by = 6;
+  // HAVING condition. Unset means none.
+  SqlCondition having = 7;
+  // ORDER BY terms in order.
+  repeated SqlOrderTerm order_by = 8;
+  // Row limit. Unset means no limit.
+  optional uint64 limit = 9;
+  // Rows to skip. Unset means none.
+  optional uint64 offset = 10;
+}
+
+// SqlTableRef names a table and the alias used to refer to it.
+message SqlTableRef {
+  // Schema, or empty for the default schema.
+  string schema = 1;
+  // Table or view name.
+  string table = 2;
+  // Alias, or empty to use the table name.
+  string alias = 3;
+}
+
+// SqlJoinKind is the type of a join.
+enum SqlJoinKind {
+  // Treated as INNER.
+  SQL_JOIN_KIND_UNSPECIFIED = 0;
+  // INNER JOIN.
+  SQL_JOIN_KIND_INNER = 1;
+  // LEFT JOIN.
+  SQL_JOIN_KIND_LEFT = 2;
+  // RIGHT JOIN.
+  SQL_JOIN_KIND_RIGHT = 3;
+  // FULL JOIN.
+  SQL_JOIN_KIND_FULL = 4;
+}
+
+// SqlJoin joins one more table to the query.
+message SqlJoin {
+  // Join type.
+  SqlJoinKind kind = 1;
+  // The joined table.
+  SqlTableRef table = 2;
+  // The ON condition. Required.
+  SqlCondition on = 3;
+}
+
+// SqlColumnRef names a column of a table in the query.
+message SqlColumnRef {
+  // Alias of the table, or empty if the query has one table.
+  string table_alias = 1;
+  // Column name. Empty together with a table_alias means "alias.*"; empty
+  // without one means "*".
+  string column = 2;
+}
+
+// SqlAggregate is an aggregate function.
+enum SqlAggregate {
+  // No aggregate: the plain column.
+  SQL_AGGREGATE_UNSPECIFIED = 0;
+  // COUNT.
+  SQL_AGGREGATE_COUNT = 1;
+  // SUM.
+  SQL_AGGREGATE_SUM = 2;
+  // AVG.
+  SQL_AGGREGATE_AVG = 3;
+  // MIN.
+  SQL_AGGREGATE_MIN = 4;
+  // MAX.
+  SQL_AGGREGATE_MAX = 5;
+}
+
+// SqlAggregateExpr applies an aggregate to a column.
+message SqlAggregateExpr {
+  // The function. Never UNSPECIFIED here.
+  SqlAggregate function = 1;
+  // The argument. An empty column means COUNT(*).
+  SqlColumnRef column = 2;
+  // COUNT(DISTINCT col) and the like.
+  bool distinct = 3;
+}
+
+// SqlSelectItem is one entry of the select list.
+message SqlSelectItem {
+  // What is selected.
+  oneof expression {
+    // A column, or "*" forms.
+    SqlColumnRef column = 1;
+    // An aggregate over a column.
+    SqlAggregateExpr aggregate = 2;
+  }
+  // Output name, or empty for none.
+  string alias = 3;
+}
+
+// SqlLiteral is a constant value in a condition.
+message SqlLiteral {
+  // The value.
+  oneof value {
+    // True for NULL.
+    bool null_value = 1;
+    // Boolean.
+    bool bool_value = 2;
+    // Integer.
+    sint64 int_value = 3;
+    // Floating point.
+    double double_value = 4;
+    // Text, also used for dates and other values written as strings.
+    string string_value = 5;
+  }
+}
+
+// SqlOperand is one side of a comparison or an ORDER BY term.
+message SqlOperand {
+  // The operand kind.
+  oneof kind {
+    // A column.
+    SqlColumnRef column = 1;
+    // A constant.
+    SqlLiteral literal = 2;
+    // An aggregate, for HAVING and ORDER BY.
+    SqlAggregateExpr aggregate = 3;
+  }
+}
+
+// SqlOperator is a comparison operator.
+enum SqlOperator {
+  // Treated as EQ.
+  SQL_OPERATOR_UNSPECIFIED = 0;
+  // =.
+  SQL_OPERATOR_EQ = 1;
+  // <>.
+  SQL_OPERATOR_NE = 2;
+  // <.
+  SQL_OPERATOR_LT = 3;
+  // <=.
+  SQL_OPERATOR_LE = 4;
+  // >.
+  SQL_OPERATOR_GT = 5;
+  // >=.
+  SQL_OPERATOR_GE = 6;
+  // LIKE. One operand.
+  SQL_OPERATOR_LIKE = 7;
+  // IN. One or more operands.
+  SQL_OPERATOR_IN = 8;
+  // BETWEEN. Exactly two operands.
+  SQL_OPERATOR_BETWEEN = 9;
+  // IS NULL. No operands.
+  SQL_OPERATOR_IS_NULL = 10;
+}
+
+// SqlComparison compares an operand with zero or more others.
+message SqlComparison {
+  // Left side.
+  SqlOperand left = 1;
+  // Operator.
+  SqlOperator op = 2;
+  // Right side. The count depends on the operator.
+  repeated SqlOperand operands = 3;
+  // Wraps the comparison in NOT (NOT IN, NOT LIKE, IS NOT NULL, ...).
+  bool negated = 4;
+}
+
+// SqlBoolOp combines the children of a condition group.
+enum SqlBoolOp {
+  // Treated as AND.
+  SQL_BOOL_OP_UNSPECIFIED = 0;
+  // AND.
+  SQL_BOOL_OP_AND = 1;
+  // OR.
+  SQL_BOOL_OP_OR = 2;
+}
+
+// SqlConditionGroup combines conditions with AND or OR.
+message SqlConditionGroup {
+  // How the children combine.
+  SqlBoolOp op = 1;
+  // Child conditions. Needs at least one.
+  repeated SqlCondition children = 2;
+  // Wraps the group in NOT.
+  bool negated = 3;
+}
+
+// SqlCondition is a node of a WHERE, HAVING or ON tree.
+message SqlCondition {
+  // The node kind.
+  oneof node {
+    // A leaf comparison.
+    SqlComparison comparison = 1;
+    // A nested group.
+    SqlConditionGroup group = 2;
+  }
+}
+
+// SqlNulls places NULLs in an ordering.
+enum SqlNulls {
+  // The engine default.
+  SQL_NULLS_UNSPECIFIED = 0;
+  // NULLS FIRST, emulated where the engine lacks it.
+  SQL_NULLS_FIRST = 1;
+  // NULLS LAST, emulated where the engine lacks it.
+  SQL_NULLS_LAST = 2;
+}
+
+// SqlOrderTerm is one ORDER BY entry.
+message SqlOrderTerm {
+  // The sorted expression. Never a literal.
+  SqlOperand expression = 1;
+  // Descending order.
+  bool descending = 2;
+  // NULL placement.
+  SqlNulls nulls = 3;
+}
+
+// -------------------------------------------------------------- Mongo
+
+// GenerateMongoQueryRequest is the input of GenerateMongoQuery.
+message GenerateMongoQueryRequest {
+  // The model to render.
+  MongoFindModel model = 1;
+}
+
+// GenerateMongoQueryResponse holds the documents or the failure.
+message GenerateMongoQueryResponse {
+  // Filter as canonical EJSON. "{}" when the model has no filter.
+  string filter_ejson = 1;
+  // Projection as canonical EJSON, or empty when there is none.
+  string projection_ejson = 2;
+  // Sort as canonical EJSON, or empty when there is none. Key order is the
+  // sort order.
+  string sort_ejson = 3;
+  // Set when generation failed.
+  QueryBuilderError error = 4;
+}
+
+// ParseMongoQueryRequest is the input of ParseMongoQuery.
+message ParseMongoQueryRequest {
+  // Filter document as EJSON. Empty means no filter.
+  string filter_ejson = 1;
+  // Projection document as EJSON. Empty means none.
+  string projection_ejson = 2;
+  // Sort document as EJSON. Empty means none.
+  string sort_ejson = 3;
+}
+
+// ParseMongoQueryResponse holds the model or the failure.
+message ParseMongoQueryResponse {
+  // The parsed model.
+  MongoFindModel model = 1;
+  // Set when parsing failed.
+  QueryBuilderError error = 2;
+}
+
+// MongoFindModel is a find filter, projection and sort in visual form.
+message MongoFindModel {
+  // Filter tree. Unset means no filter.
+  MongoCondition filter = 1;
+  // Projection entries. Empty means all fields.
+  repeated MongoProjectionField projection = 2;
+  // Sort entries in order.
+  repeated MongoSortField sort = 3;
+}
+
+// MongoBoolOp combines the children of a condition group.
+enum MongoBoolOp {
+  // Treated as AND.
+  MONGO_BOOL_OP_UNSPECIFIED = 0;
+  // $and.
+  MONGO_BOOL_OP_AND = 1;
+  // $or.
+  MONGO_BOOL_OP_OR = 2;
+  // $nor.
+  MONGO_BOOL_OP_NOR = 3;
+}
+
+// MongoConditionGroup combines conditions.
+message MongoConditionGroup {
+  // How the children combine.
+  MongoBoolOp op = 1;
+  // Child conditions. Needs at least one.
+  repeated MongoCondition children = 2;
+}
+
+// MongoOperator is a field-level comparison operator.
+enum MongoOperator {
+  // Treated as EQ.
+  MONGO_OPERATOR_UNSPECIFIED = 0;
+  // Equality, written without an operator.
+  MONGO_OPERATOR_EQ = 1;
+  // $ne.
+  MONGO_OPERATOR_NE = 2;
+  // $gt.
+  MONGO_OPERATOR_GT = 3;
+  // $gte.
+  MONGO_OPERATOR_GTE = 4;
+  // $lt.
+  MONGO_OPERATOR_LT = 5;
+  // $lte.
+  MONGO_OPERATOR_LTE = 6;
+  // $in. The value is an EJSON array.
+  MONGO_OPERATOR_IN = 7;
+  // $nin. The value is an EJSON array.
+  MONGO_OPERATOR_NIN = 8;
+  // $exists. The value is an EJSON boolean.
+  MONGO_OPERATOR_EXISTS = 9;
+  // $regex. The value is an EJSON string; options go in regex_options.
+  MONGO_OPERATOR_REGEX = 10;
+  // $type. The value is an EJSON string or number.
+  MONGO_OPERATOR_TYPE = 11;
+}
+
+// MongoFieldCondition tests one field path.
+message MongoFieldCondition {
+  // Dotted field path, for example "address.city".
+  string path = 1;
+  // Operator.
+  MongoOperator op = 2;
+  // The operand as canonical EJSON, so BSON types survive.
+  string value_ejson = 3;
+  // $options for REGEX, for example "i". Empty for other operators.
+  string regex_options = 4;
+  // Wraps the operator in $not.
+  bool negated = 5;
+}
+
+// MongoCondition is a node of a filter tree.
+message MongoCondition {
+  // The node kind.
+  oneof node {
+    // A leaf on one field.
+    MongoFieldCondition field = 1;
+    // A nested group.
+    MongoConditionGroup group = 2;
+    // A condition without a visual form, as one EJSON document that is merged
+    // into the filter as is, for example {"$expr": {...}}. It survives the
+    // round trip and is edited as text.
+    string raw_ejson = 3;
+  }
+}
+
+// MongoProjectionMode says whether a field is kept or dropped.
+enum MongoProjectionMode {
+  // Treated as INCLUDE.
+  MONGO_PROJECTION_MODE_UNSPECIFIED = 0;
+  // Keep the field.
+  MONGO_PROJECTION_MODE_INCLUDE = 1;
+  // Drop the field.
+  MONGO_PROJECTION_MODE_EXCLUDE = 2;
+}
+
+// MongoProjectionField is one projection entry.
+message MongoProjectionField {
+  // Dotted field path.
+  string path = 1;
+  // Keep or drop.
+  MongoProjectionMode mode = 2;
+}
+
+// MongoSortField is one sort entry.
+message MongoSortField {
+  // Dotted field path.
+  string path = 1;
+  // Descending order.
+  bool descending = 2;
+}
