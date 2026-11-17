@@ -10,6 +10,7 @@ import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/index.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/keyvalue.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/query.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/querybuilder.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/schema.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/session.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/shell.pbgrpc.dart';
@@ -181,6 +182,10 @@ class FakeCoreConnection implements CoreConnection {
   @override
   DiagramServiceClient get diagramService =>
       throw UnimplementedError('use a fake DiagramRepository');
+
+  @override
+  QueryBuilderServiceClient get queryBuilderService =>
+      throw UnimplementedError('use a fake QueryBuilderRepository');
 
   @override
   Future<void> close() async {

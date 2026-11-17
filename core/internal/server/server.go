@@ -135,6 +135,7 @@ func Serve(ctx context.Context, cfg Config) error {
 		graphs := diagram.NewStore()
 		schemaCache.OnInvalidate(graphs.Invalidate)
 		queravuev1.RegisterDiagramServiceServer(srv, api.NewDiagramService(cfg.Sessions, graphs, design))
+		queravuev1.RegisterQueryBuilderServiceServer(srv, api.NewQueryBuilderService(cfg.Sessions))
 	}
 	if cfg.Workspace != nil {
 		queravuev1.RegisterWorkspaceServiceServer(srv, api.NewWorkspaceService(cfg.Workspace))

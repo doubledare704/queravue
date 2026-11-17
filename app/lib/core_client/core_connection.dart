@@ -14,6 +14,7 @@ import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/index.pbgrpc.dart';
 import 'gen/queravue/v1/keyvalue.pbgrpc.dart';
 import 'gen/queravue/v1/query.pbgrpc.dart';
+import 'gen/queravue/v1/querybuilder.pbgrpc.dart';
 import 'gen/queravue/v1/schema.pbgrpc.dart';
 import 'gen/queravue/v1/session.pbgrpc.dart';
 import 'gen/queravue/v1/shell.pbgrpc.dart';
@@ -95,6 +96,9 @@ abstract interface class CoreConnection {
   /// Client for schema diagrams.
   DiagramServiceClient get diagramService;
 
+  /// Client for visual query builders.
+  QueryBuilderServiceClient get queryBuilderService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -123,6 +127,7 @@ class GrpcCoreConnection implements CoreConnection {
     designService = SchemaDesignServiceClient(_channel, options: _auth);
     completionService = CompletionServiceClient(_channel, options: _auth);
     diagramService = DiagramServiceClient(_channel, options: _auth);
+    queryBuilderService = QueryBuilderServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -238,6 +243,9 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final DiagramServiceClient diagramService;
+
+  @override
+  late final QueryBuilderServiceClient queryBuilderService;
 
   @override
   Future<CoreInfo> hello() async {

@@ -6,6 +6,7 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../domain/query_models.dart';
 import '../../documents/application/document_tab_controller.dart';
+import '../../query_builder/application/sql_query_builder_controller.dart';
 import '../../shell/application/shell_actions.dart';
 import '../../shell/application/shell_tab_controller.dart';
 import 'editor_layout_controller.dart';
@@ -66,8 +67,30 @@ Future<void> runActiveTab(WidgetRef ref, ExecuteMode mode) async {
     await ref.read(documentTabProvider(tab.id).notifier).runDraft();
   } else if (tab != null && tab.isShell) {
     await runShellTab(ref, tab);
+  } else if (tab != null &&
+      tab.isQuery &&
+      ref.read(sqlQueryBuilderProvider(tab.id)).inBuilderMode) {
+    await ref.read(sqlQueryBuilderProvider(tab.id).notifier).runPreview();
   } else if (tab != null) {
     await ref.read(editorTabsProvider.notifier).run(tab.id, mode);
+  }
+}
+
+/// Toggles the visual SQL query builder for the active query tab.
+Future<void> toggleActiveQueryBuilder(WidgetRef ref) async {
+  final tab = ref
+      .read(editorTabsProvider)
+      .activeFor(ref.read(selectedConnectionProvider));
+  if (tab == null ||
+      !tab.isQuery ||
+      !ref.read(connectionHasSqlQueryBuilderProvider(tab.connectionId))) {
+    return;
+  }
+  final controller = ref.read(sqlQueryBuilderProvider(tab.id).notifier);
+  if (ref.read(sqlQueryBuilderProvider(tab.id)).inBuilderMode) {
+    controller.openInEditor(tab.controller);
+  } else {
+    await controller.openFromEditor(tab.controller.text);
   }
 }
 

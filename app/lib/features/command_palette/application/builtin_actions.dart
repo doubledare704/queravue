@@ -160,6 +160,24 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       run: formatActiveTab,
     ),
     AppAction(
+      id: 'editor.queryBuilder',
+      enabledWhen: (watch) {
+        final tab = _activeTab(watch);
+        return tab != null &&
+            tab.isQuery &&
+            watch(connectionHasSqlQueryBuilderProvider(tab.connectionId));
+      },
+      title: 'Visual SQL query builder',
+      subtitle: 'Open or close the visual SELECT builder for the active tab',
+      category: ActionCategory.editor,
+      defaultChord: const KeyChord(
+        LogicalKeyboardKey.keyB,
+        primary: true,
+        alt: true,
+      ),
+      run: (context, ref) => toggleActiveQueryBuilder(ref),
+    ),
+    AppAction(
       id: 'editor.cancel',
       enabledWhen: _hasActiveTab,
       title: 'Cancel running statement',
