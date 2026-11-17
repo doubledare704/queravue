@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../connections/application/connection_session.dart';
+import '../../documents/pipeline_builder/application/pipeline_builder_controller.dart';
+import '../../documents/pipeline_builder/presentation/pipeline_builder_view.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../application/schema_controller.dart';
 import '../domain/schema_models.dart';
@@ -419,6 +423,11 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
         ),
         if (!docs)
           const PopupMenuItem(value: 'query', child: Text('New query here')),
+        if (docs)
+          const PopupMenuItem(
+            value: 'pipeline',
+            child: Text('Build aggregation pipeline'),
+          ),
         if (!docs && node.type == SchemaObjectType.table)
           const PopupMenuItem(value: 'design', child: Text('Design table')),
         const PopupMenuDivider(),
@@ -467,6 +476,19 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
           ref
               .read(editorTabsProvider.notifier)
               .openQueryWithSql(widget.connectionId, sql);
+        }
+      case 'pipeline':
+        if (node is ObjectNode && context.mounted) {
+          unawaited(
+            showPipelineBuilder(
+              context,
+              PipelineTarget(
+                connectionId: widget.connectionId,
+                database: node.tableRef.database,
+                collection: node.tableRef.table,
+              ),
+            ),
+          );
         }
       case 'design':
         if (node is ObjectNode) {
