@@ -2,13 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:re_editor/re_editor.dart';
 
 import '../../../shared/panes/editor_over_output.dart';
 import '../../../shared/shortcuts.dart';
+import '../../connections/application/connection_session.dart';
 import '../../grid/presentation/result_grid.dart';
+import '../../query_builder/application/sql_query_builder_controller.dart';
+import '../../query_builder/domain/sql_query_models.dart';
+import '../../query_builder/presentation/sql_query_builder_view.dart';
 import '../application/editor_tabs.dart';
 import '../application/query_run.dart';
 import '../domain/query_models.dart';
+import '../domain/text_offsets.dart';
 import 'sql_editor.dart';
 
 /// One editor tab: run bar, SQL editor and the result area under it.
@@ -26,6 +32,36 @@ class _QueryTabViewState extends ConsumerState<QueryTabView> {
   Widget build(BuildContext context) {
     final run = ref.watch(queryRunProvider(widget.tab.id));
     final tabs = ref.read(editorTabsProvider.notifier);
+    final canBuild = ref.watch(
+      connectionHasSqlQueryBuilderProvider(widget.tab.connectionId),
+    );
+    final qb = ref.watch(sqlQueryBuilderProvider(widget.tab.id));
+    final qbController = ref.read(
+      sqlQueryBuilderProvider(widget.tab.id).notifier,
+    );
+
+    ref.listen(sqlQueryBuilderProvider(widget.tab.id), (prev, next) {
+      final offset = next.editorUnsupportedOffset;
+      if (!next.inBuilderMode &&
+          next.editorUnsupportedMessage != null &&
+          offset != null &&
+          (prev?.editorUnsupportedMessage != next.editorUnsupportedMessage ||
+              prev?.editorUnsupportedOffset != offset)) {
+        final utf16 = utf8ByteOffsetToUtf16(widget.tab.controller.text, offset);
+        final (line, col) = positionOfOffset(widget.tab.controller.text, utf16);
+        widget.tab.controller.selection = CodeLineSelection.collapsed(
+          index: line,
+          offset: col,
+        );
+      }
+    });
+
+    if (canBuild && qb.inBuilderMode) {
+      return SqlQueryBuilderView(tab: widget.tab);
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -35,12 +71,50 @@ class _QueryTabViewState extends ConsumerState<QueryTabView> {
               unawaited(tabs.run(widget.tab.id, ExecuteMode.statementAtCursor)),
           onRunAll: () => unawaited(tabs.run(widget.tab.id, ExecuteMode.all)),
           onCancel: () => unawaited(tabs.cancel(widget.tab.id)),
+          onOpenBuilder: canBuild
+              ? () => unawaited(
+                  qbController.openFromEditor(widget.tab.controller.text),
+                )
+              : null,
         ),
         const Divider(height: 1),
+        if (qb.editorUnsupportedMessage != null)
+          Material(
+            key: const Key('qb-unsupported-banner'),
+            color: cs.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: cs.onErrorContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Cannot open in visual builder: ${qb.editorUnsupportedMessage}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('qb-unsupported-dismiss'),
+                    visualDensity: VisualDensity.compact,
+                    iconSize: 16,
+                    icon: const Icon(Icons.close),
+                    onPressed: qbController.dismissUnsupportedMessage,
+                  ),
+                ],
+              ),
+            ),
+          ),
         Expanded(
           child: EditorOverOutput(
             editor: SqlEditor(tab: widget.tab),
-            output: _ResultArea(tabId: widget.tab.id, run: run),
+            output: QueryResultArea(tabId: widget.tab.id, run: run),
           ),
         ),
       ],
@@ -54,16 +128,18 @@ class _RunBar extends StatelessWidget {
     required this.onRun,
     required this.onRunAll,
     required this.onCancel,
+    this.onOpenBuilder,
   });
 
   final QueryRunState run;
   final VoidCallback onRun;
   final VoidCallback onRunAll;
   final VoidCallback onCancel;
+  final VoidCallback? onOpenBuilder;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) => _build(context, compact: box.maxWidth < 560),
+    builder: (context, box) => _build(context, compact: box.maxWidth < 660),
   );
 
   Widget _build(BuildContext context, {required bool compact}) {
@@ -104,6 +180,22 @@ class _RunBar extends StatelessWidget {
                       : 'Cancel  Esc',
                 ),
               ),
+            if (onOpenBuilder != null) ...[
+              const SizedBox(width: 8),
+              compact
+                  ? IconButton(
+                      key: const Key('toggle-query-builder-button'),
+                      tooltip: 'Visual builder',
+                      onPressed: onOpenBuilder,
+                      icon: const Icon(Icons.view_quilt_outlined, size: 18),
+                    )
+                  : OutlinedButton.icon(
+                      key: const Key('toggle-query-builder-button'),
+                      onPressed: onOpenBuilder,
+                      icon: const Icon(Icons.view_quilt_outlined, size: 16),
+                      label: const Text('Visual builder'),
+                    ),
+            ],
             const SizedBox(width: 12),
             ElapsedText(
               startedAt: run.startedAt,
@@ -208,11 +300,17 @@ String formatElapsed(Duration d) {
   return '${(d.inMilliseconds / 1000).toStringAsFixed(1)} s';
 }
 
-class _ResultArea extends ConsumerWidget {
-  const _ResultArea({required this.tabId, required this.run});
+class QueryResultArea extends ConsumerWidget {
+  const QueryResultArea({
+    super.key,
+    required this.tabId,
+    required this.run,
+    this.idleHint,
+  });
 
   final String tabId;
   final QueryRunState run;
+  final String? idleHint;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -293,7 +391,7 @@ class _ResultArea extends ConsumerWidget {
     } else if (run.phase == RunPhase.idle) {
       body = Center(
         child: Text(
-          'Run a statement with $primaryLabel↵',
+          idleHint ?? 'Run a statement with $primaryLabel↵',
           style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
         ),
       );

@@ -188,3 +188,12 @@ final connectionIsDocumentOnlyProvider = Provider.family<bool, String>((
       caps.contains('document_store') &&
       !caps.contains('execute');
 });
+
+/// True when the connection speaks SQL for the visual SQL query builder.
+final connectionHasSqlQueryBuilderProvider = Provider.family<bool, String>((
+  ref,
+  connectionId,
+) {
+  final caps = ref.watch(connectionCapabilitiesProvider(connectionId));
+  return caps != null && caps.contains('execute');
+});
