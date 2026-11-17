@@ -10,6 +10,7 @@ import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../../connections/presentation/connection_actions.dart';
 import '../../documents/application/document_actions.dart';
+import '../../documents/pipeline_builder/application/pipeline_actions.dart';
 import '../../diagram/application/diagram_controller.dart';
 import '../../diagram/data/export_target.dart';
 import '../../diagram/presentation/diagram_flows.dart';
@@ -277,6 +278,15 @@ final builtinActionsProvider = Provider<List<AppAction>>(
       subtitle: 'Collection tab',
       category: ActionCategory.documents,
       run: (context, ref) async => insertDocument(context, ref),
+    ),
+    AppAction(
+      id: 'documents.pipelineBuilder',
+      enabledWhen: canBuildPipelineForActiveTab,
+      title: 'Open aggregation pipeline builder',
+      subtitle: 'Collection tab',
+      category: ActionCategory.documents,
+      defaultChord: _primary(LogicalKeyboardKey.keyA, shift: true),
+      run: openPipelineBuilderForActiveTab,
     ),
     AppAction(
       id: 'documents.refresh',
