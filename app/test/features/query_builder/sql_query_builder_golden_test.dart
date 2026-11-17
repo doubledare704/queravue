@@ -14,6 +14,7 @@ import 'package:queravue/features/schema/data/schema_repository.dart';
 
 import '../../support/fake_connections_repository.dart';
 import '../../support/fake_query_repository.dart';
+import '../../support/builder_golden_comparator.dart';
 import '../../support/providers.dart';
 import 'fake_query_builder.dart';
 
@@ -138,6 +139,7 @@ Future<void> pumpBuilder(WidgetTester tester, Brightness brightness) async {
 
 void main() {
   testWidgets('SQL query builder view, light', (tester) async {
+    useBuilderGoldenComparator();
     await pumpBuilder(tester, Brightness.light);
     await expectLater(
       find.byType(SqlQueryBuilderView),
@@ -146,6 +148,7 @@ void main() {
   });
 
   testWidgets('SQL query builder view, dark', (tester) async {
+    useBuilderGoldenComparator();
     await pumpBuilder(tester, Brightness.dark);
     await expectLater(
       find.byType(SqlQueryBuilderView),

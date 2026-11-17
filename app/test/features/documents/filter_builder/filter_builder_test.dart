@@ -6,6 +6,8 @@ import 'package:queravue/core_client/gen/queravue/v1/querybuilder.pb.dart'
 import 'package:queravue/features/documents/filter_builder/filter_builder_controller.dart';
 import 'package:queravue/features/documents/filter_builder/filter_builder_view.dart';
 
+import '../../../support/builder_golden_comparator.dart';
+
 class FakeBuilder extends FilterBuilderController {
   FakeBuilder() : super('tab');
   @override
@@ -67,6 +69,7 @@ void main() {
     expect(find.text('age'), findsNothing);
   });
   testWidgets('condition tree golden', (tester) async {
+    useBuilderGoldenComparator();
     tester.view.physicalSize = const Size(1000, 700);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
