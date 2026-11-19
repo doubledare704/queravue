@@ -124,6 +124,8 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - GridFS viewer: browse buckets, preview images/text/PDF, upload/download.
 - **Done when:** the translator passes a test corpus of 100+ queries.
 
+**Plan:** `docs/plans/iteration-12.md`. Decisions in ADRs 0022 (SQL mode) and 0023 (GridFS); the additive contract (`TranslateMongoSql`, `GridFsService`, protocol version 12) landed in PR 0.
+
 ## Phase D — Data tooling (it. 13–16)
 
 ### It. 13 — Import/export + mock data

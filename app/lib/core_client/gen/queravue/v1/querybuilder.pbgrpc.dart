@@ -73,6 +73,16 @@ class QueryBuilderServiceClient extends $grpc.Client {
     return $createUnaryCall(_$parseMongoQuery, request, options: options);
   }
 
+  /// TranslateMongoSql translates one SELECT statement into a MongoDB find or
+  /// aggregation (ADR 0022). Statements outside the supported subset fail with
+  /// UNSUPPORTED_CONSTRUCT.
+  $grpc.ResponseFuture<$0.TranslateMongoSqlResponse> translateMongoSql(
+    $0.TranslateMongoSqlRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$translateMongoSql, request, options: options);
+  }
+
   // method descriptors
 
   static final _$generateSql =
@@ -95,6 +105,11 @@ class QueryBuilderServiceClient extends $grpc.Client {
           '/queravue.v1.QueryBuilderService/ParseMongoQuery',
           ($0.ParseMongoQueryRequest value) => value.writeToBuffer(),
           $0.ParseMongoQueryResponse.fromBuffer);
+  static final _$translateMongoSql = $grpc.ClientMethod<
+          $0.TranslateMongoSqlRequest, $0.TranslateMongoSqlResponse>(
+      '/queravue.v1.QueryBuilderService/TranslateMongoSql',
+      ($0.TranslateMongoSqlRequest value) => value.writeToBuffer(),
+      $0.TranslateMongoSqlResponse.fromBuffer);
 }
 
 @$pb.GrpcServiceName('queravue.v1.QueryBuilderService')
@@ -136,6 +151,15 @@ abstract class QueryBuilderServiceBase extends $grpc.Service {
         ($core.List<$core.int> value) =>
             $0.ParseMongoQueryRequest.fromBuffer(value),
         ($0.ParseMongoQueryResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.TranslateMongoSqlRequest,
+            $0.TranslateMongoSqlResponse>(
+        'TranslateMongoSql',
+        translateMongoSql_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) =>
+            $0.TranslateMongoSqlRequest.fromBuffer(value),
+        ($0.TranslateMongoSqlResponse value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.GenerateSqlResponse> generateSql_Pre($grpc.ServiceCall $call,
@@ -171,4 +195,13 @@ abstract class QueryBuilderServiceBase extends $grpc.Service {
 
   $async.Future<$0.ParseMongoQueryResponse> parseMongoQuery(
       $grpc.ServiceCall call, $0.ParseMongoQueryRequest request);
+
+  $async.Future<$0.TranslateMongoSqlResponse> translateMongoSql_Pre(
+      $grpc.ServiceCall $call,
+      $async.Future<$0.TranslateMongoSqlRequest> $request) async {
+    return translateMongoSql($call, await $request);
+  }
+
+  $async.Future<$0.TranslateMongoSqlResponse> translateMongoSql(
+      $grpc.ServiceCall call, $0.TranslateMongoSqlRequest request);
 }

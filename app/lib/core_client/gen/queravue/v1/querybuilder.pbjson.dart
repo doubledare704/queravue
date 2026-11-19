@@ -189,6 +189,22 @@ final $typed_data.Uint8List mongoProjectionModeDescriptor = $convert.base64Decod
     'lFRBAAEiEKHU1PTkdPX1BST0pFQ1RJT05fTU9ERV9JTkNMVURFEAESIQodTU9OR09fUFJPSkVD'
     'VElPTl9NT0RFX0VYQ0xVREUQAg==');
 
+@$core.Deprecated('Use mongoSqlResultKindDescriptor instead')
+const MongoSqlResultKind$json = {
+  '1': 'MongoSqlResultKind',
+  '2': [
+    {'1': 'MONGO_SQL_RESULT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'MONGO_SQL_RESULT_KIND_FIND', '2': 1},
+    {'1': 'MONGO_SQL_RESULT_KIND_AGGREGATE', '2': 2},
+  ],
+};
+
+/// Descriptor for `MongoSqlResultKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List mongoSqlResultKindDescriptor = $convert.base64Decode(
+    'ChJNb25nb1NxbFJlc3VsdEtpbmQSJQohTU9OR09fU1FMX1JFU1VMVF9LSU5EX1VOU1BFQ0lGSU'
+    'VEEAASHgoaTU9OR09fU1FMX1JFU1VMVF9LSU5EX0ZJTkQQARIjCh9NT05HT19TUUxfUkVTVUxU'
+    'X0tJTkRfQUdHUkVHQVRFEAI=');
+
 @$core.Deprecated('Use queryBuilderErrorDescriptor instead')
 const QueryBuilderError$json = {
   '1': 'QueryBuilderError',
@@ -984,3 +1000,99 @@ const MongoSortField$json = {
 final $typed_data.Uint8List mongoSortFieldDescriptor = $convert.base64Decode(
     'Cg5Nb25nb1NvcnRGaWVsZBISCgRwYXRoGAEgASgJUgRwYXRoEh4KCmRlc2NlbmRpbmcYAiABKA'
     'hSCmRlc2NlbmRpbmc=');
+
+@$core.Deprecated('Use translateMongoSqlRequestDescriptor instead')
+const TranslateMongoSqlRequest$json = {
+  '1': 'TranslateMongoSqlRequest',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'sql', '3': 2, '4': 1, '5': 9, '10': 'sql'},
+    {'1': 'database', '3': 3, '4': 1, '5': 9, '10': 'database'},
+  ],
+};
+
+/// Descriptor for `TranslateMongoSqlRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List translateMongoSqlRequestDescriptor =
+    $convert.base64Decode(
+        'ChhUcmFuc2xhdGVNb25nb1NxbFJlcXVlc3QSHQoKc2Vzc2lvbl9pZBgBIAEoCVIJc2Vzc2lvbk'
+        'lkEhAKA3NxbBgCIAEoCVIDc3FsEhoKCGRhdGFiYXNlGAMgASgJUghkYXRhYmFzZQ==');
+
+@$core.Deprecated('Use mongoSqlWarningDescriptor instead')
+const MongoSqlWarning$json = {
+  '1': 'MongoSqlWarning',
+  '2': [
+    {'1': 'message', '3': 1, '4': 1, '5': 9, '10': 'message'},
+    {
+      '1': 'offset',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'offset',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_offset'},
+  ],
+};
+
+/// Descriptor for `MongoSqlWarning`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List mongoSqlWarningDescriptor = $convert.base64Decode(
+    'Cg9Nb25nb1NxbFdhcm5pbmcSGAoHbWVzc2FnZRgBIAEoCVIHbWVzc2FnZRIbCgZvZmZzZXQYAi'
+    'ABKA1IAFIGb2Zmc2V0iAEBQgkKB19vZmZzZXQ=');
+
+@$core.Deprecated('Use translateMongoSqlResponseDescriptor instead')
+const TranslateMongoSqlResponse$json = {
+  '1': 'TranslateMongoSqlResponse',
+  '2': [
+    {'1': 'database', '3': 1, '4': 1, '5': 9, '10': 'database'},
+    {'1': 'collection', '3': 2, '4': 1, '5': 9, '10': 'collection'},
+    {
+      '1': 'kind',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.queravue.v1.MongoSqlResultKind',
+      '10': 'kind'
+    },
+    {'1': 'filter_ejson', '3': 4, '4': 1, '5': 9, '10': 'filterEjson'},
+    {'1': 'projection_ejson', '3': 5, '4': 1, '5': 9, '10': 'projectionEjson'},
+    {'1': 'sort_ejson', '3': 6, '4': 1, '5': 9, '10': 'sortEjson'},
+    {'1': 'skip', '3': 7, '4': 1, '5': 4, '10': 'skip'},
+    {'1': 'limit', '3': 8, '4': 1, '5': 4, '9': 0, '10': 'limit', '17': true},
+    {'1': 'pipeline_ejson', '3': 9, '4': 1, '5': 9, '10': 'pipelineEjson'},
+    {'1': 'shell_code', '3': 10, '4': 1, '5': 9, '10': 'shellCode'},
+    {
+      '1': 'warnings',
+      '3': 11,
+      '4': 3,
+      '5': 11,
+      '6': '.queravue.v1.MongoSqlWarning',
+      '10': 'warnings'
+    },
+    {
+      '1': 'error',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.queravue.v1.QueryBuilderError',
+      '10': 'error'
+    },
+  ],
+  '8': [
+    {'1': '_limit'},
+  ],
+};
+
+/// Descriptor for `TranslateMongoSqlResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List translateMongoSqlResponseDescriptor = $convert.base64Decode(
+    'ChlUcmFuc2xhdGVNb25nb1NxbFJlc3BvbnNlEhoKCGRhdGFiYXNlGAEgASgJUghkYXRhYmFzZR'
+    'IeCgpjb2xsZWN0aW9uGAIgASgJUgpjb2xsZWN0aW9uEjMKBGtpbmQYAyABKA4yHy5xdWVyYXZ1'
+    'ZS52MS5Nb25nb1NxbFJlc3VsdEtpbmRSBGtpbmQSIQoMZmlsdGVyX2Vqc29uGAQgASgJUgtmaW'
+    'x0ZXJFanNvbhIpChBwcm9qZWN0aW9uX2Vqc29uGAUgASgJUg9wcm9qZWN0aW9uRWpzb24SHQoK'
+    'c29ydF9lanNvbhgGIAEoCVIJc29ydEVqc29uEhIKBHNraXAYByABKARSBHNraXASGQoFbGltaX'
+    'QYCCABKARIAFIFbGltaXSIAQESJQoOcGlwZWxpbmVfZWpzb24YCSABKAlSDXBpcGVsaW5lRWpz'
+    'b24SHQoKc2hlbGxfY29kZRgKIAEoCVIJc2hlbGxDb2RlEjgKCHdhcm5pbmdzGAsgAygLMhwucX'
+    'VlcmF2dWUudjEuTW9uZ29TcWxXYXJuaW5nUgh3YXJuaW5ncxI0CgVlcnJvchgMIAEoCzIeLnF1'
+    'ZXJhdnVlLnYxLlF1ZXJ5QnVpbGRlckVycm9yUgVlcnJvckIICgZfbGltaXQ=');

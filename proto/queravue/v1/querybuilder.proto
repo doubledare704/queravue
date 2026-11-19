@@ -23,6 +23,11 @@ service QueryBuilderService {
   // ParseMongoQuery reads EJSON filter, projection and sort documents into a
   // find model. Operators without a visual form are kept as raw EJSON leaves.
   rpc ParseMongoQuery(ParseMongoQueryRequest) returns (ParseMongoQueryResponse);
+
+  // TranslateMongoSql translates one SELECT statement into a MongoDB find or
+  // aggregation (ADR 0022). Statements outside the supported subset fail with
+  // UNSUPPORTED_CONSTRUCT.
+  rpc TranslateMongoSql(TranslateMongoSqlRequest) returns (TranslateMongoSqlResponse);
 }
 
 // QueryBuilderErrorKind classifies a failed builder call.
@@ -464,4 +469,67 @@ message MongoSortField {
   string path = 1;
   // Descending order.
   bool descending = 2;
+}
+
+// ---------------------------------------------------------------- SQL mode
+
+// TranslateMongoSqlRequest is the input of TranslateMongoSql.
+message TranslateMongoSqlRequest {
+  // Session id. Used to resolve the default database only.
+  string session_id = 1;
+  // One SELECT statement.
+  string sql = 2;
+  // Database the collections belong to. Empty means the session's default
+  // database.
+  string database = 3;
+}
+
+// MongoSqlResultKind says which MongoDB operation a translation produced.
+enum MongoSqlResultKind {
+  // Unspecified. Never sent on success.
+  MONGO_SQL_RESULT_KIND_UNSPECIFIED = 0;
+  // A find with filter, projection, sort, skip and limit.
+  MONGO_SQL_RESULT_KIND_FIND = 1;
+  // An aggregation pipeline.
+  MONGO_SQL_RESULT_KIND_AGGREGATE = 2;
+}
+
+// MongoSqlWarning points at a place where MongoDB semantics differ from SQL,
+// for example IS NULL also matching a missing field.
+message MongoSqlWarning {
+  // Human-readable explanation, safe to show to the user.
+  string message = 1;
+  // Zero-based UTF-8 byte offset into the SQL text of the construct the
+  // warning is about. Unset when it applies to the whole statement.
+  optional uint32 offset = 2;
+}
+
+// TranslateMongoSqlResponse holds the translation or the failure.
+message TranslateMongoSqlResponse {
+  // Database the query runs against.
+  string database = 1;
+  // Collection named in FROM.
+  string collection = 2;
+  // Which operation the fields below describe.
+  MongoSqlResultKind kind = 3;
+  // FIND: filter as canonical EJSON. "{}" when there is no WHERE.
+  string filter_ejson = 4;
+  // FIND: projection as canonical EJSON, or empty for all fields.
+  string projection_ejson = 5;
+  // FIND: sort as canonical EJSON, or empty when there is no ORDER BY. Key
+  // order is the sort order.
+  string sort_ejson = 6;
+  // FIND: documents to skip.
+  uint64 skip = 7;
+  // FIND: maximum documents. Unset means no limit.
+  optional uint64 limit = 8;
+  // AGGREGATE: canonical EJSON array of single-key stage documents.
+  string pipeline_ejson = 9;
+  // Runnable shell code for either kind, e.g.
+  // db.getSiblingDB("shop").orders.find({...}).
+  string shell_code = 10;
+  // Semantic differences the statement touches. Empty when none.
+  repeated MongoSqlWarning warnings = 11;
+  // Set when translation failed; all other fields are then empty.
+  QueryBuilderError error = 12;
 }

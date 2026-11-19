@@ -10,6 +10,7 @@ import 'gen/queravue/v1/connections.pbgrpc.dart';
 import 'gen/queravue/v1/core.pbgrpc.dart';
 import 'gen/queravue/v1/design.pbgrpc.dart';
 import 'gen/queravue/v1/document.pbgrpc.dart';
+import 'gen/queravue/v1/gridfs.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/index.pbgrpc.dart';
 import 'gen/queravue/v1/keyvalue.pbgrpc.dart';
@@ -99,6 +100,9 @@ abstract interface class CoreConnection {
   /// Client for visual query builders.
   QueryBuilderServiceClient get queryBuilderService;
 
+  /// Client for GridFS buckets.
+  GridFsServiceClient get gridFsService;
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -128,6 +132,7 @@ class GrpcCoreConnection implements CoreConnection {
     completionService = CompletionServiceClient(_channel, options: _auth);
     diagramService = DiagramServiceClient(_channel, options: _auth);
     queryBuilderService = QueryBuilderServiceClient(_channel, options: _auth);
+    gridFsService = GridFsServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -246,6 +251,9 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final QueryBuilderServiceClient queryBuilderService;
+
+  @override
+  late final GridFsServiceClient gridFsService;
 
   @override
   Future<CoreInfo> hello() async {
