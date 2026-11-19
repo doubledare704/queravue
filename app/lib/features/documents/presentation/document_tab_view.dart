@@ -5,6 +5,7 @@ import '../../connections/application/connections_controller.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../application/document_tab_controller.dart';
 import 'doc_views.dart';
+import 'doc_view_switch.dart';
 import 'document_dialogs.dart';
 import 'query_bar.dart';
 
@@ -121,30 +122,7 @@ class DocumentTabView extends ConsumerWidget {
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              SegmentedButton<DocView>(
-                key: const Key('doc-view-switch'),
-                showSelectedIcon: false,
-                style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                segments: const [
-                  ButtonSegment(
-                    value: DocView.table,
-                    icon: Icon(Icons.table_rows_outlined, size: 16),
-                    label: Text('Table'),
-                  ),
-                  ButtonSegment(
-                    value: DocView.tree,
-                    icon: Icon(Icons.account_tree_outlined, size: 16),
-                    label: Text('Tree'),
-                  ),
-                  ButtonSegment(
-                    value: DocView.json,
-                    icon: Icon(Icons.data_object, size: 16),
-                    label: Text('JSON'),
-                  ),
-                ],
-                selected: {state.view},
-                onSelectionChanged: (s) => c.setView(s.first),
-              ),
+              DocViewSwitch(view: state.view, onChanged: c.setView),
               Text(
                 state.docs.isEmpty ? countText : '$from–$to$countText',
                 key: const Key('doc-range'),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:queravue/features/documents/application/document_preview_controller.dart';
 import 'package:queravue/features/documents/pipeline_builder/application/pipeline_builder_controller.dart';
 
 import 'pipeline_harness.dart';
@@ -12,6 +13,7 @@ void main() {
     h = PipelineHarness();
     addTearDown(h.container.dispose);
     h.container.listen(pipelineBuilderProvider(pipelineTarget), (_, _) {});
+    h.container.listen(documentPreviewProvider(pipelineTarget), (_, _) {});
   });
 
   List<String> operators() => [for (final s in h.state.stages) s.operator];
@@ -91,8 +93,8 @@ void main() {
           'db.orders.aggregate([\n  { \$match: { a: 1 } },\n  { \$skip: 2 },\n  { \$limit: 20 }\n])',
         );
         expect(h.shell.fetches.single.limit, kDefaultPreviewLimit);
-        expect(h.state.preview.phase, PreviewPhase.done);
-        expect(h.state.preview.documents, hasLength(2));
+        expect(h.preview.phase, PreviewPhase.done);
+        expect(h.preview.docs, hasLength(2));
       },
     );
 
@@ -111,8 +113,8 @@ void main() {
       );
       await h.controller.runPreview(h.state.stages[2].id);
       expect(h.shell.evals, isEmpty);
-      expect(h.state.preview.phase, PreviewPhase.failed);
-      expect(h.state.preview.error, contains(r'$out'));
+      expect(h.preview.phase, PreviewPhase.failed);
+      expect(h.preview.error, contains(r'$out'));
 
       await h.controller.runPreview(h.state.stages[0].id);
       expect(h.shell.evals, hasLength(1));
@@ -122,15 +124,15 @@ void main() {
       h.controller.importText(r'[{ $limit: ??? }, { $match: {} }]');
       await h.controller.runPreview(h.state.stages[1].id);
       expect(h.shell.evals, isEmpty);
-      expect(h.state.preview.phase, PreviewPhase.failed);
+      expect(h.preview.phase, PreviewPhase.failed);
     });
 
     test('reports a script error', () async {
       h.controller.importText(r'[{ $match: {} }]');
       h.shell.evalError = 'boom';
       await h.controller.runPreview(h.state.stages.single.id);
-      expect(h.state.preview.phase, PreviewPhase.failed);
-      expect(h.state.preview.error, contains('boom'));
+      expect(h.preview.phase, PreviewPhase.failed);
+      expect(h.preview.error, contains('boom'));
     });
 
     test('can be cancelled', () async {
@@ -139,13 +141,15 @@ void main() {
       h.queueCursor();
       final run = h.controller.runPreview(h.state.stages.single.id);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(h.state.preview.phase, PreviewPhase.running);
+      expect(h.preview.phase, PreviewPhase.running);
 
-      await h.controller.cancelPreview();
+      h.container
+          .read(documentPreviewProvider(pipelineTarget).notifier)
+          .reset();
       await run;
 
       expect(h.shell.cancelled, isNotEmpty);
-      expect(h.state.preview.phase, PreviewPhase.idle);
+      expect(h.preview.phase, PreviewPhase.idle);
     });
 
     test('closes its shell when the builder goes away', () async {

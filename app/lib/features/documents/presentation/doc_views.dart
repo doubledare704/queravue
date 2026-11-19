@@ -103,8 +103,8 @@ class DocTableView extends StatefulWidget {
     required this.columns,
     required this.selected,
     required this.firstIndex,
-    required this.onSelect,
-    required this.onEdit,
+    this.onSelect,
+    this.onEdit,
   });
 
   final List<DocItem> docs;
@@ -113,8 +113,8 @@ class DocTableView extends StatefulWidget {
 
   /// Index of the first document in the collection, for the row numbers.
   final int firstIndex;
-  final void Function(int row, {bool toggle}) onSelect;
-  final void Function(int row) onEdit;
+  final void Function(int row, {bool toggle})? onSelect;
+  final void Function(int row)? onEdit;
 
   @override
   State<DocTableView> createState() => _DocTableViewState();
@@ -203,8 +203,8 @@ class _DocTableViewState extends State<DocTableView> {
         return GestureDetector(
           key: Key('doc-row-header-$r'),
           behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => widget.onSelect(r, toggle: true),
-          onDoubleTap: () => widget.onEdit(r),
+          onTapDown: (_) => widget.onSelect?.call(r, toggle: true),
+          onDoubleTap: widget.onEdit == null ? null : () => widget.onEdit!(r),
           child: ColoredBox(
             color: selected ? cs.primaryContainer : headerBg,
             child: Align(
@@ -223,7 +223,7 @@ class _DocTableViewState extends State<DocTableView> {
       return GestureDetector(
         key: Key('doc-cell-$r-$c'),
         behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => widget.onSelect(
+        onTapDown: (_) => widget.onSelect?.call(
           r,
           toggle:
               HardwareKeyboard.instance.isMetaPressed ||
@@ -288,15 +288,15 @@ class DocTreeView extends StatefulWidget {
     super.key,
     required this.docs,
     required this.selected,
-    required this.onSelect,
-    required this.onEdit,
+    this.onSelect,
+    this.onEdit,
     this.initiallyExpanded = const {},
   });
 
   final List<DocItem> docs;
   final Set<int> selected;
-  final void Function(int row, {bool toggle}) onSelect;
-  final void Function(int row) onEdit;
+  final void Function(int row, {bool toggle})? onSelect;
+  final void Function(int row)? onEdit;
 
   /// Paths expanded at first (for tests and goldens).
   final Set<String> initiallyExpanded;
@@ -343,9 +343,11 @@ class _DocTreeViewState extends State<DocTreeView> {
                   if (!_expanded.remove(row.path)) _expanded.add(row.path);
                 });
               }
-              if (top) widget.onSelect(docIndex);
+              if (top) widget.onSelect?.call(docIndex);
             },
-            onDoubleTap: top ? () => widget.onEdit(docIndex) : null,
+            onDoubleTap: top && widget.onEdit != null
+                ? () => widget.onEdit!(docIndex)
+                : null,
             child: Container(
               color: top && selected
                   ? cs.primaryContainer.withValues(alpha: 0.5)
@@ -406,14 +408,14 @@ class DocJsonView extends StatelessWidget {
     super.key,
     required this.docs,
     required this.selected,
-    required this.onSelect,
-    required this.onEdit,
+    this.onSelect,
+    this.onEdit,
   });
 
   final List<DocItem> docs;
   final Set<int> selected;
-  final void Function(int row, {bool toggle}) onSelect;
-  final void Function(int row) onEdit;
+  final void Function(int row, {bool toggle})? onSelect;
+  final void Function(int row)? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -426,14 +428,14 @@ class DocJsonView extends StatelessWidget {
         var text = shellPretty(docs[i].value);
         final cut = text.length > kJsonViewMaxChars;
         if (cut) {
-          text =
-              '${text.substring(0, kJsonViewMaxChars)}\n… (cut; Edit shows the whole document)';
+          final hint = onEdit == null ? '' : '; Edit shows the whole document';
+          text = '${text.substring(0, kJsonViewMaxChars)}\n… (cut$hint)';
         }
         return GestureDetector(
           key: Key('doc-json-$i'),
           behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => onSelect(i),
-          onDoubleTap: () => onEdit(i),
+          onTapDown: (_) => onSelect?.call(i),
+          onDoubleTap: onEdit == null ? null : () => onEdit!(i),
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(8),

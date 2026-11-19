@@ -7,6 +7,10 @@ import '../../../core_client/core_providers.dart';
 import '../../../core_client/gen/queravue/v1/document.pb.dart' as doc;
 import '../../../core_client/gen/queravue/v1/querybuilder.pb.dart' as pb;
 import '../../../core_client/query_builder_client.dart';
+import '../application/document_preview_controller.dart';
+import '../application/document_tab_controller.dart';
+import '../data/document_repository.dart';
+import '../domain/models.dart';
 
 class FilterBuilderState {
   const FilterBuilderState({
@@ -17,6 +21,7 @@ class FilterBuilderState {
     this.cannotShow = false,
     this.fields = const [],
     this.output,
+    this.previewQuery,
     this.revision = 0,
   });
   final bool open;
@@ -26,6 +31,7 @@ class FilterBuilderState {
   final bool cannotShow;
   final List<doc.FieldPathStat> fields;
   final pb.GenerateMongoQueryResponse? output;
+  final FindQuery? previewQuery;
   final int revision;
 }
 
@@ -96,6 +102,7 @@ class FilterBuilderController extends Notifier<FilterBuilderState> {
           error: state.error,
           cannotShow: state.cannotShow,
           output: state.output,
+          previewQuery: state.previewQuery,
           revision: state.revision,
           fields: response?.paths.toList() ?? [],
         );
@@ -106,6 +113,13 @@ class FilterBuilderController extends Notifier<FilterBuilderState> {
 
   Future<void> parse(String filter, String projection, String sort) async {
     if (!state.open) return;
+    if (!state.loading) {
+      state = FilterBuilderState(
+        open: true,
+        loading: true,
+        fields: state.fields,
+      );
+    }
     final seq = ++_sequence;
     unawaited(_call?.cancel());
     try {
@@ -136,6 +150,11 @@ class FilterBuilderController extends Notifier<FilterBuilderState> {
         state = FilterBuilderState(
           open: true,
           model: response.model,
+          previewQuery: FindQuery(
+            filter: filter,
+            projection: projection,
+            sort: sort,
+          ),
           fields: state.fields,
           revision: ++_revision,
         );
@@ -176,6 +195,13 @@ class FilterBuilderController extends Notifier<FilterBuilderState> {
         fields: state.fields,
         error: response.hasError() ? response.error.message : null,
         output: response.hasError() ? null : response,
+        previewQuery: response.hasError()
+            ? null
+            : FindQuery(
+                filter: response.filterEjson,
+                projection: response.projectionEjson,
+                sort: response.sortEjson,
+              ),
         revision: state.revision,
       );
     } catch (e) {
@@ -189,5 +215,18 @@ class FilterBuilderController extends Notifier<FilterBuilderState> {
         );
       }
     }
+  }
+
+  Future<void> runPreview() async {
+    final query = state.previewQuery;
+    final tab = ref.read(documentTabProvider(tabId));
+    final sessionId = tab.sessionId;
+    if (!state.open || query == null || sessionId == null) return;
+    await ref
+        .read(documentPreviewProvider(tabId).notifier)
+        .runFind(
+          CollectionTarget(sessionId, tab.database, tab.collection),
+          query.copyWith(skip: tab.draft.skip, limit: tab.draft.limit),
+        );
   }
 }

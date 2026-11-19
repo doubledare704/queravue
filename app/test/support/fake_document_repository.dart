@@ -16,6 +16,8 @@ class FakeDocumentRepository implements DocumentRepository {
 
   List<String> docs;
   final finds = <FindQuery>[];
+  final findTargets = <CollectionTarget>[];
+  final findTimeouts = <int>[];
   final inserted = <String>[];
   final replaced = <({String id, String doc, String? expected})>[];
   final deleted = <List<String>>[];
@@ -40,7 +42,14 @@ class FakeDocumentRepository implements DocumentRepository {
   ];
 
   @override
-  Stream<DocBatch> find(CollectionTarget t, FindQuery q, {int batchSize = 0}) {
+  Stream<DocBatch> find(
+    CollectionTarget t,
+    FindQuery q, {
+    int batchSize = 0,
+    int maxTimeMs = 0,
+  }) {
+    findTargets.add(t);
+    findTimeouts.add(maxTimeMs);
     finds.add(q);
     late StreamController<DocBatch> c;
     c = StreamController<DocBatch>(

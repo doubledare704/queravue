@@ -156,7 +156,7 @@ void main() {
     h.queueCursor();
     await tester.tap(find.byKey(const Key('stage-preview-0')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('preview-list')), findsOneWidget);
+    expect(find.byKey(const Key('doc-json-list')), findsOneWidget);
     expect(find.textContaining('doc-1'), findsOneWidget);
   });
 

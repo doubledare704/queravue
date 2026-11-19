@@ -1,8 +1,60 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core_client/gen/queravue/v1/querybuilder.pb.dart' as pb;
+import '../../../shared/shortcuts.dart';
+import '../application/document_preview_controller.dart';
+import '../application/document_tab_controller.dart';
+import '../presentation/document_preview_pane.dart';
 import 'filter_builder_controller.dart';
+
+class FilterBuilderPanel extends ConsumerWidget {
+  const FilterBuilderPanel({super.key, required this.tabId});
+
+  final String tabId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final builder = filterBuilderProvider(tabId);
+    final state = ref.watch(builder);
+    final sessionId = ref.watch(
+      documentTabProvider(tabId).select((state) => state.sessionId),
+    );
+    ref.listen(builder.select((state) => state.previewQuery), (_, _) {
+      ref.read(documentPreviewProvider(tabId).notifier).reset();
+    });
+    final run = state.previewQuery != null && sessionId != null
+        ? ref.read(builder.notifier).runPreview
+        : null;
+    return CallbackShortcuts(
+      bindings: {primaryShortcut(LogicalKeyboardKey.enter): () => run?.call()},
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: FilterBuilderView(
+                key: ValueKey(state.revision),
+                tabId: tabId,
+              ),
+            ),
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(
+            flex: 2,
+            child: DocumentPreviewPane(
+              previewKey: tabId,
+              showRun: true,
+              onRun: run,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class FilterBuilderView extends ConsumerWidget {
   const FilterBuilderView({super.key, required this.tabId});

@@ -45,7 +45,12 @@ class SampleResult {
 abstract interface class DocumentRepository {
   /// Streams the documents of [q]. Cancelling the subscription cancels the
   /// call and kills the server cursor.
-  Stream<DocBatch> find(CollectionTarget t, FindQuery q, {int batchSize});
+  Stream<DocBatch> find(
+    CollectionTarget t,
+    FindQuery q, {
+    int batchSize,
+    int maxTimeMs,
+  });
 
   Future<CountResult> count(
     CollectionTarget t,
@@ -92,7 +97,12 @@ class GrpcDocumentRepository implements DocumentRepository {
   }
 
   @override
-  Stream<DocBatch> find(CollectionTarget t, FindQuery q, {int batchSize = 0}) {
+  Stream<DocBatch> find(
+    CollectionTarget t,
+    FindQuery q, {
+    int batchSize = 0,
+    int maxTimeMs = 0,
+  }) {
     final call = _conn.documentService.find(
       pb.FindRequest(
         sessionId: t.sessionId,
@@ -104,6 +114,7 @@ class GrpcDocumentRepository implements DocumentRepository {
         skip: Int64(q.skip),
         limit: Int64(q.limit),
         batchSize: batchSize,
+        maxTimeMs: maxTimeMs,
       ),
     );
     return call.map((r) {

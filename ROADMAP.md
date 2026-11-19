@@ -117,7 +117,7 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Visual query builder: tables + joins + filters (SQL); filter/projection builder (Mongo).
 - **Done when:** builder ↔ code round-trip works for typical queries.
 
-**Known gap (carry forward):** The Mongo filter builder uses the collection query bar and its Run action, but does not yet provide the dedicated capped, cancellable preview specified by ADR 0021.
+**Closed in Iteration 12:** The Mongo filter builder has a dedicated capped, cancellable preview (ADR 0021 §5).
 
 ### It. 12 — SQL Mode for Mongo + GridFS
 - SQL → MQL translator (SELECT/WHERE/ORDER/LIMIT/GROUP BY/JOIN→$lookup); show generated MQL.
