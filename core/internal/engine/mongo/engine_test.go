@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.mongodb.org/mongo-driver/v2/mongo"
+
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
 
@@ -141,7 +143,7 @@ func TestBuildURIX509AndSRV(t *testing.T) {
 func TestDescriptors(t *testing.T) {
 	for _, v := range []Variant{VariantMongoDB, VariantCosmos, VariantDocumentDB} {
 		d := New(v).Descriptor()
-		if !d.HasCapability(engine.CapDocumentStore) || d.HasCapability(engine.CapExecute) {
+		if !d.HasCapability(engine.CapDocumentStore) || !d.HasCapability(engine.CapGridFS) || d.HasCapability(engine.CapExecute) {
 			t.Errorf("%s: capabilities = %v", d.ID, d.Capabilities)
 		}
 		pw := 0
@@ -159,6 +161,9 @@ func TestDescriptors(t *testing.T) {
 	}
 	if _, ok := any(&Conn{}).(engine.DocumentStore); !ok {
 		t.Fatal("Conn is not a DocumentStore")
+	}
+	if _, ok := any(&Conn{}).(engine.GridFS); !ok {
+		t.Fatal("Conn is not a GridFS")
 	}
 }
 
@@ -196,6 +201,10 @@ func TestClassify(t *testing.T) {
 		{errors.New("server selection error: context deadline exceeded, current topology: { Type: Unknown, Servers: [] }"), engine.KindTimeout},
 		{errors.New("server selection error: dial tcp 127.0.0.1:1: connect: connection refused"), engine.KindNetwork},
 		{errors.New("x509: certificate signed by unknown authority"), engine.KindTLS},
+		{mongo.ErrFileNotFound, engine.KindNotFound},
+		{mongo.ErrMissingChunk, engine.KindCorrupt},
+		{mongo.ErrWrongSize, engine.KindCorrupt},
+		{mongo.ErrMissingGridFSChunkSize, engine.KindCorrupt},
 	}
 	for _, tc := range cases {
 		if got := classify("op", tc.err, sec).Kind; got != tc.want {
