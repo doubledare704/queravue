@@ -405,5 +405,36 @@ class MongoProjectionMode extends $pb.ProtobufEnum {
   const MongoProjectionMode._(super.value, super.name);
 }
 
+/// MongoSqlResultKind says which MongoDB operation a translation produced.
+class MongoSqlResultKind extends $pb.ProtobufEnum {
+  /// Unspecified. Never sent on success.
+  static const MongoSqlResultKind MONGO_SQL_RESULT_KIND_UNSPECIFIED =
+      MongoSqlResultKind._(
+          0, _omitEnumNames ? '' : 'MONGO_SQL_RESULT_KIND_UNSPECIFIED');
+
+  /// A find with filter, projection, sort, skip and limit.
+  static const MongoSqlResultKind MONGO_SQL_RESULT_KIND_FIND =
+      MongoSqlResultKind._(
+          1, _omitEnumNames ? '' : 'MONGO_SQL_RESULT_KIND_FIND');
+
+  /// An aggregation pipeline.
+  static const MongoSqlResultKind MONGO_SQL_RESULT_KIND_AGGREGATE =
+      MongoSqlResultKind._(
+          2, _omitEnumNames ? '' : 'MONGO_SQL_RESULT_KIND_AGGREGATE');
+
+  static const $core.List<MongoSqlResultKind> values = <MongoSqlResultKind>[
+    MONGO_SQL_RESULT_KIND_UNSPECIFIED,
+    MONGO_SQL_RESULT_KIND_FIND,
+    MONGO_SQL_RESULT_KIND_AGGREGATE,
+  ];
+
+  static final $core.List<MongoSqlResultKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static MongoSqlResultKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const MongoSqlResultKind._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

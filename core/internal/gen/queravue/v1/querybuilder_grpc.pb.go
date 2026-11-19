@@ -23,6 +23,7 @@ const (
 	QueryBuilderService_ParseSql_FullMethodName           = "/queravue.v1.QueryBuilderService/ParseSql"
 	QueryBuilderService_GenerateMongoQuery_FullMethodName = "/queravue.v1.QueryBuilderService/GenerateMongoQuery"
 	QueryBuilderService_ParseMongoQuery_FullMethodName    = "/queravue.v1.QueryBuilderService/ParseMongoQuery"
+	QueryBuilderService_TranslateMongoSql_FullMethodName  = "/queravue.v1.QueryBuilderService/TranslateMongoSql"
 )
 
 // QueryBuilderServiceClient is the client API for QueryBuilderService service.
@@ -47,6 +48,10 @@ type QueryBuilderServiceClient interface {
 	// ParseMongoQuery reads EJSON filter, projection and sort documents into a
 	// find model. Operators without a visual form are kept as raw EJSON leaves.
 	ParseMongoQuery(ctx context.Context, in *ParseMongoQueryRequest, opts ...grpc.CallOption) (*ParseMongoQueryResponse, error)
+	// TranslateMongoSql translates one SELECT statement into a MongoDB find or
+	// aggregation (ADR 0022). Statements outside the supported subset fail with
+	// UNSUPPORTED_CONSTRUCT.
+	TranslateMongoSql(ctx context.Context, in *TranslateMongoSqlRequest, opts ...grpc.CallOption) (*TranslateMongoSqlResponse, error)
 }
 
 type queryBuilderServiceClient struct {
@@ -97,6 +102,16 @@ func (c *queryBuilderServiceClient) ParseMongoQuery(ctx context.Context, in *Par
 	return out, nil
 }
 
+func (c *queryBuilderServiceClient) TranslateMongoSql(ctx context.Context, in *TranslateMongoSqlRequest, opts ...grpc.CallOption) (*TranslateMongoSqlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TranslateMongoSqlResponse)
+	err := c.cc.Invoke(ctx, QueryBuilderService_TranslateMongoSql_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // QueryBuilderServiceServer is the server API for QueryBuilderService service.
 // All implementations must embed UnimplementedQueryBuilderServiceServer
 // for forward compatibility.
@@ -119,6 +134,10 @@ type QueryBuilderServiceServer interface {
 	// ParseMongoQuery reads EJSON filter, projection and sort documents into a
 	// find model. Operators without a visual form are kept as raw EJSON leaves.
 	ParseMongoQuery(context.Context, *ParseMongoQueryRequest) (*ParseMongoQueryResponse, error)
+	// TranslateMongoSql translates one SELECT statement into a MongoDB find or
+	// aggregation (ADR 0022). Statements outside the supported subset fail with
+	// UNSUPPORTED_CONSTRUCT.
+	TranslateMongoSql(context.Context, *TranslateMongoSqlRequest) (*TranslateMongoSqlResponse, error)
 	mustEmbedUnimplementedQueryBuilderServiceServer()
 }
 
@@ -140,6 +159,9 @@ func (UnimplementedQueryBuilderServiceServer) GenerateMongoQuery(context.Context
 }
 func (UnimplementedQueryBuilderServiceServer) ParseMongoQuery(context.Context, *ParseMongoQueryRequest) (*ParseMongoQueryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ParseMongoQuery not implemented")
+}
+func (UnimplementedQueryBuilderServiceServer) TranslateMongoSql(context.Context, *TranslateMongoSqlRequest) (*TranslateMongoSqlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TranslateMongoSql not implemented")
 }
 func (UnimplementedQueryBuilderServiceServer) mustEmbedUnimplementedQueryBuilderServiceServer() {}
 func (UnimplementedQueryBuilderServiceServer) testEmbeddedByValue()                             {}
@@ -234,6 +256,24 @@ func _QueryBuilderService_ParseMongoQuery_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _QueryBuilderService_TranslateMongoSql_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TranslateMongoSqlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(QueryBuilderServiceServer).TranslateMongoSql(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: QueryBuilderService_TranslateMongoSql_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(QueryBuilderServiceServer).TranslateMongoSql(ctx, req.(*TranslateMongoSqlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // QueryBuilderService_ServiceDesc is the grpc.ServiceDesc for QueryBuilderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -256,6 +296,10 @@ var QueryBuilderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ParseMongoQuery",
 			Handler:    _QueryBuilderService_ParseMongoQuery_Handler,
+		},
+		{
+			MethodName: "TranslateMongoSql",
+			Handler:    _QueryBuilderService_TranslateMongoSql_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

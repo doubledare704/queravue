@@ -40,6 +40,8 @@ const (
 	CapSchemaGraph Capability = "schema_graph"
 	// CapKeyValueStore: KeyValueStore (Iteration 10, ADR 0020).
 	CapKeyValueStore Capability = "key_value_store"
+	// CapGridFS: GridFS (Iteration 12, ADR 0023).
+	CapGridFS Capability = "gridfs"
 )
 
 // CapabilitiesWithoutInterface lists capabilities that core implements on its
@@ -60,6 +62,7 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapCompletion:      reflect.TypeFor[ColumnLister](),
 	CapSchemaGraph:     reflect.TypeFor[RelationLister](),
 	CapKeyValueStore:   reflect.TypeFor[KeyValueStore](),
+	CapGridFS:          reflect.TypeFor[GridFS](),
 }
 
 // CapabilityAlternatives lists further Conn interfaces that provide a

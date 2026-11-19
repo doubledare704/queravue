@@ -600,6 +600,59 @@ func (MongoProjectionMode) EnumDescriptor() ([]byte, []int) {
 	return file_queravue_v1_querybuilder_proto_rawDescGZIP(), []int{8}
 }
 
+// MongoSqlResultKind says which MongoDB operation a translation produced.
+type MongoSqlResultKind int32
+
+const (
+	// Unspecified. Never sent on success.
+	MongoSqlResultKind_MONGO_SQL_RESULT_KIND_UNSPECIFIED MongoSqlResultKind = 0
+	// A find with filter, projection, sort, skip and limit.
+	MongoSqlResultKind_MONGO_SQL_RESULT_KIND_FIND MongoSqlResultKind = 1
+	// An aggregation pipeline.
+	MongoSqlResultKind_MONGO_SQL_RESULT_KIND_AGGREGATE MongoSqlResultKind = 2
+)
+
+// Enum value maps for MongoSqlResultKind.
+var (
+	MongoSqlResultKind_name = map[int32]string{
+		0: "MONGO_SQL_RESULT_KIND_UNSPECIFIED",
+		1: "MONGO_SQL_RESULT_KIND_FIND",
+		2: "MONGO_SQL_RESULT_KIND_AGGREGATE",
+	}
+	MongoSqlResultKind_value = map[string]int32{
+		"MONGO_SQL_RESULT_KIND_UNSPECIFIED": 0,
+		"MONGO_SQL_RESULT_KIND_FIND":        1,
+		"MONGO_SQL_RESULT_KIND_AGGREGATE":   2,
+	}
+)
+
+func (x MongoSqlResultKind) Enum() *MongoSqlResultKind {
+	p := new(MongoSqlResultKind)
+	*p = x
+	return p
+}
+
+func (x MongoSqlResultKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MongoSqlResultKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_queravue_v1_querybuilder_proto_enumTypes[9].Descriptor()
+}
+
+func (MongoSqlResultKind) Type() protoreflect.EnumType {
+	return &file_queravue_v1_querybuilder_proto_enumTypes[9]
+}
+
+func (x MongoSqlResultKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MongoSqlResultKind.Descriptor instead.
+func (MongoSqlResultKind) EnumDescriptor() ([]byte, []int) {
+	return file_queravue_v1_querybuilder_proto_rawDescGZIP(), []int{9}
+}
+
 // QueryBuilderError describes why a builder call produced nothing.
 type QueryBuilderError struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -2552,6 +2605,275 @@ func (x *MongoSortField) GetDescending() bool {
 	return false
 }
 
+// TranslateMongoSqlRequest is the input of TranslateMongoSql.
+type TranslateMongoSqlRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Session id. Used to resolve the default database only.
+	SessionId string `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	// One SELECT statement.
+	Sql string `protobuf:"bytes,2,opt,name=sql,proto3" json:"sql,omitempty"`
+	// Database the collections belong to. Empty means the session's default
+	// database.
+	Database      string `protobuf:"bytes,3,opt,name=database,proto3" json:"database,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TranslateMongoSqlRequest) Reset() {
+	*x = TranslateMongoSqlRequest{}
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TranslateMongoSqlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TranslateMongoSqlRequest) ProtoMessage() {}
+
+func (x *TranslateMongoSqlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TranslateMongoSqlRequest.ProtoReflect.Descriptor instead.
+func (*TranslateMongoSqlRequest) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_querybuilder_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *TranslateMongoSqlRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlRequest) GetSql() string {
+	if x != nil {
+		return x.Sql
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlRequest) GetDatabase() string {
+	if x != nil {
+		return x.Database
+	}
+	return ""
+}
+
+// MongoSqlWarning points at a place where MongoDB semantics differ from SQL,
+// for example IS NULL also matching a missing field.
+type MongoSqlWarning struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Human-readable explanation, safe to show to the user.
+	Message string `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
+	// Zero-based UTF-8 byte offset into the SQL text of the construct the
+	// warning is about. Unset when it applies to the whole statement.
+	Offset        *uint32 `protobuf:"varint,2,opt,name=offset,proto3,oneof" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MongoSqlWarning) Reset() {
+	*x = MongoSqlWarning{}
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MongoSqlWarning) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MongoSqlWarning) ProtoMessage() {}
+
+func (x *MongoSqlWarning) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MongoSqlWarning.ProtoReflect.Descriptor instead.
+func (*MongoSqlWarning) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_querybuilder_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *MongoSqlWarning) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *MongoSqlWarning) GetOffset() uint32 {
+	if x != nil && x.Offset != nil {
+		return *x.Offset
+	}
+	return 0
+}
+
+// TranslateMongoSqlResponse holds the translation or the failure.
+type TranslateMongoSqlResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Database the query runs against.
+	Database string `protobuf:"bytes,1,opt,name=database,proto3" json:"database,omitempty"`
+	// Collection named in FROM.
+	Collection string `protobuf:"bytes,2,opt,name=collection,proto3" json:"collection,omitempty"`
+	// Which operation the fields below describe.
+	Kind MongoSqlResultKind `protobuf:"varint,3,opt,name=kind,proto3,enum=queravue.v1.MongoSqlResultKind" json:"kind,omitempty"`
+	// FIND: filter as canonical EJSON. "{}" when there is no WHERE.
+	FilterEjson string `protobuf:"bytes,4,opt,name=filter_ejson,json=filterEjson,proto3" json:"filter_ejson,omitempty"`
+	// FIND: projection as canonical EJSON, or empty for all fields.
+	ProjectionEjson string `protobuf:"bytes,5,opt,name=projection_ejson,json=projectionEjson,proto3" json:"projection_ejson,omitempty"`
+	// FIND: sort as canonical EJSON, or empty when there is no ORDER BY. Key
+	// order is the sort order.
+	SortEjson string `protobuf:"bytes,6,opt,name=sort_ejson,json=sortEjson,proto3" json:"sort_ejson,omitempty"`
+	// FIND: documents to skip.
+	Skip uint64 `protobuf:"varint,7,opt,name=skip,proto3" json:"skip,omitempty"`
+	// FIND: maximum documents. Unset means no limit.
+	Limit *uint64 `protobuf:"varint,8,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	// AGGREGATE: canonical EJSON array of single-key stage documents.
+	PipelineEjson string `protobuf:"bytes,9,opt,name=pipeline_ejson,json=pipelineEjson,proto3" json:"pipeline_ejson,omitempty"`
+	// Runnable shell code for either kind, e.g.
+	// db.getSiblingDB("shop").orders.find({...}).
+	ShellCode string `protobuf:"bytes,10,opt,name=shell_code,json=shellCode,proto3" json:"shell_code,omitempty"`
+	// Semantic differences the statement touches. Empty when none.
+	Warnings []*MongoSqlWarning `protobuf:"bytes,11,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	// Set when translation failed; all other fields are then empty.
+	Error         *QueryBuilderError `protobuf:"bytes,12,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TranslateMongoSqlResponse) Reset() {
+	*x = TranslateMongoSqlResponse{}
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TranslateMongoSqlResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TranslateMongoSqlResponse) ProtoMessage() {}
+
+func (x *TranslateMongoSqlResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_queravue_v1_querybuilder_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TranslateMongoSqlResponse.ProtoReflect.Descriptor instead.
+func (*TranslateMongoSqlResponse) Descriptor() ([]byte, []int) {
+	return file_queravue_v1_querybuilder_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *TranslateMongoSqlResponse) GetDatabase() string {
+	if x != nil {
+		return x.Database
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetKind() MongoSqlResultKind {
+	if x != nil {
+		return x.Kind
+	}
+	return MongoSqlResultKind_MONGO_SQL_RESULT_KIND_UNSPECIFIED
+}
+
+func (x *TranslateMongoSqlResponse) GetFilterEjson() string {
+	if x != nil {
+		return x.FilterEjson
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetProjectionEjson() string {
+	if x != nil {
+		return x.ProjectionEjson
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetSortEjson() string {
+	if x != nil {
+		return x.SortEjson
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetSkip() uint64 {
+	if x != nil {
+		return x.Skip
+	}
+	return 0
+}
+
+func (x *TranslateMongoSqlResponse) GetLimit() uint64 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *TranslateMongoSqlResponse) GetPipelineEjson() string {
+	if x != nil {
+		return x.PipelineEjson
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetShellCode() string {
+	if x != nil {
+		return x.ShellCode
+	}
+	return ""
+}
+
+func (x *TranslateMongoSqlResponse) GetWarnings() []*MongoSqlWarning {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+func (x *TranslateMongoSqlResponse) GetError() *QueryBuilderError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 var File_queravue_v1_querybuilder_proto protoreflect.FileDescriptor
 
 const file_queravue_v1_querybuilder_proto_rawDesc = "" +
@@ -2696,7 +3018,35 @@ const file_queravue_v1_querybuilder_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x1e\n" +
 	"\n" +
 	"descending\x18\x02 \x01(\bR\n" +
-	"descending*\xeb\x01\n" +
+	"descending\"g\n" +
+	"\x18TranslateMongoSqlRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x10\n" +
+	"\x03sql\x18\x02 \x01(\tR\x03sql\x12\x1a\n" +
+	"\bdatabase\x18\x03 \x01(\tR\bdatabase\"S\n" +
+	"\x0fMongoSqlWarning\x12\x18\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\x12\x1b\n" +
+	"\x06offset\x18\x02 \x01(\rH\x00R\x06offset\x88\x01\x01B\t\n" +
+	"\a_offset\"\xe8\x03\n" +
+	"\x19TranslateMongoSqlResponse\x12\x1a\n" +
+	"\bdatabase\x18\x01 \x01(\tR\bdatabase\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x02 \x01(\tR\n" +
+	"collection\x123\n" +
+	"\x04kind\x18\x03 \x01(\x0e2\x1f.queravue.v1.MongoSqlResultKindR\x04kind\x12!\n" +
+	"\ffilter_ejson\x18\x04 \x01(\tR\vfilterEjson\x12)\n" +
+	"\x10projection_ejson\x18\x05 \x01(\tR\x0fprojectionEjson\x12\x1d\n" +
+	"\n" +
+	"sort_ejson\x18\x06 \x01(\tR\tsortEjson\x12\x12\n" +
+	"\x04skip\x18\a \x01(\x04R\x04skip\x12\x19\n" +
+	"\x05limit\x18\b \x01(\x04H\x00R\x05limit\x88\x01\x01\x12%\n" +
+	"\x0epipeline_ejson\x18\t \x01(\tR\rpipelineEjson\x12\x1d\n" +
+	"\n" +
+	"shell_code\x18\n" +
+	" \x01(\tR\tshellCode\x128\n" +
+	"\bwarnings\x18\v \x03(\v2\x1c.queravue.v1.MongoSqlWarningR\bwarnings\x124\n" +
+	"\x05error\x18\f \x01(\v2\x1e.queravue.v1.QueryBuilderErrorR\x05errorB\b\n" +
+	"\x06_limit*\xeb\x01\n" +
 	"\x15QueryBuilderErrorKind\x12(\n" +
 	"$QUERY_BUILDER_ERROR_KIND_UNSPECIFIED\x10\x00\x12*\n" +
 	"&QUERY_BUILDER_ERROR_KIND_INVALID_MODEL\x10\x01\x12\"\n" +
@@ -2759,12 +3109,17 @@ const file_queravue_v1_querybuilder_proto_rawDesc = "" +
 	"\x13MongoProjectionMode\x12%\n" +
 	"!MONGO_PROJECTION_MODE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dMONGO_PROJECTION_MODE_INCLUDE\x10\x01\x12!\n" +
-	"\x1dMONGO_PROJECTION_MODE_EXCLUDE\x10\x022\xf5\x02\n" +
+	"\x1dMONGO_PROJECTION_MODE_EXCLUDE\x10\x02*\x80\x01\n" +
+	"\x12MongoSqlResultKind\x12%\n" +
+	"!MONGO_SQL_RESULT_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aMONGO_SQL_RESULT_KIND_FIND\x10\x01\x12#\n" +
+	"\x1fMONGO_SQL_RESULT_KIND_AGGREGATE\x10\x022\xd9\x03\n" +
 	"\x13QueryBuilderService\x12P\n" +
 	"\vGenerateSql\x12\x1f.queravue.v1.GenerateSqlRequest\x1a .queravue.v1.GenerateSqlResponse\x12G\n" +
 	"\bParseSql\x12\x1c.queravue.v1.ParseSqlRequest\x1a\x1d.queravue.v1.ParseSqlResponse\x12e\n" +
 	"\x12GenerateMongoQuery\x12&.queravue.v1.GenerateMongoQueryRequest\x1a'.queravue.v1.GenerateMongoQueryResponse\x12\\\n" +
-	"\x0fParseMongoQuery\x12#.queravue.v1.ParseMongoQueryRequest\x1a$.queravue.v1.ParseMongoQueryResponseB\xbd\x01\n" +
+	"\x0fParseMongoQuery\x12#.queravue.v1.ParseMongoQueryRequest\x1a$.queravue.v1.ParseMongoQueryResponse\x12b\n" +
+	"\x11TranslateMongoSql\x12%.queravue.v1.TranslateMongoSqlRequest\x1a&.queravue.v1.TranslateMongoSqlResponseB\xbd\x01\n" +
 	"\x0fcom.queravue.v1B\x11QuerybuilderProtoP\x01ZJgithub.com/doubledare704/queravue/core/internal/gen/queravue/v1;queravuev1\xa2\x02\x03QXX\xaa\x02\vQueravue.V1\xca\x02\vQueravue\\V1\xe2\x02\x17Queravue\\V1\\GPBMetadata\xea\x02\fQueravue::V1b\x06proto3"
 
 var (
@@ -2779,8 +3134,8 @@ func file_queravue_v1_querybuilder_proto_rawDescGZIP() []byte {
 	return file_queravue_v1_querybuilder_proto_rawDescData
 }
 
-var file_queravue_v1_querybuilder_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_queravue_v1_querybuilder_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_queravue_v1_querybuilder_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_queravue_v1_querybuilder_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_queravue_v1_querybuilder_proto_goTypes = []any{
 	(QueryBuilderErrorKind)(0),         // 0: queravue.v1.QueryBuilderErrorKind
 	(SqlJoinKind)(0),                   // 1: queravue.v1.SqlJoinKind
@@ -2791,92 +3146,101 @@ var file_queravue_v1_querybuilder_proto_goTypes = []any{
 	(MongoBoolOp)(0),                   // 6: queravue.v1.MongoBoolOp
 	(MongoOperator)(0),                 // 7: queravue.v1.MongoOperator
 	(MongoProjectionMode)(0),           // 8: queravue.v1.MongoProjectionMode
-	(*QueryBuilderError)(nil),          // 9: queravue.v1.QueryBuilderError
-	(*GenerateSqlRequest)(nil),         // 10: queravue.v1.GenerateSqlRequest
-	(*GenerateSqlResponse)(nil),        // 11: queravue.v1.GenerateSqlResponse
-	(*ParseSqlRequest)(nil),            // 12: queravue.v1.ParseSqlRequest
-	(*ParseSqlResponse)(nil),           // 13: queravue.v1.ParseSqlResponse
-	(*SqlQueryModel)(nil),              // 14: queravue.v1.SqlQueryModel
-	(*SqlTableRef)(nil),                // 15: queravue.v1.SqlTableRef
-	(*SqlJoin)(nil),                    // 16: queravue.v1.SqlJoin
-	(*SqlColumnRef)(nil),               // 17: queravue.v1.SqlColumnRef
-	(*SqlAggregateExpr)(nil),           // 18: queravue.v1.SqlAggregateExpr
-	(*SqlSelectItem)(nil),              // 19: queravue.v1.SqlSelectItem
-	(*SqlLiteral)(nil),                 // 20: queravue.v1.SqlLiteral
-	(*SqlOperand)(nil),                 // 21: queravue.v1.SqlOperand
-	(*SqlComparison)(nil),              // 22: queravue.v1.SqlComparison
-	(*SqlConditionGroup)(nil),          // 23: queravue.v1.SqlConditionGroup
-	(*SqlCondition)(nil),               // 24: queravue.v1.SqlCondition
-	(*SqlOrderTerm)(nil),               // 25: queravue.v1.SqlOrderTerm
-	(*GenerateMongoQueryRequest)(nil),  // 26: queravue.v1.GenerateMongoQueryRequest
-	(*GenerateMongoQueryResponse)(nil), // 27: queravue.v1.GenerateMongoQueryResponse
-	(*ParseMongoQueryRequest)(nil),     // 28: queravue.v1.ParseMongoQueryRequest
-	(*ParseMongoQueryResponse)(nil),    // 29: queravue.v1.ParseMongoQueryResponse
-	(*MongoFindModel)(nil),             // 30: queravue.v1.MongoFindModel
-	(*MongoConditionGroup)(nil),        // 31: queravue.v1.MongoConditionGroup
-	(*MongoFieldCondition)(nil),        // 32: queravue.v1.MongoFieldCondition
-	(*MongoCondition)(nil),             // 33: queravue.v1.MongoCondition
-	(*MongoProjectionField)(nil),       // 34: queravue.v1.MongoProjectionField
-	(*MongoSortField)(nil),             // 35: queravue.v1.MongoSortField
+	(MongoSqlResultKind)(0),            // 9: queravue.v1.MongoSqlResultKind
+	(*QueryBuilderError)(nil),          // 10: queravue.v1.QueryBuilderError
+	(*GenerateSqlRequest)(nil),         // 11: queravue.v1.GenerateSqlRequest
+	(*GenerateSqlResponse)(nil),        // 12: queravue.v1.GenerateSqlResponse
+	(*ParseSqlRequest)(nil),            // 13: queravue.v1.ParseSqlRequest
+	(*ParseSqlResponse)(nil),           // 14: queravue.v1.ParseSqlResponse
+	(*SqlQueryModel)(nil),              // 15: queravue.v1.SqlQueryModel
+	(*SqlTableRef)(nil),                // 16: queravue.v1.SqlTableRef
+	(*SqlJoin)(nil),                    // 17: queravue.v1.SqlJoin
+	(*SqlColumnRef)(nil),               // 18: queravue.v1.SqlColumnRef
+	(*SqlAggregateExpr)(nil),           // 19: queravue.v1.SqlAggregateExpr
+	(*SqlSelectItem)(nil),              // 20: queravue.v1.SqlSelectItem
+	(*SqlLiteral)(nil),                 // 21: queravue.v1.SqlLiteral
+	(*SqlOperand)(nil),                 // 22: queravue.v1.SqlOperand
+	(*SqlComparison)(nil),              // 23: queravue.v1.SqlComparison
+	(*SqlConditionGroup)(nil),          // 24: queravue.v1.SqlConditionGroup
+	(*SqlCondition)(nil),               // 25: queravue.v1.SqlCondition
+	(*SqlOrderTerm)(nil),               // 26: queravue.v1.SqlOrderTerm
+	(*GenerateMongoQueryRequest)(nil),  // 27: queravue.v1.GenerateMongoQueryRequest
+	(*GenerateMongoQueryResponse)(nil), // 28: queravue.v1.GenerateMongoQueryResponse
+	(*ParseMongoQueryRequest)(nil),     // 29: queravue.v1.ParseMongoQueryRequest
+	(*ParseMongoQueryResponse)(nil),    // 30: queravue.v1.ParseMongoQueryResponse
+	(*MongoFindModel)(nil),             // 31: queravue.v1.MongoFindModel
+	(*MongoConditionGroup)(nil),        // 32: queravue.v1.MongoConditionGroup
+	(*MongoFieldCondition)(nil),        // 33: queravue.v1.MongoFieldCondition
+	(*MongoCondition)(nil),             // 34: queravue.v1.MongoCondition
+	(*MongoProjectionField)(nil),       // 35: queravue.v1.MongoProjectionField
+	(*MongoSortField)(nil),             // 36: queravue.v1.MongoSortField
+	(*TranslateMongoSqlRequest)(nil),   // 37: queravue.v1.TranslateMongoSqlRequest
+	(*MongoSqlWarning)(nil),            // 38: queravue.v1.MongoSqlWarning
+	(*TranslateMongoSqlResponse)(nil),  // 39: queravue.v1.TranslateMongoSqlResponse
 }
 var file_queravue_v1_querybuilder_proto_depIdxs = []int32{
 	0,  // 0: queravue.v1.QueryBuilderError.kind:type_name -> queravue.v1.QueryBuilderErrorKind
-	14, // 1: queravue.v1.GenerateSqlRequest.model:type_name -> queravue.v1.SqlQueryModel
-	9,  // 2: queravue.v1.GenerateSqlResponse.error:type_name -> queravue.v1.QueryBuilderError
-	14, // 3: queravue.v1.ParseSqlResponse.model:type_name -> queravue.v1.SqlQueryModel
-	9,  // 4: queravue.v1.ParseSqlResponse.error:type_name -> queravue.v1.QueryBuilderError
-	15, // 5: queravue.v1.SqlQueryModel.from:type_name -> queravue.v1.SqlTableRef
-	16, // 6: queravue.v1.SqlQueryModel.joins:type_name -> queravue.v1.SqlJoin
-	19, // 7: queravue.v1.SqlQueryModel.select:type_name -> queravue.v1.SqlSelectItem
-	24, // 8: queravue.v1.SqlQueryModel.where:type_name -> queravue.v1.SqlCondition
-	17, // 9: queravue.v1.SqlQueryModel.group_by:type_name -> queravue.v1.SqlColumnRef
-	24, // 10: queravue.v1.SqlQueryModel.having:type_name -> queravue.v1.SqlCondition
-	25, // 11: queravue.v1.SqlQueryModel.order_by:type_name -> queravue.v1.SqlOrderTerm
+	15, // 1: queravue.v1.GenerateSqlRequest.model:type_name -> queravue.v1.SqlQueryModel
+	10, // 2: queravue.v1.GenerateSqlResponse.error:type_name -> queravue.v1.QueryBuilderError
+	15, // 3: queravue.v1.ParseSqlResponse.model:type_name -> queravue.v1.SqlQueryModel
+	10, // 4: queravue.v1.ParseSqlResponse.error:type_name -> queravue.v1.QueryBuilderError
+	16, // 5: queravue.v1.SqlQueryModel.from:type_name -> queravue.v1.SqlTableRef
+	17, // 6: queravue.v1.SqlQueryModel.joins:type_name -> queravue.v1.SqlJoin
+	20, // 7: queravue.v1.SqlQueryModel.select:type_name -> queravue.v1.SqlSelectItem
+	25, // 8: queravue.v1.SqlQueryModel.where:type_name -> queravue.v1.SqlCondition
+	18, // 9: queravue.v1.SqlQueryModel.group_by:type_name -> queravue.v1.SqlColumnRef
+	25, // 10: queravue.v1.SqlQueryModel.having:type_name -> queravue.v1.SqlCondition
+	26, // 11: queravue.v1.SqlQueryModel.order_by:type_name -> queravue.v1.SqlOrderTerm
 	1,  // 12: queravue.v1.SqlJoin.kind:type_name -> queravue.v1.SqlJoinKind
-	15, // 13: queravue.v1.SqlJoin.table:type_name -> queravue.v1.SqlTableRef
-	24, // 14: queravue.v1.SqlJoin.on:type_name -> queravue.v1.SqlCondition
+	16, // 13: queravue.v1.SqlJoin.table:type_name -> queravue.v1.SqlTableRef
+	25, // 14: queravue.v1.SqlJoin.on:type_name -> queravue.v1.SqlCondition
 	2,  // 15: queravue.v1.SqlAggregateExpr.function:type_name -> queravue.v1.SqlAggregate
-	17, // 16: queravue.v1.SqlAggregateExpr.column:type_name -> queravue.v1.SqlColumnRef
-	17, // 17: queravue.v1.SqlSelectItem.column:type_name -> queravue.v1.SqlColumnRef
-	18, // 18: queravue.v1.SqlSelectItem.aggregate:type_name -> queravue.v1.SqlAggregateExpr
-	17, // 19: queravue.v1.SqlOperand.column:type_name -> queravue.v1.SqlColumnRef
-	20, // 20: queravue.v1.SqlOperand.literal:type_name -> queravue.v1.SqlLiteral
-	18, // 21: queravue.v1.SqlOperand.aggregate:type_name -> queravue.v1.SqlAggregateExpr
-	21, // 22: queravue.v1.SqlComparison.left:type_name -> queravue.v1.SqlOperand
+	18, // 16: queravue.v1.SqlAggregateExpr.column:type_name -> queravue.v1.SqlColumnRef
+	18, // 17: queravue.v1.SqlSelectItem.column:type_name -> queravue.v1.SqlColumnRef
+	19, // 18: queravue.v1.SqlSelectItem.aggregate:type_name -> queravue.v1.SqlAggregateExpr
+	18, // 19: queravue.v1.SqlOperand.column:type_name -> queravue.v1.SqlColumnRef
+	21, // 20: queravue.v1.SqlOperand.literal:type_name -> queravue.v1.SqlLiteral
+	19, // 21: queravue.v1.SqlOperand.aggregate:type_name -> queravue.v1.SqlAggregateExpr
+	22, // 22: queravue.v1.SqlComparison.left:type_name -> queravue.v1.SqlOperand
 	3,  // 23: queravue.v1.SqlComparison.op:type_name -> queravue.v1.SqlOperator
-	21, // 24: queravue.v1.SqlComparison.operands:type_name -> queravue.v1.SqlOperand
+	22, // 24: queravue.v1.SqlComparison.operands:type_name -> queravue.v1.SqlOperand
 	4,  // 25: queravue.v1.SqlConditionGroup.op:type_name -> queravue.v1.SqlBoolOp
-	24, // 26: queravue.v1.SqlConditionGroup.children:type_name -> queravue.v1.SqlCondition
-	22, // 27: queravue.v1.SqlCondition.comparison:type_name -> queravue.v1.SqlComparison
-	23, // 28: queravue.v1.SqlCondition.group:type_name -> queravue.v1.SqlConditionGroup
-	21, // 29: queravue.v1.SqlOrderTerm.expression:type_name -> queravue.v1.SqlOperand
+	25, // 26: queravue.v1.SqlConditionGroup.children:type_name -> queravue.v1.SqlCondition
+	23, // 27: queravue.v1.SqlCondition.comparison:type_name -> queravue.v1.SqlComparison
+	24, // 28: queravue.v1.SqlCondition.group:type_name -> queravue.v1.SqlConditionGroup
+	22, // 29: queravue.v1.SqlOrderTerm.expression:type_name -> queravue.v1.SqlOperand
 	5,  // 30: queravue.v1.SqlOrderTerm.nulls:type_name -> queravue.v1.SqlNulls
-	30, // 31: queravue.v1.GenerateMongoQueryRequest.model:type_name -> queravue.v1.MongoFindModel
-	9,  // 32: queravue.v1.GenerateMongoQueryResponse.error:type_name -> queravue.v1.QueryBuilderError
-	30, // 33: queravue.v1.ParseMongoQueryResponse.model:type_name -> queravue.v1.MongoFindModel
-	9,  // 34: queravue.v1.ParseMongoQueryResponse.error:type_name -> queravue.v1.QueryBuilderError
-	33, // 35: queravue.v1.MongoFindModel.filter:type_name -> queravue.v1.MongoCondition
-	34, // 36: queravue.v1.MongoFindModel.projection:type_name -> queravue.v1.MongoProjectionField
-	35, // 37: queravue.v1.MongoFindModel.sort:type_name -> queravue.v1.MongoSortField
+	31, // 31: queravue.v1.GenerateMongoQueryRequest.model:type_name -> queravue.v1.MongoFindModel
+	10, // 32: queravue.v1.GenerateMongoQueryResponse.error:type_name -> queravue.v1.QueryBuilderError
+	31, // 33: queravue.v1.ParseMongoQueryResponse.model:type_name -> queravue.v1.MongoFindModel
+	10, // 34: queravue.v1.ParseMongoQueryResponse.error:type_name -> queravue.v1.QueryBuilderError
+	34, // 35: queravue.v1.MongoFindModel.filter:type_name -> queravue.v1.MongoCondition
+	35, // 36: queravue.v1.MongoFindModel.projection:type_name -> queravue.v1.MongoProjectionField
+	36, // 37: queravue.v1.MongoFindModel.sort:type_name -> queravue.v1.MongoSortField
 	6,  // 38: queravue.v1.MongoConditionGroup.op:type_name -> queravue.v1.MongoBoolOp
-	33, // 39: queravue.v1.MongoConditionGroup.children:type_name -> queravue.v1.MongoCondition
+	34, // 39: queravue.v1.MongoConditionGroup.children:type_name -> queravue.v1.MongoCondition
 	7,  // 40: queravue.v1.MongoFieldCondition.op:type_name -> queravue.v1.MongoOperator
-	32, // 41: queravue.v1.MongoCondition.field:type_name -> queravue.v1.MongoFieldCondition
-	31, // 42: queravue.v1.MongoCondition.group:type_name -> queravue.v1.MongoConditionGroup
+	33, // 41: queravue.v1.MongoCondition.field:type_name -> queravue.v1.MongoFieldCondition
+	32, // 42: queravue.v1.MongoCondition.group:type_name -> queravue.v1.MongoConditionGroup
 	8,  // 43: queravue.v1.MongoProjectionField.mode:type_name -> queravue.v1.MongoProjectionMode
-	10, // 44: queravue.v1.QueryBuilderService.GenerateSql:input_type -> queravue.v1.GenerateSqlRequest
-	12, // 45: queravue.v1.QueryBuilderService.ParseSql:input_type -> queravue.v1.ParseSqlRequest
-	26, // 46: queravue.v1.QueryBuilderService.GenerateMongoQuery:input_type -> queravue.v1.GenerateMongoQueryRequest
-	28, // 47: queravue.v1.QueryBuilderService.ParseMongoQuery:input_type -> queravue.v1.ParseMongoQueryRequest
-	11, // 48: queravue.v1.QueryBuilderService.GenerateSql:output_type -> queravue.v1.GenerateSqlResponse
-	13, // 49: queravue.v1.QueryBuilderService.ParseSql:output_type -> queravue.v1.ParseSqlResponse
-	27, // 50: queravue.v1.QueryBuilderService.GenerateMongoQuery:output_type -> queravue.v1.GenerateMongoQueryResponse
-	29, // 51: queravue.v1.QueryBuilderService.ParseMongoQuery:output_type -> queravue.v1.ParseMongoQueryResponse
-	48, // [48:52] is the sub-list for method output_type
-	44, // [44:48] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	9,  // 44: queravue.v1.TranslateMongoSqlResponse.kind:type_name -> queravue.v1.MongoSqlResultKind
+	38, // 45: queravue.v1.TranslateMongoSqlResponse.warnings:type_name -> queravue.v1.MongoSqlWarning
+	10, // 46: queravue.v1.TranslateMongoSqlResponse.error:type_name -> queravue.v1.QueryBuilderError
+	11, // 47: queravue.v1.QueryBuilderService.GenerateSql:input_type -> queravue.v1.GenerateSqlRequest
+	13, // 48: queravue.v1.QueryBuilderService.ParseSql:input_type -> queravue.v1.ParseSqlRequest
+	27, // 49: queravue.v1.QueryBuilderService.GenerateMongoQuery:input_type -> queravue.v1.GenerateMongoQueryRequest
+	29, // 50: queravue.v1.QueryBuilderService.ParseMongoQuery:input_type -> queravue.v1.ParseMongoQueryRequest
+	37, // 51: queravue.v1.QueryBuilderService.TranslateMongoSql:input_type -> queravue.v1.TranslateMongoSqlRequest
+	12, // 52: queravue.v1.QueryBuilderService.GenerateSql:output_type -> queravue.v1.GenerateSqlResponse
+	14, // 53: queravue.v1.QueryBuilderService.ParseSql:output_type -> queravue.v1.ParseSqlResponse
+	28, // 54: queravue.v1.QueryBuilderService.GenerateMongoQuery:output_type -> queravue.v1.GenerateMongoQueryResponse
+	30, // 55: queravue.v1.QueryBuilderService.ParseMongoQuery:output_type -> queravue.v1.ParseMongoQueryResponse
+	39, // 56: queravue.v1.QueryBuilderService.TranslateMongoSql:output_type -> queravue.v1.TranslateMongoSqlResponse
+	52, // [52:57] is the sub-list for method output_type
+	47, // [47:52] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_queravue_v1_querybuilder_proto_init() }
@@ -2911,13 +3275,15 @@ func file_queravue_v1_querybuilder_proto_init() {
 		(*MongoCondition_Group)(nil),
 		(*MongoCondition_RawEjson)(nil),
 	}
+	file_queravue_v1_querybuilder_proto_msgTypes[28].OneofWrappers = []any{}
+	file_queravue_v1_querybuilder_proto_msgTypes[29].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queravue_v1_querybuilder_proto_rawDesc), len(file_queravue_v1_querybuilder_proto_rawDesc)),
-			NumEnums:      9,
-			NumMessages:   27,
+			NumEnums:      10,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

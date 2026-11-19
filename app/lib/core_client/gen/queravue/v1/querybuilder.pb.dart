@@ -2417,6 +2417,364 @@ class MongoSortField extends $pb.GeneratedMessage {
   void clearDescending() => $_clearField(2);
 }
 
+/// TranslateMongoSqlRequest is the input of TranslateMongoSql.
+class TranslateMongoSqlRequest extends $pb.GeneratedMessage {
+  factory TranslateMongoSqlRequest({
+    $core.String? sessionId,
+    $core.String? sql,
+    $core.String? database,
+  }) {
+    final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (sql != null) result.sql = sql;
+    if (database != null) result.database = database;
+    return result;
+  }
+
+  TranslateMongoSqlRequest._();
+
+  factory TranslateMongoSqlRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TranslateMongoSqlRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TranslateMongoSqlRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(2, _omitFieldNames ? '' : 'sql')
+    ..aOS(3, _omitFieldNames ? '' : 'database')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TranslateMongoSqlRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TranslateMongoSqlRequest copyWith(
+          void Function(TranslateMongoSqlRequest) updates) =>
+      super.copyWith((message) => updates(message as TranslateMongoSqlRequest))
+          as TranslateMongoSqlRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TranslateMongoSqlRequest create() => TranslateMongoSqlRequest._();
+  @$core.override
+  TranslateMongoSqlRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TranslateMongoSqlRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TranslateMongoSqlRequest>(create);
+  static TranslateMongoSqlRequest? _defaultInstance;
+
+  /// Session id. Used to resolve the default database only.
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  /// One SELECT statement.
+  @$pb.TagNumber(2)
+  $core.String get sql => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sql($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSql() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSql() => $_clearField(2);
+
+  /// Database the collections belong to. Empty means the session's default
+  /// database.
+  @$pb.TagNumber(3)
+  $core.String get database => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set database($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasDatabase() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDatabase() => $_clearField(3);
+}
+
+/// MongoSqlWarning points at a place where MongoDB semantics differ from SQL,
+/// for example IS NULL also matching a missing field.
+class MongoSqlWarning extends $pb.GeneratedMessage {
+  factory MongoSqlWarning({
+    $core.String? message,
+    $core.int? offset,
+  }) {
+    final result = create();
+    if (message != null) result.message = message;
+    if (offset != null) result.offset = offset;
+    return result;
+  }
+
+  MongoSqlWarning._();
+
+  factory MongoSqlWarning.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MongoSqlWarning.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MongoSqlWarning',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'message')
+    ..aI(2, _omitFieldNames ? '' : 'offset', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MongoSqlWarning clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MongoSqlWarning copyWith(void Function(MongoSqlWarning) updates) =>
+      super.copyWith((message) => updates(message as MongoSqlWarning))
+          as MongoSqlWarning;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MongoSqlWarning create() => MongoSqlWarning._();
+  @$core.override
+  MongoSqlWarning createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MongoSqlWarning getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MongoSqlWarning>(create);
+  static MongoSqlWarning? _defaultInstance;
+
+  /// Human-readable explanation, safe to show to the user.
+  @$pb.TagNumber(1)
+  $core.String get message => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set message($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMessage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMessage() => $_clearField(1);
+
+  /// Zero-based UTF-8 byte offset into the SQL text of the construct the
+  /// warning is about. Unset when it applies to the whole statement.
+  @$pb.TagNumber(2)
+  $core.int get offset => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set offset($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOffset() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOffset() => $_clearField(2);
+}
+
+/// TranslateMongoSqlResponse holds the translation or the failure.
+class TranslateMongoSqlResponse extends $pb.GeneratedMessage {
+  factory TranslateMongoSqlResponse({
+    $core.String? database,
+    $core.String? collection,
+    MongoSqlResultKind? kind,
+    $core.String? filterEjson,
+    $core.String? projectionEjson,
+    $core.String? sortEjson,
+    $fixnum.Int64? skip,
+    $fixnum.Int64? limit,
+    $core.String? pipelineEjson,
+    $core.String? shellCode,
+    $core.Iterable<MongoSqlWarning>? warnings,
+    QueryBuilderError? error,
+  }) {
+    final result = create();
+    if (database != null) result.database = database;
+    if (collection != null) result.collection = collection;
+    if (kind != null) result.kind = kind;
+    if (filterEjson != null) result.filterEjson = filterEjson;
+    if (projectionEjson != null) result.projectionEjson = projectionEjson;
+    if (sortEjson != null) result.sortEjson = sortEjson;
+    if (skip != null) result.skip = skip;
+    if (limit != null) result.limit = limit;
+    if (pipelineEjson != null) result.pipelineEjson = pipelineEjson;
+    if (shellCode != null) result.shellCode = shellCode;
+    if (warnings != null) result.warnings.addAll(warnings);
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  TranslateMongoSqlResponse._();
+
+  factory TranslateMongoSqlResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TranslateMongoSqlResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TranslateMongoSqlResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'queravue.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'database')
+    ..aOS(2, _omitFieldNames ? '' : 'collection')
+    ..aE<MongoSqlResultKind>(3, _omitFieldNames ? '' : 'kind',
+        enumValues: MongoSqlResultKind.values)
+    ..aOS(4, _omitFieldNames ? '' : 'filterEjson')
+    ..aOS(5, _omitFieldNames ? '' : 'projectionEjson')
+    ..aOS(6, _omitFieldNames ? '' : 'sortEjson')
+    ..a<$fixnum.Int64>(7, _omitFieldNames ? '' : 'skip', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(8, _omitFieldNames ? '' : 'limit', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(9, _omitFieldNames ? '' : 'pipelineEjson')
+    ..aOS(10, _omitFieldNames ? '' : 'shellCode')
+    ..pPM<MongoSqlWarning>(11, _omitFieldNames ? '' : 'warnings',
+        subBuilder: MongoSqlWarning.create)
+    ..aOM<QueryBuilderError>(12, _omitFieldNames ? '' : 'error',
+        subBuilder: QueryBuilderError.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TranslateMongoSqlResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TranslateMongoSqlResponse copyWith(
+          void Function(TranslateMongoSqlResponse) updates) =>
+      super.copyWith((message) => updates(message as TranslateMongoSqlResponse))
+          as TranslateMongoSqlResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TranslateMongoSqlResponse create() => TranslateMongoSqlResponse._();
+  @$core.override
+  TranslateMongoSqlResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TranslateMongoSqlResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TranslateMongoSqlResponse>(create);
+  static TranslateMongoSqlResponse? _defaultInstance;
+
+  /// Database the query runs against.
+  @$pb.TagNumber(1)
+  $core.String get database => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set database($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDatabase() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDatabase() => $_clearField(1);
+
+  /// Collection named in FROM.
+  @$pb.TagNumber(2)
+  $core.String get collection => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set collection($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCollection() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCollection() => $_clearField(2);
+
+  /// Which operation the fields below describe.
+  @$pb.TagNumber(3)
+  MongoSqlResultKind get kind => $_getN(2);
+  @$pb.TagNumber(3)
+  set kind(MongoSqlResultKind value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasKind() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearKind() => $_clearField(3);
+
+  /// FIND: filter as canonical EJSON. "{}" when there is no WHERE.
+  @$pb.TagNumber(4)
+  $core.String get filterEjson => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set filterEjson($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFilterEjson() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFilterEjson() => $_clearField(4);
+
+  /// FIND: projection as canonical EJSON, or empty for all fields.
+  @$pb.TagNumber(5)
+  $core.String get projectionEjson => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set projectionEjson($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasProjectionEjson() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearProjectionEjson() => $_clearField(5);
+
+  /// FIND: sort as canonical EJSON, or empty when there is no ORDER BY. Key
+  /// order is the sort order.
+  @$pb.TagNumber(6)
+  $core.String get sortEjson => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set sortEjson($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSortEjson() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSortEjson() => $_clearField(6);
+
+  /// FIND: documents to skip.
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get skip => $_getI64(6);
+  @$pb.TagNumber(7)
+  set skip($fixnum.Int64 value) => $_setInt64(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasSkip() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSkip() => $_clearField(7);
+
+  /// FIND: maximum documents. Unset means no limit.
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get limit => $_getI64(7);
+  @$pb.TagNumber(8)
+  set limit($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasLimit() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLimit() => $_clearField(8);
+
+  /// AGGREGATE: canonical EJSON array of single-key stage documents.
+  @$pb.TagNumber(9)
+  $core.String get pipelineEjson => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set pipelineEjson($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasPipelineEjson() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearPipelineEjson() => $_clearField(9);
+
+  /// Runnable shell code for either kind, e.g.
+  /// db.getSiblingDB("shop").orders.find({...}).
+  @$pb.TagNumber(10)
+  $core.String get shellCode => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set shellCode($core.String value) => $_setString(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasShellCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearShellCode() => $_clearField(10);
+
+  /// Semantic differences the statement touches. Empty when none.
+  @$pb.TagNumber(11)
+  $pb.PbList<MongoSqlWarning> get warnings => $_getList(10);
+
+  /// Set when translation failed; all other fields are then empty.
+  @$pb.TagNumber(12)
+  QueryBuilderError get error => $_getN(11);
+  @$pb.TagNumber(12)
+  set error(QueryBuilderError value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasError() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearError() => $_clearField(12);
+  @$pb.TagNumber(12)
+  QueryBuilderError ensureError() => $_ensure(11);
+}
+
 const $core.bool _omitFieldNames =
     $core.bool.fromEnvironment('protobuf.omit_field_names');
 const $core.bool _omitMessageNames =
