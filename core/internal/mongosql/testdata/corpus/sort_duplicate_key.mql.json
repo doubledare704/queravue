@@ -1,0 +1,19 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {},
+  "sort": {
+    "age": {
+      "$numberInt": "1"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({}).sort({\"age\":{\"$numberInt\":\"1\"}})",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 29,
+      "at": "age, age DESC"
+    }
+  ]
+}

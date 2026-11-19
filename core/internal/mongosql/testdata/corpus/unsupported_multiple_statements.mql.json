@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "multiple statements are not supported",
+    "offset": 15,
+    "at": "; SELECT * FROM b"
+  }
+}

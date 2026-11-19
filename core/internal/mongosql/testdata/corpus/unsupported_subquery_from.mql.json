@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "subqueries are not supported",
+    "offset": 14,
+    "at": "(SELECT * FROM users) u"
+  }
+}

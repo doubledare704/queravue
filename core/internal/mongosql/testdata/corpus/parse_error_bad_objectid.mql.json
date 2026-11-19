@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "OBJECTID needs 24 hex digits, got \"xyz\"",
+    "offset": 41,
+    "at": "'xyz')"
+  }
+}

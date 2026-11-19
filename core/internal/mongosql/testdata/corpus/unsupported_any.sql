@@ -1,0 +1,1 @@
+SELECT * FROM t WHERE a = ANY (SELECT b FROM u)

@@ -1,0 +1,1 @@
+SELECT * FROM users WHERE NOT (email IS NULL)

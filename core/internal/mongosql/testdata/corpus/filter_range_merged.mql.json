@@ -1,0 +1,25 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "players",
+  "filter": {
+    "score": {
+      "$gte": {
+        "$numberInt": "10"
+      }
+    },
+    "rank": {
+      "$lte": {
+        "$numberInt": "3"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").players.find({\"score\":{\"$gte\":{\"$numberInt\":\"10\"}},\"rank\":{\"$lte\":{\"$numberInt\":\"3\"}}})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 28,
+      "at": "score >= 10 AND rank <= "
+    }
+  ]
+}

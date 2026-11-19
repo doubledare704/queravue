@@ -1,0 +1,11 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "email": {
+      "$ne": null
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"email\":{\"$ne\":null}})"
+}

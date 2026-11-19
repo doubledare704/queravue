@@ -1,0 +1,1 @@
+SELECT * FROM events WHERE seq = NUMBERLONG(42) OR seq = NUMBERLONG('-7')

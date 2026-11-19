@@ -1,0 +1,1 @@
+SELECT * FROM t WHERE date = DATE '2024-02-29'

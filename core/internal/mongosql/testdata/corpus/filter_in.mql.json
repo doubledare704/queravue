@@ -1,0 +1,21 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "orders",
+  "filter": {
+    "status": {
+      "$in": [
+        "new",
+        "paid"
+      ]
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").orders.find({\"status\":{\"$in\":[\"new\",\"paid\"]}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 27,
+      "at": "status IN ('new', 'paid'"
+    }
+  ]
+}

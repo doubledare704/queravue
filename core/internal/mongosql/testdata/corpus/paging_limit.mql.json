@@ -1,0 +1,8 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {},
+  "limit": 10,
+  "shell": "db.getSiblingDB(\"shop\").users.find({}).limit(10)"
+}

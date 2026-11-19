@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "JOIN ... USING is not supported; use ON",
+    "offset": 36,
+    "at": "USING (customer_id)"
+  }
+}

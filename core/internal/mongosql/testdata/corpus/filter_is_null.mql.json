@@ -1,0 +1,16 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "email": null
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"email\":null})",
+  "warnings": [
+    {
+      "message": "IS NULL also matches documents where the field is missing",
+      "offset": 26,
+      "at": "email IS NULL"
+    }
+  ]
+}

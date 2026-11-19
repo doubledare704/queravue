@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "a computed column needs an aggregation pipeline, which SQL mode does not translate yet",
+    "offset": 7,
+    "at": "price * qty AS amount FR"
+  }
+}

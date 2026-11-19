@@ -1,0 +1,31 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "products",
+  "filter": {
+    "$or": [
+      {
+        "weight": {
+          "$lt": {
+            "$numberDouble": "1.5"
+          }
+        }
+      },
+      {
+        "weight": {
+          "$gt": {
+            "$numberDouble": "1000.0"
+          }
+        }
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").products.find({\"$or\":[{\"weight\":{\"$lt\":{\"$numberDouble\":\"1.5\"}}},{\"weight\":{\"$gt\":{\"$numberDouble\":\"1000.0\"}}}]})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 29,
+      "at": "weight < 1.5 OR weight >"
+    }
+  ]
+}

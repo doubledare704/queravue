@@ -6,7 +6,12 @@ import (
 	"errors"
 	"math"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/mongosql"
 	"github.com/doubledare704/queravue/core/internal/querybuilder/mongo"
 )
 
@@ -37,4 +42,22 @@ func (q *QueryBuilderService) ParseMongoQuery(_ context.Context, req *queravuev1
 		return &queravuev1.ParseMongoQueryResponse{Error: &queravuev1.QueryBuilderError{Kind: kind, Message: err.Error(), Offset: &offset}}, nil
 	}
 	return &queravuev1.ParseMongoQueryResponse{Model: model}, nil
+}
+
+func (q *QueryBuilderService) TranslateMongoSql(_ context.Context, req *queravuev1.TranslateMongoSqlRequest) (*queravuev1.TranslateMongoSqlResponse, error) { //nolint:revive // matches the service contract
+	sess, err := q.session(req.GetSessionId())
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := engine.As[engine.DocumentStore](sess.Conn); !ok {
+		return nil, status.Error(codes.FailedPrecondition, "connection is not a document store")
+	}
+	database := req.GetDatabase()
+	if defaulter, ok := engine.As[engine.DefaultDatabaser](sess.Conn); ok && database == "" {
+		database = defaulter.DefaultDatabase()
+	}
+	if database == "" {
+		return nil, status.Error(codes.InvalidArgument, "no database: pass one or set a default database on the connection")
+	}
+	return mongosql.Translate(database, req.GetSql()), nil
 }

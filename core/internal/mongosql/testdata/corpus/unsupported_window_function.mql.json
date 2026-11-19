@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "window functions are not supported",
+    "offset": 22,
+    "at": "OVER (PARTITION BY city)"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "IS TRUE is not supported; only IS [NOT] NULL",
+    "offset": 36,
+    "at": "TRUE"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "promos",
+  "filter": {
+    "label": {
+      "$regularExpression": {
+        "pattern": "^100%",
+        "options": ""
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").promos.find({\"label\":{\"$regularExpression\":{\"pattern\":\"^100%\",\"options\":\"\"}}})",
+  "warnings": [
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 27,
+      "at": "label LIKE '100\\%%'"
+    }
+  ]
+}

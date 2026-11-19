@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "FETCH is not supported; use LIMIT",
+    "offset": 20,
+    "at": "FETCH FIRST 5 ROWS ONLY"
+  }
+}

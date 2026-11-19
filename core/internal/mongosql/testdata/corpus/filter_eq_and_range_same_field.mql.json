@@ -1,0 +1,34 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "t",
+  "filter": {
+    "$and": [
+      {
+        "a": {
+          "$numberInt": "1"
+        }
+      },
+      {
+        "a": {
+          "$gt": {
+            "$numberInt": "0"
+          }
+        }
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").t.find({\"$and\":[{\"a\":{\"$numberInt\":\"1\"}},{\"a\":{\"$gt\":{\"$numberInt\":\"0\"}}}]})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 22,
+      "at": "a = 1 AND a > 0"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 32,
+      "at": "a > 0"
+    }
+  ]
+}

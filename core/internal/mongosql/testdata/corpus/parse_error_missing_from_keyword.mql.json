@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "expected FROM, got \"WHERE\"",
+    "offset": 18,
+    "at": "WHERE a = 1"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "alias \"a.b\" cannot contain '.' or start with '$'",
+    "offset": 7,
+    "at": "name AS \"a.b\" FROM users"
+  }
+}

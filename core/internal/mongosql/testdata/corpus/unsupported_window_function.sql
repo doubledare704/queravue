@@ -1,0 +1,1 @@
+SELECT name, COUNT(*) OVER (PARTITION BY city) FROM users

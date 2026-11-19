@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "GROUP BY needs an aggregation pipeline, which SQL mode does not translate yet",
+    "offset": 26,
+    "at": "GROUP BY status"
+  }
+}

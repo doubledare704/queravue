@@ -1,0 +1,1 @@
+SELECT * FROM users WHERE CASE WHEN a = 1 THEN 1 END = 1

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "WHERE is out of order",
+    "offset": 28,
+    "at": "WHERE a = 1"
+  }
+}

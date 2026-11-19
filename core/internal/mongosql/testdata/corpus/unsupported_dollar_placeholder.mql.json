@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "parameter placeholders are not supported",
+    "offset": 32,
+    "at": "$1"
+  }
+}

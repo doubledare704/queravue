@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SELECT TOP is not supported; use LIMIT",
+    "offset": 7,
+    "at": "TOP 5 * FROM users"
+  }
+}

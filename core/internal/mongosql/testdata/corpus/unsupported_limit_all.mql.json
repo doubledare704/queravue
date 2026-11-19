@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "LIMIT ALL is not supported; leave LIMIT out",
+    "offset": 26,
+    "at": "ALL"
+  }
+}

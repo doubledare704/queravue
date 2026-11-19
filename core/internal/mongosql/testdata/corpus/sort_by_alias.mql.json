@@ -1,0 +1,23 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {},
+  "projection": {
+    "n": "$name",
+    "_id": false
+  },
+  "sort": {
+    "name": {
+      "$numberInt": "1"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({}, {\"n\":\"$name\",\"_id\":false}).sort({\"name\":{\"$numberInt\":\"1\"}})",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 37,
+      "at": "n"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "first name": "Ann",
+    "last-name": "Lee"
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"first name\":\"Ann\",\"last-name\":\"Lee\"})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 26,
+      "at": "\"first name\" = 'Ann' AND"
+    }
+  ]
+}

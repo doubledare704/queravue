@@ -1,0 +1,22 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "orders",
+  "filter": {
+    "created": {
+      "$lt": {
+        "$date": {
+          "$numberLong": "1714552200000"
+        }
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").orders.find({\"created\":{\"$lt\":{\"$date\":{\"$numberLong\":\"1714552200000\"}}}})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 27,
+      "at": "created < TIMESTAMP '202"
+    }
+  ]
+}

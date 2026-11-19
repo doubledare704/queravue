@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SQL mode is read-only: DELETE is not supported",
+    "offset": 0,
+    "at": "DELETE FROM users WHERE "
+  }
+}

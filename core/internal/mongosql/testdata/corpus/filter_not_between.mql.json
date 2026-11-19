@@ -1,0 +1,31 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "$or": [
+      {
+        "age": {
+          "$lt": {
+            "$numberInt": "18"
+          }
+        }
+      },
+      {
+        "age": {
+          "$gt": {
+            "$numberInt": "30"
+          }
+        }
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"$or\":[{\"age\":{\"$lt\":{\"$numberInt\":\"18\"}}},{\"age\":{\"$gt\":{\"$numberInt\":\"30\"}}}]})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 26,
+      "at": "age NOT BETWEEN 18 AND 3"
+    }
+  ]
+}

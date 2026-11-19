@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "UNION is not supported",
+    "offset": 23,
+    "at": "UNION SELECT name FROM a"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "profile.age": {
+      "$gt": {
+        "$numberInt": "21"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"profile.age\":{\"$gt\":{\"$numberInt\":\"21\"}}})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 28,
+      "at": "profile.age > 21"
+    }
+  ]
+}

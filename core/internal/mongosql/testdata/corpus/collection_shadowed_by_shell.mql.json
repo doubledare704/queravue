@@ -1,0 +1,7 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "stats",
+  "filter": {},
+  "shell": "db.getSiblingDB(\"shop\").getCollection(\"stats\").find({})"
+}

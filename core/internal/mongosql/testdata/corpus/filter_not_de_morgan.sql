@@ -1,0 +1,1 @@
+SELECT * FROM t WHERE NOT (a = 1 AND b < 2)

@@ -1,0 +1,20 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "orders",
+  "filter": {
+    "status": {
+      "$nin": [
+        "new"
+      ]
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").orders.find({\"status\":{\"$nin\":[\"new\"]}})",
+  "warnings": [
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 31,
+      "at": "status IN ('new')"
+    }
+  ]
+}

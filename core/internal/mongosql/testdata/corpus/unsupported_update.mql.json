@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SQL mode is read-only: UPDATE is not supported",
+    "offset": 0,
+    "at": "UPDATE users SET age = 3"
+  }
+}

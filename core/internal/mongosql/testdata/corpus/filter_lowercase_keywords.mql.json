@@ -1,0 +1,31 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "Age": {
+      "$gte": {
+        "$numberInt": "21"
+      }
+    }
+  },
+  "sort": {
+    "Age": {
+      "$numberInt": "1"
+    }
+  },
+  "limit": 5,
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"Age\":{\"$gte\":{\"$numberInt\":\"21\"}}}).sort({\"Age\":{\"$numberInt\":\"1\"}}).limit(5)",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 26,
+      "at": "Age >= 21 order by Age l"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 45,
+      "at": "Age limit 5"
+    }
+  ]
+}

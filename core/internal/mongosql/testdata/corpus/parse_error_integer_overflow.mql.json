@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "integer 9223372036854775808 does not fit in 64 bits",
+    "offset": 26,
+    "at": "9223372036854775808"
+  }
+}

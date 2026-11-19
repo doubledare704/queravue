@@ -1,0 +1,36 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "t",
+  "filter": {
+    "$or": [
+      {
+        "a": {
+          "$ne": {
+            "$numberInt": "1"
+          }
+        }
+      },
+      {
+        "b": {
+          "$gte": {
+            "$numberInt": "2"
+          }
+        }
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").t.find({\"$or\":[{\"a\":{\"$ne\":{\"$numberInt\":\"1\"}}},{\"b\":{\"$gte\":{\"$numberInt\":\"2\"}}}]})",
+  "warnings": [
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 27,
+      "at": "a = 1 AND b < 2)"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 37,
+      "at": "b < 2)"
+    }
+  ]
+}

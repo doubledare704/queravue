@@ -1,0 +1,18 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "age": {
+      "$numberInt": "30"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"age\":{\"$numberInt\":\"30\"}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 26,
+      "at": "age = 30"
+    }
+  ]
+}

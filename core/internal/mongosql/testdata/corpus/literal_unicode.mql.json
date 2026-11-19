@@ -1,0 +1,16 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "cities",
+  "filter": {
+    "name": "Київ"
+  },
+  "shell": "db.getSiblingDB(\"shop\").cities.find({\"name\":\"Київ\"})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 27,
+      "at": "name = 'Київ'"
+    }
+  ]
+}

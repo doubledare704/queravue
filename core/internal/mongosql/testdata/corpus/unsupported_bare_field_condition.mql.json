@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "a bare field is not a condition; compare it, e.g. active = TRUE",
+    "offset": 26,
+    "at": "active"
+  }
+}

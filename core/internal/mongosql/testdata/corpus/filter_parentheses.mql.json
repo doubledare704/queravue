@@ -1,0 +1,30 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "t",
+  "filter": {
+    "$or": [
+      {
+        "a": {
+          "$numberInt": "1"
+        }
+      },
+      {
+        "b": {
+          "$numberInt": "2"
+        }
+      }
+    ],
+    "c": {
+      "$numberInt": "3"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").t.find({\"$or\":[{\"a\":{\"$numberInt\":\"1\"}},{\"b\":{\"$numberInt\":\"2\"}}],\"c\":{\"$numberInt\":\"3\"}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 23,
+      "at": "a = 1 OR b = 2) AND c = "
+    }
+  ]
+}
