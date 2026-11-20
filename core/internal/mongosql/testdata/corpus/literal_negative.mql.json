@@ -1,0 +1,25 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "accounts",
+  "filter": {
+    "balance": {
+      "$lt": {
+        "$numberInt": "-5"
+      }
+    },
+    "delta": {
+      "$gt": {
+        "$numberDouble": "-2.5"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").accounts.find({\"balance\":{\"$lt\":{\"$numberInt\":\"-5\"}},\"delta\":{\"$gt\":{\"$numberDouble\":\"-2.5\"}}})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 29,
+      "at": "balance < -5 AND delta >"
+    }
+  ]
+}

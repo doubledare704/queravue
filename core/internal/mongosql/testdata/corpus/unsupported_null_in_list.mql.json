@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "NULL in an IN list never matches in SQL; use IS NULL",
+    "offset": 41,
+    "at": "NULL)"
+  }
+}

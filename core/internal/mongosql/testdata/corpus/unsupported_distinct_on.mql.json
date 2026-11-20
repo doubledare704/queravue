@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "DISTINCT ON is not supported",
+    "offset": 16,
+    "at": "ON (city) city FROM user"
+  }
+}

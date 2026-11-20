@@ -1,0 +1,1 @@
+SELECT * FROM events WHERE seq > 3000000000

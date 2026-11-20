@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "unexpected text after the statement, got \"v\"",
+    "offset": 22,
+    "at": "v"
+  }
+}

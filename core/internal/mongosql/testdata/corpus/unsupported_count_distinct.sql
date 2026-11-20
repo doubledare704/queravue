@@ -1,0 +1,1 @@
+SELECT name, COUNT(DISTINCT city) FROM users

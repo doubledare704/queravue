@@ -1,0 +1,1 @@
+SELECT * FROM products WHERE price = NUMBERDECIMAL('19.99')

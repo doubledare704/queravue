@@ -1,0 +1,17 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "active": true,
+    "banned": false
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"active\":true,\"banned\":false})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 26,
+      "at": "active = TRUE AND banned"
+    }
+  ]
+}

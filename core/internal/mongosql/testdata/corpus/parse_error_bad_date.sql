@@ -1,0 +1,1 @@
+SELECT * FROM users WHERE born = DATE '2024-13-01'

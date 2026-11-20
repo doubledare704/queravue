@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "\"==\" is not SQL; use \"=\"",
+    "offset": 28,
+    "at": "== 1"
+  }
+}

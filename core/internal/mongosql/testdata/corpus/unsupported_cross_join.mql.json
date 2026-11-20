@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "CROSS JOIN is not supported; use INNER or LEFT JOIN",
+    "offset": 21,
+    "at": "CROSS JOIN customers"
+  }
+}

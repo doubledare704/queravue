@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "the % operator is not supported",
+    "offset": 30,
+    "at": "% 2 = 0"
+  }
+}

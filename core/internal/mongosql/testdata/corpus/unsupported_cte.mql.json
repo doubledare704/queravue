@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "WITH (common table expressions) is not supported",
+    "offset": 0,
+    "at": "WITH adults AS (SELECT *"
+  }
+}

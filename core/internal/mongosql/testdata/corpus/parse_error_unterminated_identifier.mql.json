@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "unterminated quoted identifier",
+    "offset": 26,
+    "at": "\"name = 1"
+  }
+}

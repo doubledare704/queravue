@@ -1,0 +1,20 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "t",
+  "filter": {
+    "date": {
+      "$date": {
+        "$numberLong": "1709164800000"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").t.find({\"date\":{\"$date\":{\"$numberLong\":\"1709164800000\"}}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 22,
+      "at": "date = DATE '2024-02-29'"
+    }
+  ]
+}

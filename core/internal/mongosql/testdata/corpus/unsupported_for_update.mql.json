@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "locking clauses (FOR ...) are not supported",
+    "offset": 20,
+    "at": "FOR UPDATE"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "name": {
+      "$regularExpression": {
+        "pattern": "^al",
+        "options": "i"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"name\":{\"$regularExpression\":{\"pattern\":\"^al\",\"options\":\"i\"}}})",
+  "warnings": [
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 26,
+      "at": "name ILIKE 'al%'"
+    }
+  ]
+}

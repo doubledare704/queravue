@@ -1,0 +1,72 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "orders",
+  "filter": {
+    "status": {
+      "$in": [
+        "paid",
+        "shipped"
+      ]
+    },
+    "total": {
+      "$gte": {
+        "$numberInt": "100"
+      },
+      "$lte": {
+        "$numberInt": "500"
+      }
+    },
+    "customer.email": {
+      "$regularExpression": {
+        "pattern": "@example\\.com$",
+        "options": ""
+      }
+    },
+    "cancelled": null
+  },
+  "projection": {
+    "num": "$number",
+    "total": true,
+    "customer.name": true,
+    "_id": false
+  },
+  "sort": {
+    "total": {
+      "$numberInt": "-1"
+    },
+    "number": {
+      "$numberInt": "1"
+    }
+  },
+  "skip": 100,
+  "limit": 50,
+  "shell": "db.getSiblingDB(\"shop\").orders.find({\"status\":{\"$in\":[\"paid\",\"shipped\"]},\"total\":{\"$gte\":{\"$numberInt\":\"100\"},\"$lte\":{\"$numberInt\":\"500\"}},\"customer.email\":{\"$regularExpression\":{\"pattern\":\"@example\\\\.com$\",\"options\":\"\"}},\"cancelled\":null}, {\"num\":\"$number\",\"total\":true,\"customer.name\":true,\"_id\":false}).sort({\"total\":{\"$numberInt\":\"-1\"},\"number\":{\"$numberInt\":\"1\"}}).skip(100).limit(50)",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 69,
+      "at": "o.status IN ('paid', 'sh"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 107,
+      "at": "o.total BETWEEN 100 AND "
+    },
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 141,
+      "at": "o.customer.email LIKE '%"
+    },
+    {
+      "message": "IS NULL also matches documents where the field is missing",
+      "offset": 185,
+      "at": "o.cancelled IS NULL"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 214,
+      "at": "o.total DESC, num"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "orders",
+  "filter": {
+    "status": {
+      "$ne": "closed"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").orders.find({\"status\":{\"$ne\":\"closed\"}})",
+  "warnings": [
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 27,
+      "at": "status != 'closed'"
+    }
+  ]
+}

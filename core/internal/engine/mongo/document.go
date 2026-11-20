@@ -546,3 +546,8 @@ func typeAlias(t bson.Type) string {
 	}
 	return "unknown"
 }
+
+var _ engine.DefaultDatabaser = (*Conn)(nil)
+
+// DefaultDatabase implements engine.DefaultDatabaser.
+func (c *Conn) DefaultDatabase() string { return c.defaultDB }

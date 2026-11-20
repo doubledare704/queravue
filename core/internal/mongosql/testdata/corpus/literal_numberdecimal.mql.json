@@ -1,0 +1,18 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "products",
+  "filter": {
+    "price": {
+      "$numberDecimal": "19.99"
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").products.find({\"price\":{\"$numberDecimal\":\"19.99\"}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 29,
+      "at": "price = NUMBERDECIMAL('1"
+    }
+  ]
+}

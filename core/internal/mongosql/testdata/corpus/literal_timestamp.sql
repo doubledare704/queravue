@@ -1,0 +1,1 @@
+SELECT * FROM orders WHERE created < TIMESTAMP '2024-05-01 10:30:00.250'

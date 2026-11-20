@@ -1,0 +1,11 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {},
+  "projection": {
+    "name": true,
+    "_id": false
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({}, {\"name\":true,\"_id\":false})"
+}

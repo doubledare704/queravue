@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "empty SQL statement",
+    "offset": 0,
+    "at": "  -- nothing here"
+  }
+}

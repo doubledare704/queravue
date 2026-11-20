@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "comma joins are not supported; use JOIN ... ON",
+    "offset": 20,
+    "at": ", customers"
+  }
+}

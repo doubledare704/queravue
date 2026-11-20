@@ -164,3 +164,12 @@ func rejectBareNumbers(text string, input engine.Input) error {
 	}
 	return walk(v, false)
 }
+
+// CanonicalEJSON renders a bson.D, bson.M or other document value as canonical EJSON.
+func CanonicalEJSON(doc any) (string, error) {
+	b, err := bson.MarshalExtJSON(doc, true, false)
+	if err != nil {
+		return "", fmt.Errorf("mongo: encode document: %w", err)
+	}
+	return string(b), nil
+}

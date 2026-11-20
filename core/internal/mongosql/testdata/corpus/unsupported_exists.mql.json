@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "EXISTS subqueries are not supported",
+    "offset": 30,
+    "at": "EXISTS (SELECT 1 FROM ba"
+  }
+}

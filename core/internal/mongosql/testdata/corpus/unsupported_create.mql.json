@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SQL mode is read-only: CREATE is not supported",
+    "offset": 0,
+    "at": "CREATE TABLE t (a int)"
+  }
+}

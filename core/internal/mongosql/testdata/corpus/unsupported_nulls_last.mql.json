@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "NULLS FIRST/LAST is not supported; MongoDB sorts null and missing values first",
+    "offset": 33,
+    "at": "NULLS LAST"
+  }
+}

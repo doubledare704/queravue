@@ -1,0 +1,20 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "events",
+  "filter": {
+    "seq": {
+      "$gt": {
+        "$numberLong": "3000000000"
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").events.find({\"seq\":{\"$gt\":{\"$numberLong\":\"3000000000\"}}})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 27,
+      "at": "seq > 3000000000"
+    }
+  ]
+}

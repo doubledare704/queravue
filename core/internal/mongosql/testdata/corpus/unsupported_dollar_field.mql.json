@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "field names starting with $ are not supported (\"$where\")",
+    "offset": 26,
+    "at": "\"$where\" = 1"
+  }
+}

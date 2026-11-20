@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "subqueries are not supported",
+    "offset": 43,
+    "at": "SELECT _id FROM customer"
+  }
+}

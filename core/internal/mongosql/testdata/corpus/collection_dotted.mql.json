@@ -1,0 +1,24 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "fs.files",
+  "filter": {
+    "length": {
+      "$gt": {
+        "$numberInt": "1024"
+      }
+    }
+  },
+  "projection": {
+    "filename": true,
+    "_id": false
+  },
+  "shell": "db.getSiblingDB(\"shop\").getCollection(\"fs.files\").find({\"length\":{\"$gt\":{\"$numberInt\":\"1024\"}}}, {\"filename\":true,\"_id\":false})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 36,
+      "at": "length > 1024"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "expected an expression, got end of statement",
+    "offset": 32,
+    "at": ""
+  }
+}

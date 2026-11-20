@@ -40,6 +40,9 @@ const (
 	// DuckDB: Postgres lexing (dollar quotes, nested block comments, E'' escapes)
 	// without BEGIN ATOMIC bodies or CREATE FUNCTION bodies.
 	DuckDB
+	// MongoSQL: the SQL mode for MongoDB (ADR 0022). '...' strings with ''
+	// doubling, "..." and `...` identifiers, -- and /* */ comments, no bodies.
+	MongoSQL
 )
 
 func (d Dialect) dollarQuotes() bool { return d == Postgres || d == DuckDB }
@@ -50,7 +53,9 @@ func (d Dialect) backslashEscapes() bool { return d == MySQL || d == ClickHouse 
 
 func (d Dialect) hashComments() bool { return d == MySQL || d == ClickHouse }
 
-func (d Dialect) backtickIdents() bool { return d == MySQL || d == ClickHouse || d == SQLite }
+func (d Dialect) backtickIdents() bool {
+	return d == MySQL || d == ClickHouse || d == SQLite || d == MongoSQL
+}
 
 // Range locates one statement as byte offsets into the scanned text.
 type Range struct {

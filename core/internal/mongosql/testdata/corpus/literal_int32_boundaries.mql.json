@@ -1,0 +1,28 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "t",
+  "filter": {
+    "a": {
+      "$in": [
+        {
+          "$numberInt": "2147483647"
+        },
+        {
+          "$numberInt": "-2147483648"
+        },
+        {
+          "$numberLong": "2147483648"
+        }
+      ]
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").t.find({\"a\":{\"$in\":[{\"$numberInt\":\"2147483647\"},{\"$numberInt\":\"-2147483648\"},{\"$numberLong\":\"2147483648\"}]}})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 22,
+      "at": "a IN (2147483647, -21474"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "the LIKE pattern must be a string literal",
+    "offset": 36,
+    "at": "other"
+  }
+}

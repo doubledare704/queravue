@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "IN needs at least one value",
+    "offset": 32,
+    "at": ")"
+  }
+}

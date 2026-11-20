@@ -1,0 +1,23 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "$or": [
+      {
+        "city": "Kyiv"
+      },
+      {
+        "city": "Lviv"
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"$or\":[{\"city\":\"Kyiv\"},{\"city\":\"Lviv\"}]})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 26,
+      "at": "city = 'Kyiv' OR city = "
+    }
+  ]
+}

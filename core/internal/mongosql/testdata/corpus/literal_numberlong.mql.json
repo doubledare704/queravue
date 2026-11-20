@@ -1,0 +1,27 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "events",
+  "filter": {
+    "$or": [
+      {
+        "seq": {
+          "$numberLong": "42"
+        }
+      },
+      {
+        "seq": {
+          "$numberLong": "-7"
+        }
+      }
+    ]
+  },
+  "shell": "db.getSiblingDB(\"shop\").events.find({\"$or\":[{\"seq\":{\"$numberLong\":\"42\"}},{\"seq\":{\"$numberLong\":\"-7\"}}]})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 27,
+      "at": "seq = NUMBERLONG(42) OR "
+    }
+  ]
+}

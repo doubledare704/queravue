@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "function LOWER is not supported",
+    "offset": 26,
+    "at": "LOWER(name) = 'ann'"
+  }
+}

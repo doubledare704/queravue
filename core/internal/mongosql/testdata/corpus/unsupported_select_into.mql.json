@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SELECT INTO is not supported",
+    "offset": 9,
+    "at": "INTO backup FROM users"
+  }
+}

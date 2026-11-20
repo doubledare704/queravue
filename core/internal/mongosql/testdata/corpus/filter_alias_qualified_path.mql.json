@@ -1,0 +1,16 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "address.zip": "01001"
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"address.zip\":\"01001\"})",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 31,
+      "at": "u.address.zip = '01001'"
+    }
+  ]
+}

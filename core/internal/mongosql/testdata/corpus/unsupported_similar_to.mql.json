@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SIMILAR is not supported; use LIKE",
+    "offset": 31,
+    "at": "SIMILAR TO 'a%'"
+  }
+}

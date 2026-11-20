@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "columns \"address\" and \"address.city\" overlap in a MongoDB projection",
+    "offset": 16,
+    "at": "address.city FROM users"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "users",
+  "filter": {
+    "email": {
+      "$not": {
+        "$regularExpression": {
+          "pattern": "@test\\.com$",
+          "options": ""
+        }
+      }
+    }
+  },
+  "shell": "db.getSiblingDB(\"shop\").users.find({\"email\":{\"$not\":{\"$regularExpression\":{\"pattern\":\"@test\\\\.com$\",\"options\":\"\"}}}})",
+  "warnings": [
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 26,
+      "at": "email NOT LIKE '%@test.c"
+    },
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 26,
+      "at": "email NOT LIKE '%@test.c"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "FULL JOIN is not supported; use INNER or LEFT JOIN",
+    "offset": 23,
+    "at": "FULL JOIN customers c ON"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "TIMESTAMP \"2024-01-01 00:00:00.1234\" is more precise than the milliseconds a BSON date holds",
+    "offset": 37,
+    "at": "'2024-01-01 00:00:00.123"
+  }
+}

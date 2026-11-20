@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "an aggregate function needs an aggregation pipeline, which SQL mode does not translate yet",
+    "offset": 13,
+    "at": "COUNT(DISTINCT city) FRO"
+  }
+}

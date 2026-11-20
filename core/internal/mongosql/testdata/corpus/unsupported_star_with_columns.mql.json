@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "* cannot be combined with other columns",
+    "offset": 7,
+    "at": "*, name FROM users"
+  }
+}

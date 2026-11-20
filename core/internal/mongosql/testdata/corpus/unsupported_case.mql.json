@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "CASE is not supported",
+    "offset": 26,
+    "at": "CASE WHEN a = 1 THEN 1 E"
+  }
+}

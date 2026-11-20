@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "comparing two fields needs an aggregation pipeline, which SQL mode does not translate yet",
+    "offset": 22,
+    "at": "updated > created"
+  }
+}

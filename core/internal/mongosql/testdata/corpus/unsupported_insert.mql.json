@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "SQL mode is read-only: INSERT is not supported",
+    "offset": 0,
+    "at": "INSERT INTO users (name)"
+  }
+}
