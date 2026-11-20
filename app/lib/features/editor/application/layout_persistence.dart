@@ -26,7 +26,7 @@ class _Unloaded {
   final String? draft;
 }
 
-/// Saves the open query, shell and diagram tabs and how they are split to
+/// Saves the open query, shell, SQL mode and diagram tabs and how they are split to
 /// `.queravue/layout.json` in the first workspace root, and puts them back on
 /// the next start. Table, collection and designer tabs need a live session
 /// and are not restored.
@@ -138,6 +138,7 @@ class LayoutPersistence {
     final kind = switch (raw['kind']) {
       'query' => TabKind.query,
       'shell' => TabKind.shell,
+      'mongoSql' => TabKind.mongoSql,
       'diagram' => TabKind.diagram,
       _ => null,
     };
@@ -220,7 +221,7 @@ class LayoutPersistence {
     final connections = <String, Object?>{};
     final byConnection = <String, List<EditorTab>>{};
     for (final t in tabsState.tabs) {
-      if (t.isQuery || t.isShell || t.isDiagram) {
+      if (t.isQuery || t.isShell || t.isDiagram || t.isMongoSql) {
         byConnection.putIfAbsent(t.connectionId, () => []).add(t);
       }
     }
@@ -263,9 +264,9 @@ class LayoutPersistence {
       if (changed && text.length <= maxDraftChars) draft = text;
     }
     return {
-      'kind': tab.isShell ? 'shell' : 'query',
+      'kind': tab.kind.name,
       'title': tab.title,
-      if (tab.isShell) 'database': tab.shellDatabase,
+      if (tab.isShell || tab.isMongoSql) 'database': tab.shellDatabase,
       if (file != null) 'file': {'root': file.root, 'path': file.path},
       'draft': ?draft,
     };

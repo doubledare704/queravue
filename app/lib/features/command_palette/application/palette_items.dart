@@ -21,16 +21,17 @@ final paletteItemsProvider = Provider<List<PaletteItem>>((ref) {
 
   return [
     for (final a in registry.actions)
-      PaletteItem(
-        id: a.id,
-        title: a.title,
-        subtitle: a.subtitle,
-        trailing: registry.shortcutLabel(a.id),
-        conflicted: registry.isConflicted(a.id),
-        enabled: enabled.contains(a.id),
-        group: PaletteGroup.action,
-        run: a.run,
-      ),
+      if (!a.hideWhenDisabled || enabled.contains(a.id))
+        PaletteItem(
+          id: a.id,
+          title: a.title,
+          subtitle: a.subtitle,
+          trailing: registry.shortcutLabel(a.id),
+          conflicted: registry.isConflicted(a.id),
+          enabled: enabled.contains(a.id),
+          group: PaletteGroup.action,
+          run: a.run,
+        ),
     for (final t in tabs)
       PaletteItem(
         id: 'tab.${t.id}',

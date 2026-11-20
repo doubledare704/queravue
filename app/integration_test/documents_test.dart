@@ -21,9 +21,14 @@ import 'package:queravue/features/connections/data/connections_repository.dart';
 import 'package:queravue/features/connections/domain/models.dart';
 import 'package:queravue/features/core_status/core_status_controller.dart';
 import 'package:queravue/features/documents/application/document_tab_controller.dart';
+import 'package:queravue/features/documents/application/document_preview_controller.dart';
 import 'package:queravue/features/documents/domain/models.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
+import 'package:queravue/features/mongo_sql/application/mongo_sql_controller.dart';
+import 'package:queravue/features/mongo_sql/domain/mongo_sql_translation.dart';
 import 'package:queravue/features/schema/domain/schema_models.dart';
+import 'package:queravue/features/shell/application/cursor_page_controller.dart';
+import 'package:queravue/features/shell/application/shell_tab_controller.dart';
 
 String _env(String k, String d) => Platform.environment[k] ?? d;
 
@@ -170,6 +175,40 @@ void main() {
       await settled(users.id);
       expect(stateOf(users.id).queryError!.input, DocInput.filter);
       expect(stateOf(users.id).queryError!.position, 6);
+
+      final sql = container
+          .read(editorTabsProvider.notifier)
+          .openMongoSql(saved.id, database: 'queravue');
+      sql.controller.text = 'SELECT name FROM users ORDER BY name LIMIT 2';
+      await _pumpUntil(
+        tester,
+        'SQL mode FIND translation',
+        () =>
+            container.read(mongoSqlControllerProvider(sql)).current
+                is MongoSqlFind,
+      );
+      await tester.tap(find.byKey(const Key('mongo-sql-preview')));
+      await _pumpUntil(
+        tester,
+        'SQL mode FIND preview',
+        () =>
+            container.read(documentPreviewProvider(sql.id)).phase ==
+            PreviewPhase.done,
+      );
+      final preview = container.read(documentPreviewProvider(sql.id)).docs;
+      expect(preview, hasLength(2));
+      expect(preview.first.text, contains('Ada Lovelace'));
+
+      await tester.tap(find.byKey(const Key('mongo-sql-run')));
+      await _pumpUntil(tester, 'SQL mode cursor results', () {
+        final cursor = cursorOf(container.read(shellTabProvider(sql.id)));
+        if (cursor == null) return false;
+        return container.read(cursorPageProvider(cursor)).docs.isNotEmpty;
+      });
+      final cursor = cursorOf(container.read(shellTabProvider(sql.id)))!;
+      final results = container.read(cursorPageProvider(cursor)).docs;
+      expect(results.map((doc) => doc.text), preview.map((doc) => doc.text));
+      container.read(editorTabsProvider.notifier).close(sql.id);
 
       // ---- page through 1M events: the UI holds one page ----
       final events = container

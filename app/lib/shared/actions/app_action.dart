@@ -31,6 +31,7 @@ class AppAction {
     this.subtitle = '',
     this.defaultChord,
     this.inMenu = true,
+    this.hideWhenDisabled = false,
     this.enabledWhen,
   });
 
@@ -40,6 +41,7 @@ class AppAction {
   final ActionCategory category;
   final KeyChord? defaultChord;
   final bool inMenu;
+  final bool hideWhenDisabled;
   final ActionRun run;
 
   /// Null means always enabled. A disabled action is greyed out in the

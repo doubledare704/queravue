@@ -10,18 +10,20 @@ import '../data/shell_repository.dart';
 /// Identifies one cursor handle of one shell.
 @immutable
 class CursorKey {
-  const CursorKey(this.shellId, this.cursorId);
+  const CursorKey(this.shellId, this.cursorId, {this.transient = false});
   final String shellId;
   final String cursorId;
+  final bool transient;
 
   @override
   bool operator ==(Object other) =>
       other is CursorKey &&
       other.shellId == shellId &&
-      other.cursorId == cursorId;
+      other.cursorId == cursorId &&
+      other.transient == transient;
 
   @override
-  int get hashCode => Object.hash(shellId, cursorId);
+  int get hashCode => Object.hash(shellId, cursorId, transient);
 }
 
 @immutable
@@ -33,6 +35,7 @@ class CursorPageState {
     this.docs = const [],
     this.hasNext = false,
     this.isLoading = false,
+    this.showCancel = false,
     this.error,
     this.selected = const {},
     this.columns = const [],
@@ -44,6 +47,7 @@ class CursorPageState {
   final List<DocItem> docs;
   final bool hasNext;
   final bool isLoading;
+  final bool showCancel;
   final String? error;
   final Set<int> selected;
   final List<FieldStat> columns;
@@ -57,6 +61,7 @@ class CursorPageState {
     List<DocItem>? docs,
     bool? hasNext,
     bool? isLoading,
+    bool? showCancel,
     String? error,
     bool clearError = false,
     Set<int>? selected,
@@ -68,14 +73,15 @@ class CursorPageState {
     docs: docs ?? this.docs,
     hasNext: hasNext ?? this.hasNext,
     isLoading: isLoading ?? this.isLoading,
+    showCancel: showCancel ?? this.showCancel,
     error: clearError ? null : (error ?? this.error),
     selected: selected ?? this.selected,
     columns: columns ?? this.columns,
   );
 }
 
-final cursorPageProvider =
-    NotifierProvider.family<CursorPageController, CursorPageState, CursorKey>(
+final cursorPageProvider = NotifierProvider.autoDispose
+    .family<CursorPageController, CursorPageState, CursorKey>(
       CursorPageController.new,
     );
 
@@ -86,55 +92,83 @@ class CursorPageController extends Notifier<CursorPageState> {
 
   final CursorKey key;
 
-  StreamSubscription<DocBatch>? _sub;
-  int _epoch = 0;
+  StreamIterator<DocBatch>? _stream;
+  Timer? _cancelTimer;
 
   @override
   CursorPageState build() {
-    ref.onDispose(() => unawaited(_sub?.cancel()));
-    Future.microtask(_load);
+    if (!key.transient) ref.keepAlive();
+    ref.onDispose(_stop);
+    Future.microtask(() {
+      if (ref.mounted && state.isLoading && _stream == null) {
+        unawaited(_load(0));
+      }
+    });
     return const CursorPageState(isLoading: true);
   }
 
-  Future<void> _load() async {
-    final epoch = ++_epoch;
+  void _stop() {
+    _cancelTimer?.cancel();
+    unawaited(_stream?.cancel());
+    _stream = null;
+  }
+
+  Future<void> _load(int pageIndex) async {
+    _stop();
     state = state.copyWith(
       isLoading: true,
+      showCancel: false,
       clearError: true,
       selected: const {},
     );
-    unawaited(_sub?.cancel());
     final size = state.pageSize;
     final docs = <String>[];
-    final done = Completer<void>();
-    _sub = ref
-        .read(shellRepositoryProvider)
-        .fetchCursor(
-          key.shellId,
-          key.cursorId,
-          skip: state.page * size,
-          limit: size + 1,
-        )
-        .listen(
-          (b) => docs.addAll(b.documents),
-          onError: (Object e) {
-            if (ref.mounted && epoch == _epoch) {
-              state = state.copyWith(isLoading: false, error: '$e');
-            }
-            if (!done.isCompleted) done.complete();
-          },
-          onDone: () {
-            if (!done.isCompleted) done.complete();
-          },
-        );
-    await done.future;
-    if (!ref.mounted || epoch != _epoch || state.error != null) return;
-    final page = docs.take(size).map(DocItem.new).toList();
+    final iterator = _stream = StreamIterator(
+      ref
+          .read(shellRepositoryProvider)
+          .fetchCursor(
+            key.shellId,
+            key.cursorId,
+            skip: pageIndex * size,
+            limit: size + 1,
+          ),
+    );
+    _cancelTimer = Timer(kCancelDelay, () {
+      state = state.copyWith(showCancel: true);
+    });
+    try {
+      while (docs.length <= size && await iterator.moveNext()) {
+        docs.addAll(iterator.current.documents.take(size + 1 - docs.length));
+      }
+      if (iterator != _stream) return;
+      final page = docs.take(size).map(DocItem.new).toList();
+      state = state.copyWith(
+        isLoading: false,
+        showCancel: false,
+        page: pageIndex,
+        docs: page,
+        hasNext: docs.length > size,
+        columns: columnsOf(page),
+      );
+    } on Object catch (error) {
+      if (iterator != _stream) return;
+      state = state.copyWith(
+        isLoading: false,
+        showCancel: false,
+        error: '$error',
+      );
+    } finally {
+      if (iterator == _stream) _stop();
+    }
+  }
+
+  void cancel() {
+    if (!state.isLoading) return;
+    _stop();
     state = state.copyWith(
       isLoading: false,
-      docs: page,
-      hasNext: docs.length > size,
-      columns: columnsOf(page),
+      showCancel: false,
+      error: state.docs.isEmpty ? 'Results cancelled.' : null,
     );
   }
 
@@ -147,24 +181,26 @@ class CursorPageController extends Notifier<CursorPageState> {
 
   void nextPage() {
     if (!state.hasNext || state.isLoading) return;
-    state = state.copyWith(page: state.page + 1, isLoading: true);
-    unawaited(_load());
+    unawaited(_load(state.page + 1));
   }
 
   void prevPage() {
     if (state.page == 0 || state.isLoading) return;
-    state = state.copyWith(page: state.page - 1, isLoading: true);
-    unawaited(_load());
+    unawaited(_load(state.page - 1));
   }
 
   void setPageSize(int n) {
-    state = state.copyWith(pageSize: n, page: 0, isLoading: true);
-    unawaited(_load());
+    state = state.copyWith(
+      pageSize: n,
+      page: 0,
+      docs: const [],
+      hasNext: false,
+    );
+    unawaited(_load(0));
   }
 
   void refresh() {
-    state = state.copyWith(isLoading: true);
-    unawaited(_load());
+    unawaited(_load(state.page));
   }
 }
 
