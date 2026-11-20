@@ -23,6 +23,7 @@ import '../../editor/domain/query_models.dart';
 import '../../history/presentation/history_dialog.dart';
 import '../../keybindings/presentation/keybindings_dialog.dart';
 import '../../keyvalue/application/key_value_actions.dart';
+import '../../mongo_sql/application/mongo_sql_actions.dart';
 import '../../workspace/domain/workspace_models.dart';
 import '../../workspace/presentation/workspace_flows.dart';
 import '../presentation/command_palette.dart';
@@ -107,6 +108,7 @@ bool _canOpenShellTab(ActionWatch watch) {
 final builtinActionsProvider = Provider<List<AppAction>>(
   (ref) => [
     ...keyValueActions(),
+    ...mongoSqlActions(),
     AppAction(
       id: 'connection.new',
       title: 'New connection',

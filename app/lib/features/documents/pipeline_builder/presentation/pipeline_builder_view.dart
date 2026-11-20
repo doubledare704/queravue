@@ -8,22 +8,54 @@ import '../application/pipeline_builder_controller.dart';
 import '../domain/pipeline_stage.dart';
 import 'stage_card.dart';
 
-Future<void> showPipelineBuilder(BuildContext context, PipelineTarget target) =>
-    showDialog<void>(
-      context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: PipelineBuilderView(target: target),
-      ),
-    );
+Future<void> showPipelineBuilder(
+  BuildContext context,
+  PipelineTarget target, {
+  String? initialPipeline,
+}) => showDialog<void>(
+  context: context,
+  builder: (_) => Dialog(
+    insetPadding: const EdgeInsets.all(24),
+    child: PipelineBuilderView(
+      target: target,
+      initialPipeline: initialPipeline,
+    ),
+  ),
+);
 
-class PipelineBuilderView extends ConsumerWidget {
-  const PipelineBuilderView({super.key, required this.target});
+class PipelineBuilderView extends ConsumerStatefulWidget {
+  const PipelineBuilderView({
+    super.key,
+    required this.target,
+    this.initialPipeline,
+  });
 
   final PipelineTarget target;
+  final String? initialPipeline;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PipelineBuilderView> createState() =>
+      _PipelineBuilderViewState();
+}
+
+class _PipelineBuilderViewState extends ConsumerState<PipelineBuilderView> {
+  @override
+  void initState() {
+    super.initState();
+    final initialPipeline = widget.initialPipeline;
+    if (initialPipeline == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref
+            .read(pipelineBuilderProvider(widget.target).notifier)
+            .importText(initialPipeline);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final target = widget.target;
     final state = ref.watch(pipelineBuilderProvider(target));
     final controller = ref.read(pipelineBuilderProvider(target).notifier);
     final preview = ref.watch(documentPreviewProvider(target));

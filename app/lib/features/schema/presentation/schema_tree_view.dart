@@ -8,6 +8,8 @@ import '../../connections/application/connection_session.dart';
 import '../../documents/pipeline_builder/application/pipeline_builder_controller.dart';
 import '../../documents/pipeline_builder/presentation/pipeline_builder_view.dart';
 import '../../editor/application/editor_tabs.dart';
+import '../../mongo_sql/application/mongo_sql_actions.dart';
+import '../../mongo_sql/application/mongo_sql_controller.dart';
 import '../application/schema_controller.dart';
 import '../domain/schema_models.dart';
 
@@ -410,6 +412,13 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
     SchemaTreeNode node,
     SchemaTreeController controller,
   ) async {
+    final sqlMode =
+        (node is DatabaseNode || node is ObjectNode) &&
+        ref.read(connectionHasMongoSqlProvider(widget.connectionId));
+    const queryWithSql = PopupMenuItem(
+      value: 'mongo-sql',
+      child: Text('Query with SQL'),
+    );
     final items = <PopupMenuEntry<String>>[];
 
     final docs = ref
@@ -423,6 +432,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
         ),
         if (!docs)
           const PopupMenuItem(value: 'query', child: Text('New query here')),
+        if (sqlMode) queryWithSql,
         if (docs)
           const PopupMenuItem(
             value: 'pipeline',
@@ -435,6 +445,7 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
         const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
       ]);
     } else {
+      if (sqlMode) items.add(queryWithSql);
       if (!docs && (node is SchemaNamespaceNode)) {
         items.add(
           const PopupMenuItem(value: 'new-table', child: Text('New table')),
@@ -477,6 +488,15 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
               .read(editorTabsProvider.notifier)
               .openQueryWithSql(widget.connectionId, sql);
         }
+      case 'mongo-sql':
+        openMongoSqlTab(
+          ref,
+          widget.connectionId,
+          database: node is DatabaseNode
+              ? node.label
+              : (node as ObjectNode).tableRef.database,
+          collection: node is ObjectNode ? node.tableRef.table : '',
+        );
       case 'pipeline':
         if (node is ObjectNode && context.mounted) {
           unawaited(
