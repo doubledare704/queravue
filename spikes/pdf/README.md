@@ -50,7 +50,7 @@ All fixtures loaded via `PdfViewer.data(Uint8List, ...)` (no path passed to `pdf
 | `images_30mib.pdf` | `29.76 MiB` / 15 p | 15 (all 15 pages) | `15 ms` | **`165 ms`** (`165, 165, 157`) | `143.95 MiB` | `398.08 MiB` (`392.50 MiB`) | `372.39 MiB` | **`372.33 MiB`** (`+228.38 MiB`) |
 
 Additional observations:
-- Opening `one_page.pdf` is slower (`313 ms`) than subsequent runs because `PdfViewer` lazily runs `pdfrxFlutterInitialize()` (spawns `BackgroundWorker`, calls `FPDF_InitLibrary()`, and scans system fonts) on first open; once initialized, page 1 paints in `160–165 ms` (or `148–157 ms` in `pdfrx_sequence`).
+- In `pdfrx_sequence`, `onViewerReady` dropped from `15 ms` on the first open (which lazily initializes `BackgroundWorker` and `FPDF_InitLibrary()`) to `7 ms` on subsequent opens (`firstPageMs`: `315 ms` → `148 ms` → `157 ms`). Across fresh single-file processes (`pdfrx_single`), `one_page.pdf` took `313 ms` while `text_300_pages.pdf` and `images_30mib.pdf` rendered page 1 in `160–165 ms`.
 - **Post-close retention:** Unmounting `PdfViewer` and dropping the `Uint8List` reference did **not** return RSS to baseline. Clearing Flutter's `PaintingBinding.instance.imageCache` left `images_30mib` at `370.25 MiB`. A sequential session (`one_page` → close 5 s → `text_300` → close 5 s → `images_30mib` → close 10 s) peaked at `384.94 MiB` (`401.16 MiB` kernel `maxRss`) and remained at `374.52 MiB` 10 s after closing the third file.
 
 ### 3. System viewer (`open` / `start` / `xdg-open`)
