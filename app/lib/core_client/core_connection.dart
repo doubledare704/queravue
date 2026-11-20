@@ -3,7 +3,9 @@ import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 
+import '../features/connections/domain/cancellation.dart';
 import 'core_launcher.dart';
+import 'gridfs_upload.dart';
 import 'gen/queravue/v1/completion.pbgrpc.dart';
 import 'gen/queravue/v1/diagram.pbgrpc.dart';
 import 'gen/queravue/v1/connections.pbgrpc.dart';
@@ -103,6 +105,11 @@ abstract interface class CoreConnection {
   /// Client for GridFS buckets.
   GridFsServiceClient get gridFsService;
 
+  Future<UploadResponse> uploadGridFsFile(
+    Stream<UploadRequest> requests,
+    CancellationToken cancel,
+  );
+
   /// Closes the underlying channel.
   Future<void> close();
 }
@@ -112,9 +119,13 @@ typedef CoreConnector = Future<CoreConnection> Function(CoreHandle handle);
 
 /// gRPC implementation over the core's Unix socket.
 class GrpcCoreConnection implements CoreConnection {
-  GrpcCoreConnection._(this._channel, this._openChannel, String token)
-    : _client = CoreServiceClient(_channel),
-      _auth = CallOptions(metadata: {'authorization': 'Bearer $token'}) {
+  GrpcCoreConnection._(
+    this._channel,
+    this._openChannel,
+    this._address,
+    this._token,
+  ) : _client = CoreServiceClient(_channel),
+      _auth = CallOptions(metadata: {'authorization': 'Bearer $_token'}) {
     connectionService = ConnectionServiceClient(_channel, options: _auth);
     sessionService = SessionServiceClient(_channel, options: _auth);
     queryService = QueryServiceClient(_channel, options: _auth);
@@ -138,8 +149,12 @@ class GrpcCoreConnection implements CoreConnection {
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
   /// establishes it.
   static Future<CoreConnection> connect(CoreHandle handle) async {
+    final address = InternetAddress(
+      handle.socketPath,
+      type: InternetAddressType.unix,
+    );
     ClientChannel openChannel() => ClientChannel(
-      InternetAddress(handle.socketPath, type: InternetAddressType.unix),
+      address,
       port: 0,
       options: const ChannelOptions(
         credentials: ChannelCredentials.insecure(),
@@ -148,12 +163,19 @@ class GrpcCoreConnection implements CoreConnection {
         connectionTimeout: Duration(seconds: 2),
       ),
     );
-    return GrpcCoreConnection._(openChannel(), openChannel, handle.token);
+    return GrpcCoreConnection._(
+      openChannel(),
+      openChannel,
+      address,
+      handle.token,
+    );
   }
 
   static const _clientVersion = '0.1.0';
 
   final ClientChannel _channel;
+  final InternetAddress _address;
+  final String _token;
   final ClientChannel Function() _openChannel;
   final _scanChannels = <ClientChannel>{};
   final CoreServiceClient _client;
@@ -254,6 +276,12 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final GridFsServiceClient gridFsService;
+
+  @override
+  Future<UploadResponse> uploadGridFsFile(
+    Stream<UploadRequest> requests,
+    CancellationToken cancel,
+  ) => uploadGridFs(_address, _token, requests, cancel);
 
   @override
   Future<CoreInfo> hello() async {

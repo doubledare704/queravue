@@ -26,7 +26,7 @@ class _Unloaded {
   final String? draft;
 }
 
-/// Saves the open query, shell and diagram tabs and how they are split to
+/// Saves the open query, shell, diagram and GridFS tabs and how they are split to
 /// `.queravue/layout.json` in the first workspace root, and puts them back on
 /// the next start. Table, collection and designer tabs need a live session
 /// and are not restored.
@@ -139,9 +139,28 @@ class LayoutPersistence {
       'query' => TabKind.query,
       'shell' => TabKind.shell,
       'diagram' => TabKind.diagram,
+      'gridFs' => TabKind.gridFs,
       _ => null,
     };
     if (kind == null) return null;
+    if (kind == TabKind.gridFs) {
+      final database = raw['database'];
+      final bucket = raw['bucket'];
+      if (database is! String ||
+          database.isEmpty ||
+          bucket is! String ||
+          bucket.isEmpty) {
+        return null;
+      }
+      return tabs
+          .restoreTab(
+            connectionId: connectionId,
+            kind: kind,
+            title: bucket,
+            tableRef: TableRef(database: database, table: bucket),
+          )
+          .id;
+    }
     final fileJson = raw['file'];
     final file =
         fileJson is Map<String, Object?> &&
@@ -220,7 +239,7 @@ class LayoutPersistence {
     final connections = <String, Object?>{};
     final byConnection = <String, List<EditorTab>>{};
     for (final t in tabsState.tabs) {
-      if (t.isQuery || t.isShell || t.isDiagram) {
+      if (t.isQuery || t.isShell || t.isDiagram || t.isGridFs) {
         byConnection.putIfAbsent(t.connectionId, () => []).add(t);
       }
     }
@@ -241,6 +260,13 @@ class LayoutPersistence {
   }
 
   Map<String, Object?> _tabJson(EditorTab tab) {
+    if (tab.isGridFs) {
+      return {
+        'kind': tab.kind.name,
+        'database': tab.tableRef!.database,
+        'bucket': tab.tableRef!.table,
+      };
+    }
     if (tab.isDiagram) {
       final file = tab.diagramFile;
       return {
