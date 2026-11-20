@@ -20,6 +20,7 @@ import '../../editor/application/editor_layout_controller.dart';
 import '../../editor/application/editor_tabs.dart';
 import '../../editor/domain/editor_layout.dart';
 import '../../editor/domain/query_models.dart';
+import '../../gridfs/application/gridfs_actions.dart';
 import '../../history/presentation/history_dialog.dart';
 import '../../keybindings/presentation/keybindings_dialog.dart';
 import '../../keyvalue/application/key_value_actions.dart';
@@ -107,6 +108,7 @@ bool _canOpenShellTab(ActionWatch watch) {
 final builtinActionsProvider = Provider<List<AppAction>>(
   (ref) => [
     ...keyValueActions(),
+    ...gridFsActions(),
     AppAction(
       id: 'connection.new',
       title: 'New connection',

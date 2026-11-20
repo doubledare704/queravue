@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../connections/application/connection_session.dart';
+import '../../gridfs/data/gridfs_repository.dart';
 import '../data/schema_repository.dart';
 import '../domain/schema_models.dart';
 
@@ -17,6 +18,23 @@ sealed class SchemaTreeNode {
 
 class DatabaseNode extends SchemaTreeNode {
   const DatabaseNode({required super.key, required super.label});
+}
+
+typedef _GridFsBuckets = ({List<String> buckets, Object? error});
+
+class GridFsGroupNode extends SchemaTreeNode {
+  const GridFsGroupNode(this.database, {this.error})
+    : super(key: 'gridfs:$database', label: 'GridFS');
+
+  final String database;
+  final Object? error;
+}
+
+class GridFsBucketNode extends SchemaTreeNode {
+  const GridFsBucketNode(this.database, String bucket)
+    : super(key: 'gridfs-bucket:$database/$bucket', label: bucket);
+
+  final String database;
 }
 
 class SchemaNamespaceNode extends SchemaTreeNode {
@@ -81,6 +99,8 @@ class SchemaTreeState {
   const SchemaTreeState({
     this.sessionId,
     this.documentStore = false,
+    this.gridFs = false,
+    this.showGridFsCollections = const {},
     this.isLoading = false,
     this.error,
     this.expandedKeys = const {},
@@ -95,6 +115,8 @@ class SchemaTreeState {
   /// The engine has the `document_store` capability: databases hold
   /// collections directly (no schema level) and open in document tabs.
   final bool documentStore;
+  final bool gridFs;
+  final Set<String> showGridFsCollections;
   final bool isLoading;
   final Object? error;
   final Set<String> expandedKeys;
@@ -103,9 +125,34 @@ class SchemaTreeState {
   final Map<String, List<SchemaTreeNode>> childrenByKey;
   final Map<String, TableDetails> tableDetailsByRef;
 
+  List<SchemaTreeNode> visibleChildren(SchemaTreeNode node) {
+    final children = childrenByKey[node.key] ?? const [];
+    if (!gridFs ||
+        node is! DatabaseNode ||
+        showGridFsCollections.contains(node.label)) {
+      return children;
+    }
+    final backingCollections = {
+      for (final bucket
+          in childrenByKey['gridfs:${node.label}'] ??
+              const <SchemaTreeNode>[]) ...[
+        '${bucket.label}.files',
+        '${bucket.label}.chunks',
+      ],
+    };
+    return [
+      for (final child in children)
+        if (child is! ObjectNode ||
+            child.type != SchemaObjectType.collection ||
+            !backingCollections.contains(child.label))
+          child,
+    ];
+  }
+
   SchemaTreeState copyWith({
     String? sessionId,
     bool? documentStore,
+    Set<String>? showGridFsCollections,
     bool? isLoading,
     Object? error,
     bool clearError = false,
@@ -117,6 +164,8 @@ class SchemaTreeState {
   }) => SchemaTreeState(
     sessionId: sessionId ?? this.sessionId,
     documentStore: documentStore ?? this.documentStore,
+    gridFs: gridFs,
+    showGridFsCollections: showGridFsCollections ?? this.showGridFsCollections,
     isLoading: isLoading ?? this.isLoading,
     error: clearError ? null : (error ?? this.error),
     expandedKeys: expandedKeys ?? this.expandedKeys,
@@ -148,6 +197,7 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
         sessionId: sessionId,
         documentStore:
             connState.session?.capabilities.contains('document_store') ?? false,
+        gridFs: connState.session?.capabilities.contains('gridfs') ?? false,
         isLoading: true,
       );
     }
@@ -159,7 +209,7 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
   Future<void> _loadRoot(String sessionId) async {
     try {
       final dbs = await _repo.listDatabases(sessionId);
-      if (state.documentStore) {
+      if (state.documentStore || state.gridFs) {
         state = state.copyWith(
           isLoading: false,
           childrenByKey: {
@@ -202,6 +252,27 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
     state = state.copyWith(filterText: text);
   }
 
+  void toggleGridFsCollections(String database) {
+    final shown = {...state.showGridFsCollections};
+    if (!shown.add(database)) shown.remove(database);
+    state = state.copyWith(showGridFsCollections: shown);
+  }
+
+  Future<_GridFsBuckets> _gridFsBuckets(
+    String sessionId,
+    String database,
+  ) async {
+    try {
+      final buckets = await ref.read(gridFsRepositoryProvider).listBuckets((
+        sessionId: sessionId,
+        database: database,
+      ));
+      return (buckets: buckets, error: null);
+    } on Object catch (error) {
+      return (buckets: const <String>[], error: error);
+    }
+  }
+
   Future<void> toggleExpand(String key) async {
     final expanded = Set<String>.from(state.expandedKeys);
     if (expanded.contains(key)) {
@@ -238,7 +309,8 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
       await _fetchChildren(key, refresh: true);
     } else {
       await _repo.refreshSchema(sessionId);
-      await _fetchChildren(key, refresh: true);
+      final target = key.startsWith('gridfs:') ? 'db:${key.substring(7)}' : key;
+      await _fetchChildren(target, refresh: true);
     }
   }
 
@@ -249,18 +321,34 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
     state = state.copyWith(loadingKeys: {...state.loadingKeys, key});
 
     try {
-      if (key.startsWith('db:') && state.documentStore) {
+      if (key.startsWith('db:') && (state.documentStore || state.gridFs)) {
         final db = key.substring(3);
-        final objs = await _repo.listObjects(
+        final objects = _repo.listObjects(
           sessionId,
           database: db,
           schema: '',
           refresh: refresh,
         );
+        final (objs, gridFs) = await (
+          objects,
+          state.gridFs
+              ? _gridFsBuckets(sessionId, db)
+              : Future<_GridFsBuckets?>.value(),
+        ).wait;
+        if (!ref.mounted || state.sessionId != sessionId) return;
+        final group = gridFs == null
+            ? null
+            : GridFsGroupNode(db, error: gridFs.error);
         state = state.copyWith(
           childrenByKey: {
             ...state.childrenByKey,
+            if (group != null)
+              group.key: [
+                for (final bucket in gridFs!.buckets)
+                  GridFsBucketNode(db, bucket),
+              ],
             key: [
+              ?group,
               for (final o in objs)
                 ObjectNode(
                   key: 'coll:$db/${o.name}',
@@ -335,10 +423,14 @@ class SchemaTreeController extends Notifier<SchemaTreeState> {
         );
       }
     } catch (e) {
-      state = state.copyWith(error: e);
+      if (ref.mounted && state.sessionId == sessionId) {
+        state = state.copyWith(error: e);
+      }
     } finally {
-      final loading = Set<String>.from(state.loadingKeys)..remove(key);
-      state = state.copyWith(loadingKeys: loading);
+      if (ref.mounted && state.sessionId == sessionId) {
+        final loading = Set<String>.from(state.loadingKeys)..remove(key);
+        state = state.copyWith(loadingKeys: loading);
+      }
     }
   }
 

@@ -11,7 +11,7 @@ import '../../workspace/domain/workspace_models.dart';
 import 'query_run.dart';
 
 /// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table, collection, shell, designer, diagram }
+enum TabKind { query, table, collection, shell, designer, diagram, gridFs }
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -47,6 +47,7 @@ class EditorTab {
   bool get isShell => kind == TabKind.shell;
   bool get isDesigner => kind == TabKind.designer;
   bool get isDiagram => kind == TabKind.diagram;
+  bool get isGridFs => kind == TabKind.gridFs;
 
   /// The same tab, with its editor kept, under a new title.
   EditorTab withTitle(String newTitle) =>
@@ -269,6 +270,27 @@ class EditorTabs extends Notifier<EditorTabsState> {
       tabs: [...state.tabs, tab],
       activeByConnection: {...state.activeByConnection, connectionId: tab.id},
     );
+    return tab;
+  }
+
+  EditorTab openGridFs(String connectionId, TableRef bucket) {
+    final existing = state.tabs
+        .where(
+          (tab) =>
+              tab.isGridFs &&
+              tab.connectionId == connectionId &&
+              tab.tableRef == bucket,
+        )
+        .firstOrNull;
+    final tab =
+        existing ??
+        restoreTab(
+          connectionId: connectionId,
+          kind: TabKind.gridFs,
+          title: bucket.table,
+          tableRef: bucket,
+        );
+    select(tab.id);
     return tab;
   }
 

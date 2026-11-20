@@ -8,6 +8,7 @@ import '../../connections/application/connection_session.dart';
 import '../../documents/pipeline_builder/application/pipeline_builder_controller.dart';
 import '../../documents/pipeline_builder/presentation/pipeline_builder_view.dart';
 import '../../editor/application/editor_tabs.dart';
+import '../../gridfs/presentation/gridfs_tree_menu.dart';
 import '../application/schema_controller.dart';
 import '../domain/schema_models.dart';
 
@@ -178,8 +179,11 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
     final controller = ref.read(
       schemaTreeProvider(widget.connectionId).notifier,
     );
-    if (key.startsWith('coll:')) {
-      final node = _findObject(key);
+    if (key.startsWith('gridfs-bucket:')) {
+      final bucket = _findNode<GridFsBucketNode>(key);
+      if (bucket != null) _openBucket(bucket.database, bucket.label);
+    } else if (key.startsWith('coll:')) {
+      final node = _findNode<ObjectNode>(key);
       if (node != null) _openObject(node);
     } else if (key.startsWith('table:')) {
       final raw = key.substring(6);
@@ -197,11 +201,11 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
     }
   }
 
-  ObjectNode? _findObject(String key) {
+  T? _findNode<T extends SchemaTreeNode>(String key) {
     final all = ref.read(schemaTreeProvider(widget.connectionId)).childrenByKey;
     for (final list in all.values) {
       for (final n in list) {
-        if (n is ObjectNode && n.key == key) return n;
+        if (n is T && n.key == key) return n;
       }
     }
     return null;
@@ -226,11 +230,11 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
   ) {
     final isExpanded = state.expandedKeys.contains(node.key);
     final isLoading = state.loadingKeys.contains(node.key);
-    final children = state.childrenByKey[node.key] ?? const [];
+    final children = state.visibleChildren(node);
     final filter = state.filterText.trim().toLowerCase();
 
     // Check filter match
-    if (filter.isNotEmpty && node is ObjectNode) {
+    if (filter.isNotEmpty && (node is ObjectNode || node is GridFsBucketNode)) {
       if (!node.label.toLowerCase().contains(filter)) {
         return const SizedBox.shrink();
       }
@@ -244,14 +248,18 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
       key: Key('tree-node-${node.key}'),
       onTap: () {
         setState(() => _selectedKey = node.key);
-        if (node is ObjectNode) {
+        if (node is GridFsBucketNode) {
+          _openBucket(node.database, node.label);
+        } else if (node is ObjectNode) {
           _openObject(node);
         } else {
           controller.toggleExpand(node.key);
         }
       },
-      onSecondaryTapUp: (d) =>
-          _showContextMenu(context, d.globalPosition, node, controller),
+      onSecondaryTapUp: node is GridFsGroupNode || node is GridFsBucketNode
+          ? null
+          : (d) =>
+                _showContextMenu(context, d.globalPosition, node, controller),
       child: Container(
         height: 26,
         padding: EdgeInsets.only(left: 8.0 + depth * 14.0, right: 6),
@@ -291,6 +299,17 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
                 ),
               ),
             ),
+            if (node is GridFsGroupNode)
+              GridFsTreeMenu(
+                showCollections: state.showGridFsCollections.contains(
+                  node.database,
+                ),
+                onToggleCollections: () =>
+                    controller.toggleGridFsCollections(node.database),
+                onOpenBucket: (bucket) => _openBucket(node.database, bucket),
+                onRefresh: () => controller.refresh(node.key),
+                error: node.error,
+              ),
             if (node is ObjectNode && node.rowCountEstimate >= 0)
               Padding(
                 padding: const EdgeInsets.only(left: 4),
@@ -330,22 +349,63 @@ class _SchemaTreeViewState extends ConsumerState<SchemaTreeView> {
       mainAxisSize: MainAxisSize.min,
       children: [
         tile,
-        ...children.map(
-          (child) => _buildNode(context, child, depth + 1, state, controller),
-        ),
+        if (node is GridFsGroupNode)
+          _buildGridFsBuckets(children, depth + 1, state, controller)
+        else
+          ...children.map(
+            (child) => _buildNode(context, child, depth + 1, state, controller),
+          ),
       ],
     );
   }
 
+  Widget _buildGridFsBuckets(
+    List<SchemaTreeNode> children,
+    int depth,
+    SchemaTreeState state,
+    SchemaTreeController controller,
+  ) {
+    final filter = state.filterText.trim().toLowerCase();
+    final matching = [
+      for (final bucket in children)
+        if (bucket.label.toLowerCase().contains(filter)) bucket,
+    ];
+    return SizedBox(
+      height: matching.length.clamp(0, 8) * 26.0,
+      child: ListView.builder(
+        itemExtent: 26,
+        itemCount: matching.length,
+        primary: false,
+        itemBuilder: (context, index) =>
+            _buildNode(context, matching[index], depth, state, controller),
+      ),
+    );
+  }
+
+  void _openBucket(String database, String bucket) {
+    ref
+        .read(editorTabsProvider.notifier)
+        .openGridFs(
+          widget.connectionId,
+          TableRef(database: database, table: bucket),
+        );
+  }
+
   bool _canExpand(SchemaTreeNode node) {
     if (node is ObjectNode && node.key.startsWith('coll:')) return false;
-    return node is DatabaseNode ||
+    return node is GridFsGroupNode ||
+        node is DatabaseNode ||
         node is SchemaNamespaceNode ||
         node is ObjectNode;
   }
 
   Widget _iconFor(SchemaTreeNode node, ColorScheme scheme) {
     return switch (node) {
+      GridFsGroupNode() || GridFsBucketNode() => Icon(
+        Icons.folder_outlined,
+        size: 14,
+        color: scheme.secondary,
+      ),
       DatabaseNode() => Icon(
         Icons.dns_outlined,
         size: 14,
