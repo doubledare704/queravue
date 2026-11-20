@@ -56,6 +56,8 @@ const (
 	KindKeysRefused
 	// KindBlockingRefused: a blocking command was used.
 	KindBlockingRefused
+	// KindCorrupt: GridFS chunks are missing or do not match the file length.
+	KindCorrupt
 )
 
 // String implements fmt.Stringer.
@@ -101,6 +103,8 @@ func (k Kind) String() string {
 		return "keys_refused"
 	case KindBlockingRefused:
 		return "blocking_refused"
+	case KindCorrupt:
+		return "corrupt"
 	default:
 		return "unknown"
 	}

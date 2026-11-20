@@ -8,7 +8,7 @@ One package, `core/internal/engine/mongo`, built on the official `go.mongodb.org
 | `cosmosdb-mongo` | Azure Cosmos DB for MongoDB | [cosmosdb.md](cosmosdb.md) |
 | `documentdb` | DocumentDB (documentdb.io, Amazon DocumentDB) | [documentdb.md](documentdb.md) |
 
-Design: [ADR 0009](../adr/0009-document-model.md). The engine declares `connect`, `schema_inspector` and `document_store`, not `execute`: a Mongo connection never offers "Run SQL".
+Design: [ADR 0009](../adr/0009-document-model.md) and [ADR 0023](../adr/0023-gridfs.md). The engine declares `connect`, `schema_inspector`, `document_store`, `shell`, `index_manager`, `stats`, `validation`, `schema_graph`, and `gridfs`, not `execute`: a Mongo connection never offers "Run SQL".
 
 ## Connecting
 Fields: hosts (comma list), SRV, replica set, default database, user, password (keychain only), auth source, auth mechanism (`default`, `SCRAM-SHA-256`, `SCRAM-SHA-1`, `MONGODB-X509`), TLS, CA file, client certificate + key, allow invalid certificates, direct connection, read preference.
@@ -71,6 +71,15 @@ The core reads and replaces a collection's validator (`ValidationService`, capab
 - **Start from sample:** uses the same 100-document sample as the table view. It never applies anything, asks before replacing text you wrote, and says how many documents it read (and when it had to fall back to the first documents).
 - The validator is parsed as relaxed EJSON, so plain numbers such as `"minimum": 0` are accepted.
 
+## GridFS
+The core browses, uploads, downloads, renames and deletes GridFS files (`GridFsService`, capability `gridfs`); see [ADR 0023](../adr/0023-gridfs.md).
+- **Bucket discovery:** scans a database for matching `<name>.files` and `<name>.chunks` collection pairs (views, `system.*` collections, and unpaired `.files` or `.chunks` collections are ignored). Reports an estimated file count (`EstimatedDocumentCount`) and best-effort `total_bytes` via `$group` `$sum` when the estimated count is at most 10,000.
+- **Listing & content type:** `ListFiles` streams `<bucket>.files` in batches with relaxed EJSON `filter` and `sort`, `skip`, `limit`, and `max_time_ms` (default 30,000 ms). `content_type` reads `metadata.contentType` and falls back to the deprecated top-level `contentType` field written by tools such as `mongofiles`.
+- **Streaming download & ranged reads:** `Download` sends the `GridFsFile` header first, then bytes in chunks of at most 1 MiB, bounded by optional `offset` and `length`. Reads from `offset == 0` use `GridFSBucket.OpenDownloadStream`; reads with `offset > 0` query `<bucket>.chunks` starting at chunk `offset / chunkSize` directly instead of skipping earlier chunks. Missing, out-of-order, or mismatched-length chunks are reported in-band as `CORRUPT`.
+- **Streaming upload, replace & cancel:** `Upload` streams chunks directly into `GridFSBucket.OpenUploadStream` (custom `chunk_size_bytes` must stay under 16 MiB). When `replace_id_ejson` is set, the replaced file is deleted after the new file commits. Cancelling an upload or failing the input stream aborts and removes any chunks already written for that upload (using a fresh cleanup context so an already-cancelled RPC context never strands chunks).
+- **Safety & errors:** connections flagged `production` require `confirmed=true` for `DeleteFile` and replacing `Upload` (`CONFIRMATION_REQUIRED`, nothing changed); `RenameFile` and new uploads need no confirmation. Unknown sessions return gRPC `NOT_FOUND`; sessions without `gridfs` return `FAILED_PRECONDITION`.
+- **Memory & throughput:** 1 GiB round-trips keep live core heap flat at `17.5 MiB` during upload and `17.1 MiB` during download, returning to `0.6–0.7 MiB` afterwards; see [perf/iteration-12.md](../perf/iteration-12.md).
+
 ## Limitations
 - No aggregation builder yet. The validation editor starts from the collection's current validator; "Start from sample" fills it with a `$jsonSchema` inferred from a sample of documents (types per field, `required` for fields every sampled document had), for you to edit. The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
@@ -80,7 +89,7 @@ The core reads and replaces a collection's validator (`ValidationService`, capab
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
 docker compose -f dev/docker-compose.yml --profile seed up mongo-seed    # users, orders, 1M events
-cd core && go test -tags=integration ./internal/engine/mongo/... ./internal/shell/...
+cd core && go test -tags=integration ./internal/engine/mongo/... ./internal/shell/... ./internal/api/...
 ```
 The shell's snippet corpus lives in `core/internal/shell/testdata/corpus`: each `name.js` has a `name.out` transcript produced by a real server. After changing shell behaviour on purpose, regenerate with `go test -tags=integration ./internal/shell -run TestSnippetCorpus -update` and review the diff. `make test-docdb` also runs a shell smoke test on the DocumentDB service.
 Auth, TLS and X.509 are covered by unit tests only: the dev server runs without authentication.

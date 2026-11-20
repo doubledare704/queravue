@@ -115,7 +115,7 @@ func Serve(ctx context.Context, cfg Config) error {
 			docSvc.SetHistory(cfg.History)
 		}
 		queravuev1.RegisterDocumentServiceServer(srv, docSvc)
-		queravuev1.RegisterGridFsServiceServer(srv, api.NewGridFsService(cfg.Sessions))
+		queravuev1.RegisterGridFsServiceServer(srv, api.NewGridFsService(cfg.Sessions, cfg.Connections, log))
 		queravuev1.RegisterKeyValueServiceServer(srv, api.NewKeyValueService(cfg.Sessions, cfg.Connections, log))
 		shellSvc := cfg.Shells
 		if shellSvc == nil {

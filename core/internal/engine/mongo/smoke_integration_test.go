@@ -3,13 +3,18 @@
 package mongo
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
@@ -187,4 +192,156 @@ func smoke(t *testing.T, envVar string, v Variant) {
 	if n, err := c.Delete(ctx, db, coll, ids, engine.WriteOptions{}); err != nil || n != 2 {
 		t.Fatalf("delete = %d, %v", n, err)
 	}
+
+	// 7. GridFS.
+	smokeGridFS(ctx, t, c, db)
+}
+
+func smokeGridFS(ctx context.Context, t *testing.T, c *Conn, db string) {
+	t.Helper()
+	bucket := fmt.Sprintf("smoke_gfs_%d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		dctx, dcancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer dcancel()
+		if cl, err := c.live("cleanup"); err == nil {
+			_ = cl.Database(db).Collection(bucket + ".files").Drop(dctx)
+			_ = cl.Database(db).Collection(bucket + ".chunks").Drop(dctx)
+		}
+	})
+
+	payload := bytes.Repeat([]byte("docdb-gridfs-"), 16000) // ~208 KB -> 4 chunks of 64 KiB
+	f1, err := c.Upload(ctx, engine.GridFSUpload{
+		Database:       db,
+		Bucket:         bucket,
+		Filename:       "smoke.bin",
+		ContentType:    "application/octet-stream",
+		Metadata:       `{"env":"smoke"}`,
+		ChunkSizeBytes: 64 << 10,
+	}, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatalf("gridfs upload: %v", err)
+	}
+
+	buckets, err := c.ListBuckets(ctx, db)
+	if err != nil {
+		t.Fatalf("gridfs list buckets: %v", err)
+	}
+	var bucketOK bool
+	for _, b := range buckets {
+		if b.Name == bucket && b.FileCountEstimate >= 1 {
+			bucketOK = true
+		}
+	}
+	if !bucketOK {
+		t.Fatalf("bucket %s missing from %+v", bucket, buckets)
+	}
+
+	var listed []engine.GridFSFile
+	if err := c.ListFiles(ctx, engine.GridFSListOptions{
+		Database: db,
+		Bucket:   bucket,
+		Filter:   `{"filename":"smoke.bin"}`,
+		Sort:     `{"uploadDate":-1}`,
+	}, gridfsSliceSink{out: &listed}); err != nil || len(listed) != 1 || listed[0].ContentType != "application/octet-stream" {
+		t.Fatalf("gridfs list files = %+v, %v", listed, err)
+	}
+
+	_, rcFull, err := c.OpenDownload(ctx, db, bucket, f1.ID, 0)
+	if err != nil {
+		t.Fatalf("gridfs download full: %v", err)
+	}
+	gotFull, err := io.ReadAll(rcFull)
+	_ = rcFull.Close()
+	if err != nil || !bytes.Equal(gotFull, payload) {
+		t.Fatalf("gridfs full bytes mismatch: len=%d err=%v", len(gotFull), err)
+	}
+
+	_, rcRange, err := c.OpenDownload(ctx, db, bucket, f1.ID, 70_000)
+	if err != nil {
+		t.Fatalf("gridfs download ranged: %v", err)
+	}
+	gotRange, err := io.ReadAll(rcRange)
+	_ = rcRange.Close()
+	if err != nil || !bytes.Equal(gotRange, payload[70_000:]) {
+		t.Fatalf("gridfs ranged bytes mismatch: len=%d err=%v", len(gotRange), err)
+	}
+
+	if err := c.RenameFile(ctx, db, bucket, f1.ID, "smoke-renamed.bin"); err != nil {
+		t.Fatalf("gridfs rename: %v", err)
+	}
+
+	f2, err := c.Upload(ctx, engine.GridFSUpload{
+		Database:  db,
+		Bucket:    bucket,
+		Filename:  "smoke-v2.bin",
+		ReplaceID: f1.ID,
+	}, bytes.NewReader([]byte("v2")))
+	if err != nil {
+		t.Fatalf("gridfs replace upload: %v", err)
+	}
+	if _, _, err := c.OpenDownload(ctx, db, bucket, f1.ID, 0); engine.KindOf(err) != engine.KindNotFound {
+		t.Fatalf("replaced file still readable: err=%v", err)
+	}
+
+	// Cancel upload after flushing >16 MiB and verify no orphan chunks remain.
+	cl, err := c.live("smoke gridfs chunks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunksColl := cl.Database(db).Collection(bucket + ".chunks")
+	baseChunks, err := chunksColl.CountDocuments(ctx, bson.D{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	gr := &smokeGatedReader{remaining: 20 << 20, chunks: chunksColl, base: baseChunks, cancel: cancel}
+	_, err = c.Upload(cancelCtx, engine.GridFSUpload{Database: db, Bucket: bucket, Filename: "cancelled.bin"}, gr)
+	if engine.KindOf(err) != engine.KindCanceled || !gr.triggered {
+		t.Fatalf("gridfs cancel upload: err=%v triggered=%v", err, gr.triggered)
+	}
+	afterChunks, err := chunksColl.CountDocuments(ctx, bson.D{})
+	if err != nil || afterChunks != baseChunks {
+		t.Fatalf("gridfs chunks after cancel = %d, want %d (err=%v)", afterChunks, baseChunks, err)
+	}
+
+	if err := c.DeleteFile(ctx, db, bucket, f2.ID); err != nil {
+		t.Fatalf("gridfs delete: %v", err)
+	}
+}
+
+type gridfsSliceSink struct{ out *[]engine.GridFSFile }
+
+func (s gridfsSliceSink) Batch(files []engine.GridFSFile) error {
+	*s.out = append(*s.out, files...)
+	return nil
+}
+
+type smokeGatedReader struct {
+	remaining int64
+	chunks    *mongo.Collection
+	base      int64
+	triggered bool
+	cancel    context.CancelFunc
+}
+
+func (r *smokeGatedReader) Read(p []byte) (int, error) {
+	if !r.triggered {
+		n, err := r.chunks.CountDocuments(context.Background(), bson.D{})
+		if err == nil && n > r.base {
+			r.triggered = true
+			r.cancel()
+			return 0, context.Canceled
+		}
+	}
+	if r.remaining <= 0 {
+		return 0, io.EOF
+	}
+	n := int64(len(p))
+	if n > r.remaining {
+		n = r.remaining
+	}
+	clear(p[:n])
+	r.remaining -= n
+	return int(n), nil
 }

@@ -24,6 +24,7 @@ All of this comes from Microsoft's documentation and is **not verified by our te
 - Only a subset of MongoDB operators and aggregation stages is implemented, depending on the account's server version (3.6 to 7.0). Operators you type that are missing come back as server errors next to the query bar.
 - Time-series collections, views and capped collections may be unavailable.
 - Estimated counts are cheap, exact counts and `$sample` consume RUs.
+- **GridFS (unverified):** the `gridfs` capability shares the [MongoDB](mongodb.md) code path and has not been verified against Cosmos DB for MongoDB. On RU accounts, large uploads and downloads can hit rate limits (`16500`), and custom `ListFiles` sorts require indexes on the sorted `<bucket>.files` fields. vCore clusters share the [DocumentDB](documentdb.md) gateway.
 
 ## Testing
 **There is no Docker image that serves the MongoDB API on Apple Silicon.** The vNext Linux emulator (`mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-latest`) supports the **NoSQL API only**, in HTTP/HTTPS gateway mode without authentication, so it cannot test this engine. The older Windows emulator and the legacy Linux emulator image (x64 only) expose a Mongo endpoint but are not part of our dev stack. For vCore behaviour use [DocumentDB Local](documentdb.md), which is the same engine family.

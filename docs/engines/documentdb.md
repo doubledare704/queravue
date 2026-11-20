@@ -35,15 +35,15 @@ Taken from vendor documentation and experience with the protocol, **not verified
 - Estimated counts and "databases visible" depend on the user's privileges; if listing databases is denied, the tree falls back to the connection's default database.
 
 ## Verified against
-Run manually on 2026-11-06 with `make test-docdb` (smoke test `TestSmokeDocumentDB`):
+Run manually on 2026-11-19 with `make test-docdb` (smoke test `TestSmokeDocumentDB` and `TestSmokeShellDocumentDB`):
 
 | Server | `buildInfo` version | Result |
 |---|---|---|
 | DocumentDB Local `ghcr.io/documentdb/documentdb/documentdb-local:pg17-1.0.0`, arm64, username/password auth, TLS self-signed | 7.0.0 | pass |
 
-Verified: connect and ping with TLS and SCRAM credentials; `buildInfo`; insert of `Int32`, `Int64`, `Double` and `Date` values and find returning them type for type; filter, sort and projection; exact count; collection listing; replace with `expected_document`; field update with set and unset; conflict on a stale replace with the current document attached; delete; `$sample` (no fallback needed); index create, list and drop, with `$indexStats` usage and per-index sizes, `collStats`, and a `collMod` `$jsonSchema` validator set, read back and removed (DocumentDB Local 7.0.0).
+Verified: connect and ping with TLS and SCRAM credentials; `buildInfo`; insert of `Int32`, `Int64`, `Double` and `Date` values and find returning them type for type; filter, sort and projection; exact count; collection listing; replace with `expected_document`; field update with set and unset; conflict on a stale replace with the current document attached; delete; `$sample` (no fallback needed); index create, list and drop, with `$indexStats` usage and per-index sizes, `collStats`, and a `collMod` `$jsonSchema` validator set, read back and removed; shell smoke test; and **GridFS**: bucket discovery, upload with `contentType` and metadata, `ListFiles` with filter and sort, full and ranged `OpenDownload`, `RenameFile`, replacing `Upload`, upload cancellation after > 16 MiB flushed leaving zero orphan chunks, and `DeleteFile` (DocumentDB Local 7.0.0).
 
-**Not verified:** Amazon DocumentDB (no AWS account used), `listDatabases` as a user without that privilege, large result streaming, retryable writes.
+**Not verified:** Amazon DocumentDB (no AWS account used), `listDatabases` as a user without that privilege, large result / 1 GiB GridFS streaming against DocumentDB, retryable writes.
 
 ## Testing
 The container is behind a compose profile, so a plain `up` does not start it:

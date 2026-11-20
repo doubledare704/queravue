@@ -38,6 +38,10 @@ func classify(op string, err error, secret engine.Secret) *engine.Error {
 	var bulk mongo.BulkWriteException
 	code := 0
 	switch {
+	case errors.Is(err, mongo.ErrFileNotFound):
+		kind = engine.KindNotFound
+	case errors.Is(err, mongo.ErrMissingChunk), errors.Is(err, mongo.ErrWrongSize), errors.Is(err, mongo.ErrMissingGridFSChunkSize):
+		kind = engine.KindCorrupt
 	case errors.As(err, &write) && len(write.WriteErrors) > 0:
 		kind, msg, code = engine.KindServer, write.WriteErrors[0].Message, write.WriteErrors[0].Code
 	case errors.As(err, &bulk) && len(bulk.WriteErrors) > 0:

@@ -61,6 +61,6 @@ type GridFS interface {
 	// Upload reads r to EOF; when ctx is cancelled or r fails, the chunks
 	// written so far are removed.
 	Upload(ctx context.Context, u GridFSUpload, r io.Reader) (GridFSFile, error)
-	Delete(ctx context.Context, database, bucket string, id Document) error
-	Rename(ctx context.Context, database, bucket string, id Document, filename string) error
+	DeleteFile(ctx context.Context, database, bucket string, id Document) error
+	RenameFile(ctx context.Context, database, bucket string, id Document, filename string) error
 }
