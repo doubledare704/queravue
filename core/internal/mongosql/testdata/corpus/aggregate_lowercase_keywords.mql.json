@@ -1,0 +1,42 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "users",
+  "pipeline": [
+    {
+      "$match": {
+        "age": {
+          "$gt": {
+            "$numberInt": "30"
+          }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").users.aggregate([{\"$match\":{\"age\":{\"$gt\":{\"$numberInt\":\"30\"}}}},{\"$group\":{\"_id\":{\"city\":\"$city\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 38,
+      "at": "age > 30 group by city"
+    }
+  ]
+}

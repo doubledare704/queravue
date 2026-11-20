@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "DISTINCT supports only plain fields",
+    "offset": 16,
+    "at": "* FROM orders"
+  }
+}

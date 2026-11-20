@@ -1,0 +1,57 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$group": {
+        "_id": {
+          "c_city": "$c.city"
+        },
+        "kinds": {
+          "$addToSet": "$status"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "kinds": {
+          "$size": {
+            "$setDifference": [
+              "$kinds",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.c_city",
+        "kinds": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$group\":{\"_id\":{\"c_city\":\"$c.city\"},\"kinds\":{\"$addToSet\":\"$status\"}}},{\"$addFields\":{\"kinds\":{\"$size\":{\"$setDifference\":[\"$kinds\",[null]]}}}},{\"$project\":{\"city\":\"$_id.c_city\",\"kinds\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 71,
+      "at": "JOIN customers c ON o.cu"
+    }
+  ]
+}

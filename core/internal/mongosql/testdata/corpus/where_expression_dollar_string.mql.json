@@ -1,0 +1,43 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            {
+              "$multiply": [
+                "$price",
+                "$qty"
+              ]
+            },
+            {
+              "$numberInt": "5"
+            }
+          ]
+        },
+        "label": "$special"
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[{\"$multiply\":[\"$price\",\"$qty\"]},{\"$numberInt\":\"5\"}]},\"label\":\"$special\"}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 32,
+      "at": "price * qty > 5 AND labe"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 32,
+      "at": "price * qty > 5 AND labe"
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 52,
+      "at": "label = '$special'"
+    }
+  ]
+}

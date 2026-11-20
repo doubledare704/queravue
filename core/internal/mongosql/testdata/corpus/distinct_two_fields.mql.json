@@ -1,0 +1,23 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city",
+          "tier": "$tier"
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "tier": "$_id.tier",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\",\"tier\":\"$tier\"}}},{\"$project\":{\"city\":\"$_id.city\",\"tier\":\"$_id.tier\",\"_id\":false}}])"
+}

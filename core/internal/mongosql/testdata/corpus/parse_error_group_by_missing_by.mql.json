@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "expected BY, got \"status\"",
+    "offset": 32,
+    "at": "status"
+  }
+}

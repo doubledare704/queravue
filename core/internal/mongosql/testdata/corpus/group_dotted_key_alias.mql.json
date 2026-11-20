@@ -1,0 +1,27 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "users",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "address_city": "$address.city"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.address_city",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").users.aggregate([{\"$group\":{\"_id\":{\"address_city\":\"$address.city\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"city\":\"$_id.address_city\",\"n\":true,\"_id\":false}}])"
+}

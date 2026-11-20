@@ -1,0 +1,41 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "customer_id": {
+          "$oid": "507f1f77bcf86cd799439011"
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"customer_id\":{\"$oid\":\"507f1f77bcf86cd799439011\"}}},{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"status\":\"$_id.status\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 47,
+      "at": "customer_id = OBJECTID('"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        },
+        "total_age": {
+          "$sum": "$age"
+        },
+        "tiers": {
+          "$addToSet": "$tier"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "tiers": {
+          "$size": {
+            "$setDifference": [
+              "$tiers",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "total_age": true,
+        "tiers": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\"},\"total_age\":{\"$sum\":\"$age\"},\"tiers\":{\"$addToSet\":\"$tier\"}}},{\"$addFields\":{\"tiers\":{\"$size\":{\"$setDifference\":[\"$tiers\",[null]]}}}},{\"$project\":{\"city\":\"$_id.city\",\"total_age\":true,\"tiers\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 13,
+      "at": "SUM(age) AS total_age, C"
+    }
+  ]
+}

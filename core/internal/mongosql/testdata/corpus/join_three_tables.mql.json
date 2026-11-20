@@ -1,0 +1,56 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$lookup": {
+        "from": "order_lines",
+        "localField": "_id",
+        "foreignField": "order_id",
+        "as": "l"
+      }
+    },
+    {
+      "$unwind": "$l"
+    },
+    {
+      "$lookup": {
+        "from": "products",
+        "localField": "l.sku",
+        "foreignField": "sku",
+        "as": "p"
+      }
+    },
+    {
+      "$unwind": "$p"
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "customer": "$c.name",
+        "product": "$p.name",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$lookup\":{\"from\":\"order_lines\",\"localField\":\"_id\",\"foreignField\":\"order_id\",\"as\":\"l\"}},{\"$unwind\":\"$l\"},{\"$lookup\":{\"from\":\"products\",\"localField\":\"l.sku\",\"foreignField\":\"sku\",\"as\":\"p\"}},{\"$unwind\":\"$p\"},{\"$project\":{\"order_id\":\"$_id\",\"customer\":\"$c.name\",\"product\":\"$p.name\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 78,
+      "at": "JOIN customers c ON o.cu"
+    }
+  ]
+}

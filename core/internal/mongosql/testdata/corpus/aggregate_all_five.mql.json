@@ -1,0 +1,52 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        },
+        "s": {
+          "$sum": "$total"
+        },
+        "a": {
+          "$avg": "$total"
+        },
+        "lo": {
+          "$min": "$total"
+        },
+        "hi": {
+          "$max": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "n": true,
+        "s": true,
+        "a": true,
+        "lo": true,
+        "hi": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":null,\"n\":{\"$sum\":{\"$numberInt\":\"1\"}},\"s\":{\"$sum\":\"$total\"},\"a\":{\"$avg\":\"$total\"},\"lo\":{\"$min\":\"$total\"},\"hi\":{\"$max\":\"$total\"}}},{\"$project\":{\"n\":true,\"s\":true,\"a\":true,\"lo\":true,\"hi\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "COUNT(*) AS n, SUM(total"
+    },
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 22,
+      "at": "SUM(total) AS s, AVG(tot"
+    }
+  ]
+}

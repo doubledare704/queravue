@@ -1,0 +1,21 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "users",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").users.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\"}}},{\"$project\":{\"city\":\"$_id.city\",\"_id\":false}}])"
+}

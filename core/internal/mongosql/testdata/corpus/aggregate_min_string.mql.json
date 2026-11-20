@@ -1,0 +1,29 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "first_city": {
+          "$min": "$city"
+        }
+      }
+    },
+    {
+      "$project": {
+        "first_city": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":null,\"first_city\":{\"$min\":\"$city\"}}},{\"$project\":{\"first_city\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "MIN(city) AS first_city "
+    }
+  ]
+}

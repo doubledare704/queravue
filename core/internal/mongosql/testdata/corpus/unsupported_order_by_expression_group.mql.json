@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "ORDER BY accepts fields, aliases, ordinals and aggregates; select the expression with an alias and order by that",
+    "offset": 51,
+    "at": "COUNT(*) + 1"
+  }
+}

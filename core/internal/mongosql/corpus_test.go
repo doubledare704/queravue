@@ -18,7 +18,10 @@ var update = flag.Bool("update", false, "rewrite the expected .mql.json files of
 
 const corpusDatabase = "shop"
 
-const minimumCorpusSize = 50
+const (
+	minimumCorpusSize     = 200
+	minimumSupportedCases = 100
+)
 
 type goldenLocation struct {
 	Offset uint32 `json:"offset"`
@@ -43,6 +46,7 @@ type golden struct {
 	Filter     json.RawMessage `json:"filter,omitempty"`
 	Projection json.RawMessage `json:"projection,omitempty"`
 	Sort       json.RawMessage `json:"sort,omitempty"`
+	Pipeline   json.RawMessage `json:"pipeline,omitempty"`
 	Skip       uint64          `json:"skip,omitempty"`
 	Limit      *uint64         `json:"limit,omitempty"`
 	Shell      string          `json:"shell,omitempty"`
@@ -57,6 +61,15 @@ func TestCorpus(t *testing.T) {
 	}
 	if len(files) < minimumCorpusSize {
 		t.Errorf("corpus has %d cases, want at least %d", len(files), minimumCorpusSize)
+	}
+	supported := 0
+	for _, file := range files {
+		if name := filepath.Base(file); !strings.HasPrefix(name, "unsupported_") && !strings.HasPrefix(name, "parse_error_") {
+			supported++
+		}
+	}
+	if supported < minimumSupportedCases {
+		t.Errorf("corpus has %d supported cases, want at least %d", supported, minimumSupportedCases)
 	}
 	for _, file := range files {
 		name := strings.TrimSuffix(filepath.Base(file), ".sql")
@@ -103,6 +116,16 @@ func checkInvariants(t *testing.T, name, sql string, resp *queravuev1.TranslateM
 		}
 		return
 	}
+	checkKindMatchesFields(t, resp)
+	if pipeline := resp.GetPipelineEjson(); pipeline != "" {
+		var wrapped struct{ Stages bson.A }
+		if err := bson.UnmarshalExtJSON([]byte(`{"stages":`+pipeline+`}`), true, &wrapped); err != nil {
+			t.Errorf("%s is not a canonical EJSON array: %v", pipeline, err)
+		}
+		if !strings.HasSuffix(resp.GetShellCode(), ".aggregate("+pipeline+")") {
+			t.Errorf("shell code %q does not run the pipeline", resp.GetShellCode())
+		}
+	}
 	for _, doc := range []string{resp.GetFilterEjson(), resp.GetProjectionEjson(), resp.GetSortEjson()} {
 		if doc == "" {
 			continue
@@ -111,6 +134,17 @@ func checkInvariants(t *testing.T, name, sql string, resp *queravuev1.TranslateM
 		if err := bson.UnmarshalExtJSON([]byte(doc), true, &d); err != nil {
 			t.Errorf("%s is not canonical EJSON: %v", doc, err)
 		}
+	}
+}
+
+func checkKindMatchesFields(t *testing.T, resp *queravuev1.TranslateMongoSqlResponse) {
+	t.Helper()
+	isAggregate := resp.GetKind() == queravuev1.MongoSqlResultKind_MONGO_SQL_RESULT_KIND_AGGREGATE
+	if isAggregate != (resp.GetPipelineEjson() != "") {
+		t.Errorf("kind %v does not match pipeline %q", resp.GetKind(), resp.GetPipelineEjson())
+	}
+	if isAggregate && (resp.GetFilterEjson() != "" || resp.GetProjectionEjson() != "" || resp.GetSortEjson() != "") {
+		t.Errorf("an aggregate response must not carry find fields")
 	}
 }
 
@@ -130,6 +164,7 @@ func renderGolden(t *testing.T, sql string, resp *queravuev1.TranslateMongoSqlRe
 		g.Filter = rawJSON(resp.GetFilterEjson())
 		g.Projection = rawJSON(resp.GetProjectionEjson())
 		g.Sort = rawJSON(resp.GetSortEjson())
+		g.Pipeline = rawJSON(resp.GetPipelineEjson())
 		g.Skip = resp.GetSkip()
 		g.Limit = resp.Limit
 		g.Shell = resp.GetShellCode()

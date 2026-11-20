@@ -1,0 +1,25 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "mean": {
+          "$avg": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "mean": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"mean\":{\"$avg\":\"$total\"}}},{\"$project\":{\"status\":\"$_id.status\",\"mean\":true,\"_id\":false}}])"
+}

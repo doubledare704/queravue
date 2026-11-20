@@ -1,0 +1,63 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "let": {
+          "v0": "$_id"
+        },
+        "pipeline": [
+          {
+            "$match": {
+              "$expr": {
+                "$and": [
+                  {
+                    "$lt": [
+                      "$$v0",
+                      "$_id"
+                    ]
+                  },
+                  {
+                    "$lte": [
+                      "$_id",
+                      {
+                        "$numberInt": "3"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "as": "b"
+      }
+    },
+    {
+      "$unwind": "$b"
+    },
+    {
+      "$project": {
+        "low": "$_id",
+        "high": "$b._id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$lookup\":{\"from\":\"customers\",\"let\":{\"v0\":\"$_id\"},\"pipeline\":[{\"$match\":{\"$expr\":{\"$and\":[{\"$lt\":[\"$$v0\",\"$_id\"]},{\"$lte\":[\"$_id\",{\"$numberInt\":\"3\"}]}]}}}],\"as\":\"b\"}},{\"$unwind\":\"$b\"},{\"$project\":{\"low\":\"$_id\",\"high\":\"$b._id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "a JOIN with more than one ON condition becomes $lookup with let and pipeline, which older DocumentDB and Cosmos DB servers reject",
+      "offset": 52,
+      "at": "JOIN customers b ON a._i"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 72,
+      "at": "a._id < b._id AND b._id "
+    }
+  ]
+}

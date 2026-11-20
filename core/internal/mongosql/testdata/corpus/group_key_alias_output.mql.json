@@ -1,0 +1,27 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "state": "$_id.status",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"state\":\"$_id.status\",\"n\":true,\"_id\":false}}])"
+}

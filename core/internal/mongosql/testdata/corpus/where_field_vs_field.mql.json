@@ -1,0 +1,25 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "t",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            "$updated",
+            "$created"
+          ]
+        }
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").t.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[\"$updated\",\"$created\"]}}}])",
+  "warnings": [
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 22,
+      "at": "updated > created"
+    }
+  ]
+}

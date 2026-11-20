@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "comparing with NULL is never true in SQL; use IS NULL or IS NOT NULL",
+    "offset": 46,
+    "at": "NULL"
+  }
+}

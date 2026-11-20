@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "\"orders\" names two tables in this query; give one an alias",
+    "offset": 26,
+    "at": "orders ON orders._id = o"
+  }
+}

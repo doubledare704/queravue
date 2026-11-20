@@ -1,0 +1,39 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "kinds": {
+          "$addToSet": "$status"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "kinds": {
+          "$size": {
+            "$setDifference": [
+              "$kinds",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "kinds": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"kinds\":{\"$addToSet\":\"$status\"}}},{\"$addFields\":{\"kinds\":{\"$size\":{\"$setDifference\":[\"$kinds\",[null]]}}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"kinds\":true,\"_id\":false}}])"
+}

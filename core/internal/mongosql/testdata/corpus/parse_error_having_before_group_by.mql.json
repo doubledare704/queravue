@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "GROUP is out of order",
+    "offset": 46,
+    "at": "GROUP BY status"
+  }
+}

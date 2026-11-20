@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "a computed column needs an alias: add AS name",
+    "offset": 15,
+    "at": "COUNT(*) + 1 FROM orders"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "min_total": {
+          "$min": "$total"
+        }
+      }
+    },
+    {
+      "$match": {
+        "min_total": {
+          "$lt": {
+            "$numberInt": "50"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"min_total\":{\"$min\":\"$total\"}}},{\"$match\":{\"min_total\":{\"$lt\":{\"$numberInt\":\"50\"}}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 59,
+      "at": "MIN(total) < 50"
+    }
+  ]
+}

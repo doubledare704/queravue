@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "expected \")\", got \"FROM\"",
+    "offset": 27,
+    "at": "FROM users"
+  }
+}

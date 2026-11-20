@@ -1,0 +1,46 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$match": {
+        "tier": "bronze"
+      }
+    },
+    {
+      "$lookup": {
+        "from": "orders",
+        "localField": "_id",
+        "foreignField": "customer_id",
+        "as": "o"
+      }
+    },
+    {
+      "$unwind": {
+        "path": "$o",
+        "preserveNullAndEmptyArrays": true
+      }
+    },
+    {
+      "$project": {
+        "cid": "$_id",
+        "order_id": "$o._id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$match\":{\"tier\":\"bronze\"}},{\"$lookup\":{\"from\":\"orders\",\"localField\":\"_id\",\"foreignField\":\"customer_id\",\"as\":\"o\"}},{\"$unwind\":{\"path\":\"$o\",\"preserveNullAndEmptyArrays\":true}},{\"$project\":{\"cid\":\"$_id\",\"order_id\":\"$o._id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 56,
+      "at": "LEFT JOIN orders o ON o."
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 106,
+      "at": "c.tier = 'bronze'"
+    }
+  ]
+}

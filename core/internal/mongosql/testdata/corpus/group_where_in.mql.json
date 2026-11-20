@@ -1,0 +1,44 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$match": {
+        "tier": {
+          "$in": [
+            "gold",
+            "silver"
+          ]
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$match\":{\"tier\":{\"$in\":[\"gold\",\"silver\"]}}},{\"$group\":{\"_id\":{\"city\":\"$city\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"city\":\"$_id.city\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 48,
+      "at": "tier IN ('gold', 'silver"
+    }
+  ]
+}

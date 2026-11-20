@@ -1,0 +1,32 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "spent": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "spent": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"spent\":{\"$sum\":\"$total\"}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"spent\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 20,
+      "at": "SUM(total) AS spent FROM"
+    }
+  ]
+}

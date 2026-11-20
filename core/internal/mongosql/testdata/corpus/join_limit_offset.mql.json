@@ -1,0 +1,55 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$sort": {
+        "_id": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "customer": "$c.name",
+        "_id": false
+      }
+    },
+    {
+      "$skip": {
+        "$numberLong": "2"
+      }
+    },
+    {
+      "$limit": {
+        "$numberLong": "4"
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$sort\":{\"_id\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"order_id\":\"$_id\",\"customer\":\"$c.name\",\"_id\":false}},{\"$skip\":{\"$numberLong\":\"2\"}},{\"$limit\":{\"$numberLong\":\"4\"}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 59,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 110,
+      "at": "o._id LIMIT 4 OFFSET 2"
+    }
+  ]
+}

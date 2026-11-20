@@ -1,0 +1,31 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "users",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "count": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "count": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").users.aggregate([{\"$group\":{\"_id\":null,\"count\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"count\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "COUNT(*) FROM users"
+    }
+  ]
+}

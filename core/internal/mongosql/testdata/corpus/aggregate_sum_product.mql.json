@@ -1,0 +1,44 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "amount": {
+          "$sum": {
+            "$multiply": [
+              "$price",
+              "$qty"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "amount": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$group\":{\"_id\":null,\"amount\":{\"$sum\":{\"$multiply\":[\"$price\",\"$qty\"]}}}},{\"$project\":{\"amount\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "SUM(price * qty) AS amou"
+    },
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 7,
+      "at": "SUM(price * qty) AS amou"
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 11,
+      "at": "price * qty) AS amount F"
+    }
+  ]
+}

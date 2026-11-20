@@ -1,0 +1,43 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "status": "paid"
+      }
+    },
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "customer": "$c.name",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"status\":\"paid\"}},{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$project\":{\"order_id\":\"$_id\",\"customer\":\"$c.name\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 59,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 107,
+      "at": "status = 'paid'"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "doubled": {
+          "$multiply": [
+            {
+              "$subtract": [
+                "$total",
+                "$discount"
+              ]
+            },
+            {
+              "$numberInt": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "doubled": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"doubled\":{\"$multiply\":[{\"$subtract\":[\"$total\",\"$discount\"]},{\"$numberInt\":\"2\"}]}}},{\"$project\":{\"_id\":true,\"doubled\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "(total - discount) * 2 A"
+    }
+  ]
+}

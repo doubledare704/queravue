@@ -1,0 +1,42 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "count": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        },
+        "sum_total": {
+          "$sum": "$total"
+        },
+        "avg_total": {
+          "$avg": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "count": true,
+        "sum_total": true,
+        "avg_total": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"count\":{\"$sum\":{\"$numberInt\":\"1\"}},\"sum_total\":{\"$sum\":\"$total\"},\"avg_total\":{\"$avg\":\"$total\"}}},{\"$project\":{\"status\":\"$_id.status\",\"count\":true,\"sum_total\":true,\"avg_total\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 25,
+      "at": "SUM(total), AVG(total) F"
+    }
+  ]
+}

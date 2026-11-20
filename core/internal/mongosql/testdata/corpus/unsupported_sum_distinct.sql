@@ -1,0 +1,1 @@
+SELECT SUM(DISTINCT total) FROM orders

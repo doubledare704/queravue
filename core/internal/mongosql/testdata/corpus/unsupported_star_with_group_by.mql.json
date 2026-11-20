@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "* cannot be used with GROUP BY, DISTINCT, HAVING or aggregate functions",
+    "offset": 7,
+    "at": "* FROM orders GROUP BY s"
+  }
+}

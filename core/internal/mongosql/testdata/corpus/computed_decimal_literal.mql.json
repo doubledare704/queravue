@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "products",
+  "pipeline": [
+    {
+      "$addFields": {
+        "scaled": {
+          "$multiply": [
+            "$price",
+            {
+              "$numberDouble": "1.5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "scaled": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").products.aggregate([{\"$addFields\":{\"scaled\":{\"$multiply\":[\"$price\",{\"$numberDouble\":\"1.5\"}]}}},{\"$project\":{\"_id\":true,\"scaled\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "price * 1.5 AS scaled FR"
+    }
+  ]
+}

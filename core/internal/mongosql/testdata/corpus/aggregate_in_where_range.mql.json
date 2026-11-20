@@ -1,0 +1,46 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "products",
+  "pipeline": [
+    {
+      "$match": {
+        "price": {
+          "$gte": {
+            "$numberInt": "10"
+          },
+          "$lte": {
+            "$numberInt": "50"
+          }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": null,
+        "mean": {
+          "$avg": "$price"
+        }
+      }
+    },
+    {
+      "$project": {
+        "mean": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").products.aggregate([{\"$match\":{\"price\":{\"$gte\":{\"$numberInt\":\"10\"},\"$lte\":{\"$numberInt\":\"50\"}}}},{\"$group\":{\"_id\":null,\"mean\":{\"$avg\":\"$price\"}}},{\"$project\":{\"mean\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "AVG(price) AS mean FROM "
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 46,
+      "at": "price BETWEEN 10 AND 50"
+    }
+  ]
+}

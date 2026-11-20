@@ -1,7 +1,7 @@
 {
   "error": {
     "kind": "UNSUPPORTED_CONSTRUCT",
-    "message": "an ORDER BY expression needs an aggregation pipeline, which SQL mode does not translate yet",
+    "message": "ORDER BY accepts fields, aliases, ordinals and aggregates; select the expression with an alias and order by that",
     "offset": 29,
     "at": "age + 1"
   }

@@ -1,8 +1,8 @@
 {
   "error": {
     "kind": "UNSUPPORTED_CONSTRUCT",
-    "message": "HAVING needs an aggregation pipeline, which SQL mode does not translate yet",
-    "offset": 21,
-    "at": "HAVING total > 5"
+    "message": "* cannot be used with GROUP BY, DISTINCT, HAVING or aggregate functions",
+    "offset": 7,
+    "at": "* FROM orders HAVING tot"
   }
 }

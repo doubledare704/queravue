@@ -1,0 +1,54 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "spent": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$sort": {
+        "_id.customer_id": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "spent": true,
+        "_id": false
+      }
+    },
+    {
+      "$skip": {
+        "$numberLong": "2"
+      }
+    },
+    {
+      "$limit": {
+        "$numberLong": "3"
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"spent\":{\"$sum\":\"$total\"}}},{\"$sort\":{\"_id.customer_id\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"spent\":true,\"_id\":false}},{\"$skip\":{\"$numberLong\":\"2\"}},{\"$limit\":{\"$numberLong\":\"3\"}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 20,
+      "at": "SUM(total) AS spent FROM"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 82,
+      "at": "customer_id LIMIT 3 OFFS"
+    }
+  ]
+}
