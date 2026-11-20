@@ -1,0 +1,69 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$lookup": {
+        "from": "order_lines",
+        "localField": "_id",
+        "foreignField": "order_id",
+        "as": "l"
+      }
+    },
+    {
+      "$unwind": "$l"
+    },
+    {
+      "$group": {
+        "_id": {
+          "c_name": "$c.name"
+        },
+        "spend": {
+          "$sum": {
+            "$multiply": [
+              "$l.price",
+              "$l.qty"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer": "$_id.c_name",
+        "spend": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$lookup\":{\"from\":\"order_lines\",\"localField\":\"_id\",\"foreignField\":\"order_id\",\"as\":\"l\"}},{\"$unwind\":\"$l\"},{\"$group\":{\"_id\":{\"c_name\":\"$c.name\"},\"spend\":{\"$sum\":{\"$multiply\":[\"$l.price\",\"$l.qty\"]}}}},{\"$project\":{\"customer\":\"$_id.c_name\",\"spend\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 27,
+      "at": "SUM(l.price * l.qty) AS "
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 31,
+      "at": "l.price * l.qty) AS spen"
+    },
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 71,
+      "at": "JOIN customers c ON o.cu"
+    }
+  ]
+}

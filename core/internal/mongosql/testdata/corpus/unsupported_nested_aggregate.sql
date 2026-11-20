@@ -1,0 +1,1 @@
+SELECT SUM(COUNT(*)) AS n FROM orders

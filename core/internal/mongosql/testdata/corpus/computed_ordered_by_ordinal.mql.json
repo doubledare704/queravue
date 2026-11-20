@@ -1,0 +1,46 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "net": {
+          "$subtract": [
+            "$total",
+            "$discount"
+          ]
+        }
+      }
+    },
+    {
+      "$sort": {
+        "net": {
+          "$numberInt": "-1"
+        },
+        "_id": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "net": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"net\":{\"$subtract\":[\"$total\",\"$discount\"]}}},{\"$sort\":{\"net\":{\"$numberInt\":\"-1\"},\"_id\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"_id\":true,\"net\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "total - discount AS net "
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 57,
+      "at": "2 DESC, 1"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "last_name": {
+          "$max": "$name"
+        }
+      }
+    },
+    {
+      "$project": {
+        "last_name": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":null,\"last_name\":{\"$max\":\"$name\"}}},{\"$project\":{\"last_name\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "MAX(name) AS last_name F"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "max_total": {
+          "$max": "$total"
+        },
+        "min_total": {
+          "$min": "$total"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "spread": {
+          "$subtract": [
+            "$max_total",
+            "$min_total"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "spread": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":null,\"max_total\":{\"$max\":\"$total\"},\"min_total\":{\"$min\":\"$total\"}}},{\"$addFields\":{\"spread\":{\"$subtract\":[\"$max_total\",\"$min_total\"]}}},{\"$project\":{\"spread\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 7,
+      "at": "MAX(total) - MIN(total) "
+    },
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "MAX(total) - MIN(total) "
+    }
+  ]
+}

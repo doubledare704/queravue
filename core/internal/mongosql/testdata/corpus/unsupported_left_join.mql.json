@@ -1,8 +1,0 @@
-{
-  "error": {
-    "kind": "UNSUPPORTED_CONSTRUCT",
-    "message": "JOIN needs an aggregation pipeline, which SQL mode does not translate yet",
-    "offset": 23,
-    "at": "LEFT OUTER JOIN customer"
-  }
-}

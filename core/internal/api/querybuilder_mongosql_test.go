@@ -42,7 +42,12 @@ func TestQueryBuilderServiceTranslateMongoSql(t *testing.T) {
 		t.Errorf("explicit database = %v, %v, want archive", explicit, err)
 	}
 
-	unsupported, err := svc.TranslateMongoSql(ctx, &queravuev1.TranslateMongoSqlRequest{SessionId: sess.ID, Sql: "SELECT * FROM a JOIN b ON a.x = b.y"})
+	aggregate, err := svc.TranslateMongoSql(ctx, &queravuev1.TranslateMongoSqlRequest{SessionId: sess.ID, Sql: "SELECT status, COUNT(*) AS n FROM orders GROUP BY status"})
+	if err != nil || aggregate.GetKind() != queravuev1.MongoSqlResultKind_MONGO_SQL_RESULT_KIND_AGGREGATE || aggregate.GetPipelineEjson() == "" {
+		t.Errorf("aggregate = %v, %v, want a pipeline", aggregate, err)
+	}
+
+	unsupported, err := svc.TranslateMongoSql(ctx, &queravuev1.TranslateMongoSqlRequest{SessionId: sess.ID, Sql: "SELECT * FROM a RIGHT JOIN b ON a.x = b.y"})
 	if err != nil {
 		t.Fatalf("TranslateMongoSql: %v", err)
 	}

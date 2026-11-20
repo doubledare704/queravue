@@ -61,6 +61,15 @@ func (t *translator) condition(e expr) (bson.D, *queravuev1.QueryBuilderError) {
 			return nil, t.notACondition(n.operand)
 		}
 		return t.condition(negated)
+	}
+	if needsExpression(e) {
+		doc, err := t.expressionCondition(e)
+		if err != nil {
+			return nil, err
+		}
+		return bson.D{{Key: "$expr", Value: doc}}, nil
+	}
+	switch n := e.(type) {
 	case comparison:
 		return t.comparisonCondition(n)
 	case inList:
@@ -82,7 +91,7 @@ func (t *translator) notACondition(e expr) *queravuev1.QueryBuilderError {
 	case aggregateCall:
 		return unsupportedError("aggregate functions in WHERE are not valid SQL; use HAVING", n.offset)
 	case arithmetic:
-		return unsupportedError("arithmetic "+needsPipeline, n.offset)
+		return unsupportedError("arithmetic is not a condition; compare it, e.g. a * b > 10", n.offset)
 	}
 	return unsupportedError("this expression is not a condition", e.pos())
 }
@@ -132,25 +141,23 @@ func mergeDisjointKeys(parts []bson.D) (bson.D, bool) {
 }
 
 func (t *translator) fieldAndValue(left, right expr, offset int) (string, any, bool, *queravuev1.QueryBuilderError) {
-	leftField, leftIsField := left.(fieldRef)
-	rightField, rightIsField := right.(fieldRef)
+	leftPath, leftIsField, err := t.pathOperand(left)
+	if err != nil {
+		return "", nil, false, err
+	}
+	rightPath, rightIsField, err := t.pathOperand(right)
+	if err != nil {
+		return "", nil, false, err
+	}
 	switch {
 	case leftIsField && rightIsField:
-		return "", nil, false, unsupportedError("comparing two fields "+needsPipeline, offset)
+		return "", nil, false, unsupportedError("comparing two fields is not supported here", offset)
 	case leftIsField:
 		value, err := t.value(right)
-		if err != nil {
-			return "", nil, false, err
-		}
-		path, err := t.fieldPath(leftField)
-		return path, value, false, err
+		return leftPath, value, false, err
 	case rightIsField:
 		value, err := t.value(left)
-		if err != nil {
-			return "", nil, false, err
-		}
-		path, err := t.fieldPath(rightField)
-		return path, value, true, err
+		return rightPath, value, true, err
 	}
 	if _, ok := left.(literal); !ok {
 		return "", nil, false, t.notAValue(left)
@@ -159,6 +166,21 @@ func (t *translator) fieldAndValue(left, right expr, offset int) (string, any, b
 		return "", nil, false, t.notAValue(right)
 	}
 	return "", nil, false, unsupportedError("a comparison needs a field on one side", offset)
+}
+
+func (t *translator) pathOperand(e expr) (string, bool, *queravuev1.QueryBuilderError) {
+	switch n := e.(type) {
+	case fieldRef:
+		path, err := t.refPath(n)
+		return path, true, err
+	case aggregateCall:
+		if !t.postGroup {
+			return "", false, unsupportedError("aggregate functions in WHERE are not valid SQL; use HAVING", n.offset)
+		}
+		name, err := t.accumulator(n, "")
+		return name, true, err
+	}
+	return "", false, nil
 }
 
 func (t *translator) value(e expr) (any, *queravuev1.QueryBuilderError) {
@@ -177,7 +199,7 @@ func (t *translator) notAValue(e expr) *queravuev1.QueryBuilderError {
 	case aggregateCall:
 		return unsupportedError("aggregate functions in WHERE are not valid SQL; use HAVING", n.offset)
 	case arithmetic:
-		return unsupportedError("arithmetic "+needsPipeline, n.offset)
+		return unsupportedError("arithmetic is not a literal value", n.offset)
 	}
 	return unsupportedError("expected a literal value", e.pos())
 }
@@ -204,14 +226,14 @@ func (t *translator) comparisonCondition(n comparison) (bson.D, *queravuev1.Quer
 }
 
 func (t *translator) operandPath(operand expr) (string, *queravuev1.QueryBuilderError) {
-	ref, ok := operand.(fieldRef)
-	if !ok {
-		if _, isLiteral := operand.(literal); isLiteral {
-			return "", unsupportedError("the left side must be a field", operand.pos())
-		}
-		return "", t.notAValue(operand)
+	path, ok, err := t.pathOperand(operand)
+	if err != nil || ok {
+		return path, err
 	}
-	return t.fieldPath(ref)
+	if _, isLiteral := operand.(literal); isLiteral {
+		return "", unsupportedError("the left side must be a field", operand.pos())
+	}
+	return "", t.notAValue(operand)
 }
 
 func (t *translator) inCondition(n inList) (bson.D, *queravuev1.QueryBuilderError) {

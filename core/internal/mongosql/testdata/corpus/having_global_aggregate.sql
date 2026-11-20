@@ -1,0 +1,1 @@
+SELECT COUNT(*) AS n FROM orders HAVING COUNT(*) > 10

@@ -1,0 +1,71 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "orders",
+        "localField": "_id",
+        "foreignField": "customer_id",
+        "as": "o"
+      }
+    },
+    {
+      "$unwind": {
+        "path": "$o",
+        "preserveNullAndEmptyArrays": true
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "_id": "$_id"
+        },
+        "orders": {
+          "$sum": {
+            "$cond": [
+              {
+                "$ne": [
+                  {
+                    "$ifNull": [
+                      "$o._id",
+                      null
+                    ]
+                  },
+                  null
+                ]
+              },
+              {
+                "$numberInt": "1"
+              },
+              {
+                "$numberInt": "0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "cid": "$_id._id",
+        "orders": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$lookup\":{\"from\":\"orders\",\"localField\":\"_id\",\"foreignField\":\"customer_id\",\"as\":\"o\"}},{\"$unwind\":{\"path\":\"$o\",\"preserveNullAndEmptyArrays\":true}},{\"$group\":{\"_id\":{\"_id\":\"$_id\"},\"orders\":{\"$sum\":{\"$cond\":[{\"$ne\":[{\"$ifNull\":[\"$o._id\",null]},null]},{\"$numberInt\":\"1\"},{\"$numberInt\":\"0\"}]}}}},{\"$project\":{\"cid\":\"$_id._id\",\"orders\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "COUNT(f) counts documents where f is neither null nor missing",
+      "offset": 21,
+      "at": "COUNT(o._id) AS orders F"
+    },
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 61,
+      "at": "LEFT JOIN orders o ON o."
+    }
+  ]
+}

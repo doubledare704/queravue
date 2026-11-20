@@ -1,0 +1,41 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "status": "paid"
+      }
+    },
+    {
+      "$addFields": {
+        "net": {
+          "$subtract": [
+            "$total",
+            "$discount"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "net": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"status\":\"paid\"}},{\"$addFields\":{\"net\":{\"$subtract\":[\"$total\",\"$discount\"]}}},{\"$project\":{\"_id\":true,\"net\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "total - discount AS net "
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 54,
+      "at": "status = 'paid'"
+    }
+  ]
+}

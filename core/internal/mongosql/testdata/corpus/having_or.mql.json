@@ -1,0 +1,66 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        },
+        "s": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$match": {
+        "$or": [
+          {
+            "n": {
+              "$numberInt": "1"
+            }
+          },
+          {
+            "s": {
+              "$gt": {
+                "$numberInt": "400"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "n": true,
+        "s": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}},\"s\":{\"$sum\":\"$total\"}}},{\"$match\":{\"$or\":[{\"n\":{\"$numberInt\":\"1\"}},{\"s\":{\"$gt\":{\"$numberInt\":\"400\"}}}]}},{\"$project\":{\"status\":\"$_id.status\",\"n\":true,\"s\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 30,
+      "at": "SUM(total) AS s FROM ord"
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 81,
+      "at": "COUNT(*) = 1 OR SUM(tota"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 97,
+      "at": "SUM(total) > 400"
+    }
+  ]
+}

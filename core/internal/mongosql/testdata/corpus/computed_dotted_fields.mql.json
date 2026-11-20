@@ -1,0 +1,31 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$addFields": {
+        "amount": {
+          "$multiply": [
+            "$pricing.unit",
+            "$qty"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "amount": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$addFields\":{\"amount\":{\"$multiply\":[\"$pricing.unit\",\"$qty\"]}}},{\"$project\":{\"amount\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 7,
+      "at": "pricing.unit * qty AS am"
+    }
+  ]
+}

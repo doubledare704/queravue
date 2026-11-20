@@ -1,0 +1,21 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"}}},{\"$project\":{\"status\":\"$_id.status\",\"_id\":false}}])"
+}

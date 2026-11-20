@@ -1,0 +1,35 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        }
+      }
+    },
+    {
+      "$sort": {
+        "_id.city": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\"}}},{\"$sort\":{\"_id.city\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"city\":\"$_id.city\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 45,
+      "at": "city"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "kinds": {
+          "$addToSet": "$status"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "kinds": {
+          "$size": {
+            "$setDifference": [
+              "$kinds",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$sort": {
+        "kinds": {
+          "$numberInt": "-1"
+        },
+        "_id.customer_id": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "kinds": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"kinds\":{\"$addToSet\":\"$status\"}}},{\"$addFields\":{\"kinds\":{\"$size\":{\"$setDifference\":[\"$kinds\",[null]]}}}},{\"$sort\":{\"kinds\":{\"$numberInt\":\"-1\"},\"_id.customer_id\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"kinds\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 94,
+      "at": "kinds DESC, customer_id"
+    }
+  ]
+}

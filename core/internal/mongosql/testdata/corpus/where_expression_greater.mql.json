@@ -1,0 +1,42 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            "$total",
+            {
+              "$multiply": [
+                "$discount",
+                {
+                  "$numberInt": "10"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[\"$total\",{\"$multiply\":[\"$discount\",{\"$numberInt\":\"10\"}]}]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 29,
+      "at": "total > discount * 10"
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 37,
+      "at": "discount * 10"
+    }
+  ]
+}

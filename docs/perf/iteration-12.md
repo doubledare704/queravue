@@ -26,4 +26,20 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 
 ### Not measured yet
 - App-side GridFS viewer RSS during 1 GiB upload/download, 32 MiB image preview peak/release, and combined idle memory after a GridFS session (PR 6).
-- SQL mode translator p50/p95 timing (PRs 1/2/4).
+- App-side SQL mode latency (editor to MQL pane, PR 4); the translator itself is in Lane T.
+
+## Lane T: SQL → MQL translator
+
+Apple M4 Pro laptop (arm64, macOS), 2026-11-20, pure translation (no I/O) of every `core/internal/mongosql/testdata/corpus` query, `BenchmarkTranslate` with 3000 passes over each group. The percentiles are per `Translate` call, from timing each call separately.
+
+```bash
+cd core && go test ./internal/mongosql -run '^$' -bench Translate -benchtime 3000x -count=1
+```
+
+| Group | Queries | p50 | p95 |
+|---|---:|---:|---:|
+| `find` (no pipeline) | 86 | 1.9 µs | 4.5 µs |
+| `aggregate` (group, aggregates, join, computed, DISTINCT) | 175 | 4.6 µs | 9.5 µs |
+| rejected (parse error or unsupported, offset reported) | 95 | 0.8 µs | 2.5 µs |
+
+Even the p95 of the pipeline group is under 10 µs, so translation is negligible next to the RPC round trip.

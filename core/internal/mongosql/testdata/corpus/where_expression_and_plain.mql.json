@@ -1,0 +1,48 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "status": "paid",
+        "$expr": {
+          "$gt": [
+            {
+              "$subtract": [
+                "$total",
+                "$discount"
+              ]
+            },
+            {
+              "$numberInt": "100"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"status\":\"paid\",\"$expr\":{\"$gt\":[{\"$subtract\":[\"$total\",\"$discount\"]},{\"$numberInt\":\"100\"}]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 29,
+      "at": "status = 'paid' AND tota"
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 49,
+      "at": "total - discount > 100"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 49,
+      "at": "total - discount > 100"
+    }
+  ]
+}

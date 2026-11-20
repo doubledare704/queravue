@@ -1,0 +1,40 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "tier": "$tier"
+        }
+      }
+    },
+    {
+      "$sort": {
+        "_id.tier": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "tier": "$_id.tier",
+        "_id": false
+      }
+    },
+    {
+      "$limit": {
+        "$numberLong": "2"
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"tier\":\"$tier\"}}},{\"$sort\":{\"_id.tier\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"tier\":\"$_id.tier\",\"_id\":false}},{\"$limit\":{\"$numberLong\":\"2\"}}])",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 45,
+      "at": "tier LIMIT 2"
+    }
+  ]
+}

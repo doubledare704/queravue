@@ -1,0 +1,43 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$match": {
+        "n": {
+          "$lte": {
+            "$numberInt": "2"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$match\":{\"n\":{\"$lte\":{\"$numberInt\":\"2\"}}}},{\"$project\":{\"status\":\"$_id.status\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 68,
+      "at": "COUNT(*) > 2"
+    }
+  ]
+}

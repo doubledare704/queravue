@@ -1,0 +1,32 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$project": {
+        "number": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$project\":{\"number\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 38,
+      "at": "JOIN \"customers\" \"c\" ON "
+    }
+  ]
+}

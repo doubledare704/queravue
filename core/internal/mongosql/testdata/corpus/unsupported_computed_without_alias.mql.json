@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "a computed column needs an alias: add AS name",
+    "offset": 7,
+    "at": "price * qty FROM order_l"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "a": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "a": true,
+        "b": "$a",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"a\":{\"$sum\":\"$total\"}}},{\"$project\":{\"status\":\"$_id.status\",\"a\":true,\"b\":\"$a\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 15,
+      "at": "SUM(total) AS a, SUM(tot"
+    }
+  ]
+}

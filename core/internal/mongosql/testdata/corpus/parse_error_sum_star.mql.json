@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "SUM(*) is not valid; only COUNT(*)",
+    "offset": 7,
+    "at": "SUM(*) FROM orders"
+  }
+}

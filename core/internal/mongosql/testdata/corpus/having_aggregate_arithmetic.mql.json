@@ -1,0 +1,63 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "sum_total": {
+          "$sum": "$total"
+        },
+        "count": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            "$sum_total",
+            {
+              "$multiply": [
+                "$count",
+                {
+                  "$numberInt": "100"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"sum_total\":{\"$sum\":\"$total\"},\"count\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$match\":{\"$expr\":{\"$gt\":[\"$sum_total\",{\"$multiply\":[\"$count\",{\"$numberInt\":\"100\"}]}]}}},{\"$project\":{\"status\":\"$_id.status\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 49,
+      "at": "SUM(total) > COUNT(*) * "
+    },
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 49,
+      "at": "SUM(total) > COUNT(*) * "
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 62,
+      "at": "COUNT(*) * 100"
+    }
+  ]
+}

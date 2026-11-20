@@ -1,0 +1,30 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            "$total",
+            "$qty"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[\"$total\",\"$qty\"]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 29,
+      "at": "total > qty"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "GROUP BY ordinal is out of range",
+    "offset": 35,
+    "at": "5"
+  }
+}

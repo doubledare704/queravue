@@ -1,0 +1,35 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "three": {
+          "$add": [
+            {
+              "$numberInt": "1"
+            },
+            {
+              "$numberInt": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "three": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"three\":{\"$add\":[{\"$numberInt\":\"1\"},{\"$numberInt\":\"2\"}]}}},{\"$project\":{\"three\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 7,
+      "at": "1 + 2 AS three FROM orde"
+    }
+  ]
+}
