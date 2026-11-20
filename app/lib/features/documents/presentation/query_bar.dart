@@ -274,13 +274,7 @@ class _DocumentQueryBarState extends ConsumerState<DocumentQueryBar> {
           if (enabled && builder.open)
             SizedBox(
               height: 300,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(12),
-                child: FilterBuilderView(
-                  key: ValueKey(builder.revision),
-                  tabId: widget.tabId,
-                ),
-              ),
+              child: FilterBuilderPanel(tabId: widget.tabId),
             ),
         ],
       ),

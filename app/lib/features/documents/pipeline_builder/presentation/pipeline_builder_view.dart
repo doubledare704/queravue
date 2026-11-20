@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/document_preview_controller.dart';
+import '../../presentation/document_preview_pane.dart';
 import '../application/pipeline_builder_controller.dart';
 import '../domain/pipeline_stage.dart';
-import 'preview_pane.dart';
 import 'stage_card.dart';
 
 Future<void> showPipelineBuilder(BuildContext context, PipelineTarget target) =>
@@ -25,6 +26,7 @@ class PipelineBuilderView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(pipelineBuilderProvider(target));
     final controller = ref.read(pipelineBuilderProvider(target).notifier);
+    final preview = ref.watch(documentPreviewProvider(target));
     final selectedIndex = state.stages.indexWhere(
       (s) => s.id == state.selectedId,
     );
@@ -62,8 +64,7 @@ class PipelineBuilderView extends ConsumerWidget {
                             index: i,
                             selected: stage.id == state.selectedId,
                             running:
-                                state.preview.phase == PreviewPhase.running &&
-                                state.preview.stageId == stage.id,
+                                preview.running && state.selectedId == stage.id,
                             fieldNames: state.fieldNames,
                             collectionNames: state.collectionNames,
                             actions: StageCardActions(
@@ -78,7 +79,9 @@ class PipelineBuilderView extends ConsumerWidget {
                               duplicate: () =>
                                   controller.duplicateStage(stage.id),
                               remove: () => controller.removeStage(stage.id),
-                              preview: () => controller.runPreview(stage.id),
+                              preview: preview.running
+                                  ? null
+                                  : () => controller.runPreview(stage.id),
                             ),
                           );
                         },
@@ -87,12 +90,15 @@ class PipelineBuilderView extends ConsumerWidget {
               const VerticalDivider(width: 1),
               Expanded(
                 flex: 2,
-                child: PreviewPane(
-                  preview: state.preview,
-                  stageNumber: selectedIndex < 0 ? null : selectedIndex + 1,
+                child: DocumentPreviewPane(
+                  previewKey: target,
+                  title: selectedIndex < 0
+                      ? 'Preview'
+                      : 'Preview after stage ${selectedIndex + 1}',
+                  idleHint:
+                      'Press play on a stage to preview the pipeline up to it.',
                   limit: state.previewLimit,
                   onLimit: controller.setPreviewLimit,
-                  onCancel: controller.cancelPreview,
                 ),
               ),
             ],

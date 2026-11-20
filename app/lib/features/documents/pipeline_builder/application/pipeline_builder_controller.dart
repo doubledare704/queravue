@@ -5,14 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../connections/application/connection_session.dart';
 import '../../../schema/data/schema_repository.dart';
-import '../../../shell/data/shell_repository.dart';
-import '../../../shell/domain/shell_models.dart';
+import '../../application/document_preview_controller.dart';
 import '../../data/document_repository.dart';
 import '../domain/pipeline_codec.dart';
 import '../domain/pipeline_stage.dart';
 import '../domain/stage_forms.dart';
-
-const int kDefaultPreviewLimit = 20;
 
 @immutable
 class PipelineTarget {
@@ -37,29 +34,11 @@ class PipelineTarget {
   int get hashCode => Object.hash(connectionId, database, collection);
 }
 
-enum PreviewPhase { idle, running, done, failed }
-
-@immutable
-class StagePreview {
-  const StagePreview({
-    this.phase = PreviewPhase.idle,
-    this.stageId,
-    this.documents = const [],
-    this.error,
-  });
-
-  final PreviewPhase phase;
-  final int? stageId;
-  final List<String> documents;
-  final String? error;
-}
-
 @immutable
 class PipelineBuilderState {
   const PipelineBuilderState({
     this.stages = const [],
     this.selectedId,
-    this.preview = const StagePreview(),
     this.previewLimit = kDefaultPreviewLimit,
     this.fieldNames = const [],
     this.collectionNames = const [],
@@ -68,7 +47,6 @@ class PipelineBuilderState {
 
   final List<PipelineStage> stages;
   final int? selectedId;
-  final StagePreview preview;
   final int previewLimit;
   final List<String> fieldNames;
   final List<String> collectionNames;
@@ -78,7 +56,6 @@ class PipelineBuilderState {
     List<PipelineStage>? stages,
     int? selectedId,
     bool clearSelection = false,
-    StagePreview? preview,
     int? previewLimit,
     List<String>? fieldNames,
     List<String>? collectionNames,
@@ -87,7 +64,6 @@ class PipelineBuilderState {
   }) => PipelineBuilderState(
     stages: stages ?? this.stages,
     selectedId: clearSelection ? null : (selectedId ?? this.selectedId),
-    preview: preview ?? this.preview,
     previewLimit: previewLimit ?? this.previewLimit,
     fieldNames: fieldNames ?? this.fieldNames,
     collectionNames: collectionNames ?? this.collectionNames,
@@ -107,22 +83,13 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
 
   final PipelineTarget target;
 
-  StreamSubscription<Object?>? _previewSub;
-  String? _shellId;
   String? _sessionId;
-  int _previewEpoch = 0;
-  Completer<void>? _previewWaiting;
 
-  ShellRepository get _shell => ref.read(shellRepositoryProvider);
+  DocumentPreviewController get _preview =>
+      ref.read(documentPreviewProvider(target).notifier);
 
   @override
   PipelineBuilderState build() {
-    final shell = ref.read(shellRepositoryProvider);
-    ref.onDispose(() {
-      unawaited(_previewSub?.cancel());
-      final id = _shellId;
-      if (id != null) unawaited(shell.closeShell(id).catchError((_) {}));
-    });
     unawaited(Future.microtask(_loadSuggestions));
     return const PipelineBuilderState();
   }
@@ -172,11 +139,11 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
   }
 
   void _setStages(List<PipelineStage> stages, {int? select}) {
+    _preview.reset();
     state = state.copyWith(
       stages: stages,
       selectedId: select,
       clearNotice: true,
-      preview: const StagePreview(),
     );
   }
 
@@ -192,10 +159,10 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
 
   void removeStage(int id) {
     final stages = [...state.stages]..removeWhere((s) => s.id == id);
+    _preview.reset();
     state = state.copyWith(
       stages: stages,
       clearSelection: state.selectedId == id,
-      preview: const StagePreview(),
       clearNotice: true,
     );
   }
@@ -246,7 +213,11 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
     _setStages(stages, select: state.selectedId);
   }
 
-  void select(int id) => state = state.copyWith(selectedId: id);
+  void select(int id) {
+    if (state.selectedId == id) return;
+    _preview.reset();
+    state = state.copyWith(selectedId: id);
+  }
 
   void setPreviewLimit(int limit) =>
       state = state.copyWith(previewLimit: limit.clamp(1, 1000));
@@ -256,11 +227,8 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
     if (i < 0) return;
     final stages = [...state.stages];
     stages[i] = change(stages[i]);
-    state = state.copyWith(
-      stages: stages,
-      preview: const StagePreview(),
-      clearNotice: true,
-    );
+    _preview.reset();
+    state = state.copyWith(stages: stages, clearNotice: true);
   }
 
   String exportJson() => pipelineToJson(state.stages);
@@ -298,87 +266,23 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
   }
 
   Future<void> runPreview(int id) async {
+    if (ref.read(documentPreviewProvider(target)).running) return;
+    select(id);
     final stages = stagesUpTo(id);
     final problem = _previewProblem(stages);
     if (problem != null) {
-      state = state.copyWith(
-        selectedId: id,
-        preview: StagePreview(
-          phase: PreviewPhase.failed,
-          stageId: id,
-          error: problem,
-        ),
-      );
+      _preview.fail(problem);
       return;
     }
-    await cancelPreview();
-    final epoch = ++_previewEpoch;
-    state = state.copyWith(
-      selectedId: id,
-      preview: StagePreview(phase: PreviewPhase.running, stageId: id),
+    await _preview.runShell(
+      connect: _session,
+      database: target.database,
+      limit: state.previewLimit,
+      code: (limit) => pipelineToShell(target.collection, [
+        ...stages,
+        PipelineStage.of(r'$limit', limit),
+      ]),
     );
-    final limited = [
-      ...stages,
-      PipelineStage.of(r'$limit', state.previewLimit),
-    ];
-    final code = pipelineToShell(target.collection, limited);
-    final shellId = await _ensureShell();
-    if (shellId == null) {
-      _finishPreview(
-        epoch,
-        id,
-        error: 'Cannot start a shell on this connection.',
-      );
-      return;
-    }
-    if (epoch != _previewEpoch || !ref.mounted) return;
-    final done = _previewWaiting = Completer<void>();
-    final documents = <String>[];
-    String? error;
-    CursorHandle? cursor;
-    _previewSub = _shell
-        .eval(shellId, code)
-        .listen(
-          (e) {
-            if (e is ShellCursorEvent) cursor = e.handle;
-            if (e is ShellErrorEvent) error = e.failure.message;
-          },
-          onError: (Object e) {
-            error = '$e';
-            if (!done.isCompleted) done.complete();
-          },
-          onDone: () {
-            if (!done.isCompleted) done.complete();
-          },
-        );
-    await done.future;
-    if (epoch != _previewEpoch || !ref.mounted) return;
-    final handle = cursor;
-    if (error == null && handle != null) {
-      try {
-        final fetch = _shell.fetchCursor(
-          shellId,
-          handle.cursorId,
-          limit: state.previewLimit,
-        );
-        final completer = _previewWaiting = Completer<void>();
-        _previewSub = fetch.listen(
-          (batch) => documents.addAll(batch.documents),
-          onError: (Object e) {
-            error = '$e';
-            if (!completer.isCompleted) completer.complete();
-          },
-          onDone: () {
-            if (!completer.isCompleted) completer.complete();
-          },
-        );
-        await completer.future;
-      } on Object catch (e) {
-        error = '$e';
-      }
-    }
-    if (epoch != _previewEpoch || !ref.mounted) return;
-    _finishPreview(epoch, id, documents: documents, error: error);
   }
 
   String? _previewProblem(List<PipelineStage> stages) {
@@ -389,54 +293,5 @@ class PipelineBuilderController extends Notifier<PipelineBuilderState> {
       return 'A stage before this one is not valid JSON. Fix or disable it first.';
     }
     return null;
-  }
-
-  void _finishPreview(
-    int epoch,
-    int id, {
-    List<String> documents = const [],
-    String? error,
-  }) {
-    if (epoch != _previewEpoch || !ref.mounted) return;
-    _previewSub = null;
-    state = state.copyWith(
-      preview: StagePreview(
-        phase: error == null ? PreviewPhase.done : PreviewPhase.failed,
-        stageId: id,
-        documents: documents,
-        error: error,
-      ),
-    );
-  }
-
-  Future<void> cancelPreview() async {
-    _previewEpoch++;
-    final sub = _previewSub;
-    _previewSub = null;
-    await sub?.cancel();
-    final waiting = _previewWaiting;
-    if (waiting != null && !waiting.isCompleted) waiting.complete();
-    final shellId = _shellId;
-    if (shellId != null && state.preview.phase == PreviewPhase.running) {
-      unawaited(_shell.cancel(shellId).catchError((_) {}));
-      state = state.copyWith(preview: const StagePreview());
-    }
-  }
-
-  Future<String?> _ensureShell() async {
-    final existing = _shellId;
-    if (existing != null) return existing;
-    final session = await _session();
-    if (session == null || !ref.mounted) return null;
-    try {
-      final id = await _shell.openShell(session, target.database);
-      if (!ref.mounted) {
-        unawaited(_shell.closeShell(id).catchError((_) {}));
-        return null;
-      }
-      return _shellId = id;
-    } on Object {
-      return null;
-    }
   }
 }

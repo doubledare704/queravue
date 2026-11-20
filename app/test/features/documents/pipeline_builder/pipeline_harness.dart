@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:queravue/features/documents/application/document_preview_controller.dart';
 import 'package:queravue/features/documents/pipeline_builder/application/pipeline_builder_controller.dart';
 import 'package:queravue/features/schema/data/schema_repository.dart';
 import 'package:queravue/features/shell/data/shell_repository.dart';
@@ -44,6 +45,9 @@ class PipelineHarness {
 
   PipelineBuilderState get state =>
       container.read(pipelineBuilderProvider(pipelineTarget));
+
+  DocumentPreviewState get preview =>
+      container.read(documentPreviewProvider(pipelineTarget));
 
   void queueCursor() =>
       shell.scripts.add([aggregateCursor, const ShellDone(Duration.zero)]);

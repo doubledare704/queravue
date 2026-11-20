@@ -27,7 +27,7 @@ class StageCardActions {
   final ValueChanged<String> setRawText;
   final VoidCallback duplicate;
   final VoidCallback remove;
-  final VoidCallback preview;
+  final VoidCallback? preview;
 }
 
 class StageCard extends StatelessWidget {
