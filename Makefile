@@ -7,7 +7,7 @@ COMPOSE    := docker compose -f dev/docker-compose.yml
 DART_FILES  = $(shell find app/lib app/test app/integration_test app/test_driver -name '*.dart' -not -path '*/gen/*')
 
 .DEFAULT_GOAL := help
-.PHONY: test-perf-completion help proto core core-duckdb test-core-duckdb lint-core-duckdb app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-design test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
+.PHONY: perf-idle-release test-perf-completion help proto core core-duckdb test-core-duckdb lint-core-duckdb app-run test test-core test-app test-integration test-e2e test-e2e-mongo test-e2e-shell test-e2e-designer test-e2e-designer-postgres test-e2e-diagram-design test-e2e-panels test-perf lint lint-proto lint-core lint-app db-up db-down db-only test-docdb test-cosmos seed-sqlite
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,6 +74,9 @@ test-perf-diagram: core ## Diagram budget: open, pan and zoom the 500-table sche
 
 test-perf: db-up core ## Grid perf budget: 1M rows through the real core and Postgres (profile build)
 	cd app && QUERAVUE_E2E=1 flutter drive --profile -d macos --driver=test_driver/perf_driver.dart --target=integration_test/grid_perf_test.dart
+
+perf-idle-release: ## App memory on a macOS release build with the real core and docker Mongo (seeded)
+	dev/perf-release-app.sh
 
 lint: lint-proto lint-core lint-app ## Run all linters
 

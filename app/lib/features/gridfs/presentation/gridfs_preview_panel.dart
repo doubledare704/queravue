@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -105,14 +106,14 @@ class GridFsPreviewPanel extends StatelessWidget {
           line: (i) => _hexLine(preview.bytes!, i),
         ),
         GridFsPreviewKind.image => _PreviewImage(
-          key: ObjectKey(preview.bytes),
-          bytes: preview.bytes!,
+          key: ObjectKey(preview.file),
+          file: preview.file!,
         ),
         GridFsPreviewKind.pdf => Center(
           child: OutlinedButton.icon(
             onPressed: () async {
               try {
-                await previewer.open(preview.bytes!);
+                await previewer.open(preview.file!);
               } on Object catch (error) {
                 if (context.mounted) {
                   ScaffoldMessenger.maybeOf(context)
@@ -160,9 +161,9 @@ class _PreviewLines extends StatelessWidget {
 }
 
 class _PreviewImage extends StatefulWidget {
-  const _PreviewImage({super.key, required this.bytes});
+  const _PreviewImage({super.key, required this.file});
 
-  final Uint8List bytes;
+  final File file;
 
   @override
   State<_PreviewImage> createState() => _PreviewImageState();
@@ -173,7 +174,7 @@ class _PreviewImageState extends State<_PreviewImage> {
   ImageProvider<Object>? _imageProvider;
 
   Future<({int? width, int? height})> _readDimensions() async {
-    final buffer = await ui.ImmutableBuffer.fromUint8List(widget.bytes);
+    final buffer = await ui.ImmutableBuffer.fromFilePath(widget.file.path);
     try {
       final descriptor = await ui.ImageDescriptor.encoded(buffer);
       try {
@@ -209,8 +210,8 @@ class _PreviewImageState extends State<_PreviewImage> {
       }
       final size = snapshot.data;
       if (size == null) return const Center(child: CircularProgressIndicator());
-      final image = Image.memory(
-        widget.bytes,
+      final image = Image.file(
+        widget.file,
         fit: BoxFit.contain,
         cacheWidth: size.width,
         cacheHeight: size.height,

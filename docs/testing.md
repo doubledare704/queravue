@@ -27,3 +27,6 @@ Still seen once, before the window joined every Space: a few panel runs took 1 t
 - `pumpAndSettle` does not wait for calls to the core: it returns as soon as no frame is scheduled. Wait for those explicitly:
   - when the result shows in the UI, use a per-file `_pumpUntil` with a condition on providers or widgets;
   - when only the core knows it, use `pumpUntilServer` with an async check.
+
+## Release-build memory
+`make perf-idle-release` builds the macOS release app with `app/perf/release_memory_main.dart`, runs a scripted scenario against the real core and the seeded docker Mongo (idle, connection, GridFS preview and transfers, SQL mode tab) and prints app and core RSS and footprint per checkpoint. Read footprint, not RSS: see `docs/perf/iteration-12.md`.

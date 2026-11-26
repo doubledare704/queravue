@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:queravue/features/connections/domain/cancellation.dart';
 import 'package:queravue/features/gridfs/application/gridfs_controller.dart';
 import 'package:queravue/features/gridfs/application/gridfs_preview.dart';
+import 'package:queravue/features/gridfs/data/gridfs_preview_files.dart';
 import 'package:queravue/features/gridfs/data/gridfs_repository.dart';
 import 'package:queravue/features/gridfs/domain/gridfs_models.dart';
 
@@ -22,6 +23,23 @@ GridFsEntry _entry(String id, {int length = 0, String contentType = ''}) =>
       contentType: contentType,
       uploadDate: DateTime.utc(2026),
     );
+
+class _RecordingPreviewFiles extends GridFsPreviewFiles {
+  final live = <String>{};
+
+  @override
+  Future<File> create(String name) async {
+    final file = await super.create(name);
+    live.add(file.path);
+    return file;
+  }
+
+  @override
+  Future<void> delete(File file) {
+    live.remove(file.path);
+    return super.delete(file);
+  }
+}
 
 class _Repository extends Fake implements GridFsRepository {
   final queries = <({int skip, int limit, String filter, String sort})>[];
@@ -102,15 +120,18 @@ class _Repository extends Fake implements GridFsRepository {
 
 void main() {
   late _Repository repository;
+  late _RecordingPreviewFiles previewFiles;
   late ProviderContainer container;
   late GridFsController controller;
   GridFsState state() => container.read(_provider('tab'));
 
   setUp(() async {
     repository = _Repository();
+    previewFiles = _RecordingPreviewFiles();
     container = ProviderContainer.test(
       overrides: [
         gridFsRepositoryProvider.overrideWithValue(repository),
+        gridFsPreviewFilesProvider.overrideWithValue(previewFiles),
         gridFsTargetProvider('tab').overrideWithValue(_target),
       ],
     );
@@ -196,6 +217,42 @@ void main() {
     expect(repository.ranges.single, (offset: 0, length: 512));
     expect(state().selection?.preview?.kind, GridFsPreviewKind.pdf);
     expect(state().selection?.preview?.tooLarge, isTrue);
+  });
+
+  test(
+    'image preview lives in a temp file that selection change deletes',
+    () async {
+      final image = _entry('png', length: 600, contentType: 'image/png');
+      repository.bytes[image.id] = List.generate(600, (i) => i % 251);
+      await controller.select(image);
+      final preview = state().selection!.preview!;
+      expect(preview.kind, GridFsPreviewKind.image);
+      expect(preview.bytes, isNull);
+      expect(await preview.file!.readAsBytes(), repository.bytes[image.id]);
+      await controller.select(null);
+      expect(preview.file!.existsSync(), isFalse);
+    },
+  );
+
+  test('PDF preview files stay until the tab closes', () async {
+    final pdf = _entry('pdf', length: 8, contentType: 'application/pdf');
+    repository.bytes[pdf.id] = '%PDF-1.4'.codeUnits;
+    await controller.select(pdf);
+    final file = state().selection!.preview!.file!;
+    expect(file.path, endsWith('preview.pdf'));
+    await controller.select(null);
+    expect(file.existsSync(), isTrue);
+    container.dispose();
+    await pumpEventQueue();
+    expect(file.existsSync(), isFalse);
+  });
+
+  test('a failed image download leaves no temp file behind', () async {
+    final image = _entry('short', length: 600, contentType: 'image/png');
+    repository.bytes[image.id] = List.filled(10, 1);
+    await controller.select(image);
+    expect(state().selection?.error, isNotNull);
+    expect(previewFiles.live, isEmpty);
   });
 
   test('sniffing recognizes supported image signatures', () {

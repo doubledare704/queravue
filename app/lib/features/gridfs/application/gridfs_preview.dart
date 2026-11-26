@@ -1,20 +1,23 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import '../../connections/domain/cancellation.dart';
+import '../data/gridfs_preview_files.dart';
 import '../data/gridfs_repository.dart';
 import '../domain/gridfs_models.dart';
 
 enum GridFsPreviewKind { text, hex, image, pdf }
 
 class GridFsPreview {
-  const GridFsPreview(this.kind, {this.lines, this.bytes});
+  const GridFsPreview(this.kind, {this.lines, this.bytes, this.file});
 
   final GridFsPreviewKind kind;
   final List<String>? lines;
   final Uint8List? bytes;
+  final File? file;
 
-  bool get tooLarge => lines == null && bytes == null;
+  bool get tooLarge => lines == null && bytes == null && file == null;
 }
 
 Future<GridFsPreview> loadGridFsPreview(
@@ -22,6 +25,7 @@ Future<GridFsPreview> loadGridFsPreview(
   GridFsTarget target,
   GridFsEntry file,
   CancellationToken cancel,
+  GridFsPreviewFiles files,
 ) async {
   var kind = _declaredType(file.contentType);
   Uint8List? prefix;
@@ -34,6 +38,18 @@ Future<GridFsPreview> loadGridFsPreview(
     GridFsPreviewKind.text || GridFsPreviewKind.hex => gridFsChunkBytes,
   };
   if (file.length > cap) return GridFsPreview(kind);
+  if (kind == GridFsPreviewKind.image || kind == GridFsPreviewKind.pdf) {
+    final preview = await _downloadToFile(
+      repository,
+      target,
+      file,
+      cancel,
+      files,
+      kind == GridFsPreviewKind.pdf ? 'preview.pdf' : 'preview',
+      prefix,
+    );
+    return GridFsPreview(kind, file: preview);
+  }
   final remaining = file.length - (prefix?.length ?? 0);
   final bytes = remaining == 0 && prefix != null
       ? prefix
@@ -54,6 +70,58 @@ Future<GridFsPreview> loadGridFsPreview(
     }
   }
   return GridFsPreview(kind, bytes: bytes);
+}
+
+Future<File> _downloadToFile(
+  GridFsRepository repository,
+  GridFsTarget target,
+  GridFsEntry file,
+  CancellationToken cancel,
+  GridFsPreviewFiles files,
+  String name,
+  Uint8List? prefix,
+) async {
+  final destination = await files.create(name);
+  try {
+    final output = await destination.open(mode: FileMode.write);
+    var written = 0;
+    try {
+      if (prefix != null) {
+        await output.writeFrom(prefix);
+        written = prefix.length;
+      }
+      if (written < file.length) {
+        await for (final chunk in repository.download(
+          target,
+          file.id,
+          cancel: cancel,
+          offset: written,
+          length: file.length - written,
+        )) {
+          if (written + chunk.length > file.length) {
+            throw const GridFsFailure(
+              GridFsFailureKind.corrupt,
+              'Preview exceeds its requested range',
+            );
+          }
+          await output.writeFrom(chunk);
+          written += chunk.length;
+        }
+      }
+    } finally {
+      await output.close();
+    }
+    if (written != file.length) {
+      throw const GridFsFailure(
+        GridFsFailureKind.corrupt,
+        'Incomplete preview',
+      );
+    }
+    return destination;
+  } on Object {
+    await files.delete(destination);
+    rethrow;
+  }
 }
 
 Future<Uint8List> _readRange(

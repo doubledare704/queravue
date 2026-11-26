@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,13 +10,10 @@ import 'package:queravue/features/gridfs/presentation/gridfs_file_list.dart';
 import 'package:queravue/features/gridfs/presentation/gridfs_preview_panel.dart';
 
 class _PdfViewer implements PdfPreviewer {
-  Uint8List? opened;
+  File? opened;
 
   @override
-  Future<void> open(Uint8List bytes) async => opened = bytes;
-
-  @override
-  Future<void> dispose() async {}
+  Future<void> open(File pdf) async => opened = pdf;
 }
 
 final _file = GridFsEntry(
@@ -118,13 +117,13 @@ void main() {
 
   testWidgets('PDF preview delegates to the selected viewer', (tester) async {
     final viewer = _PdfViewer();
-    final bytes = Uint8List.fromList('%PDF-1.4'.codeUnits);
+    final pdf = File('preview.pdf');
     await tester.pumpWidget(
       _surface(
         GridFsPreviewPanel(
           selection: (
             file: _file,
-            preview: GridFsPreview(GridFsPreviewKind.pdf, bytes: bytes),
+            preview: GridFsPreview(GridFsPreviewKind.pdf, file: pdf),
             error: null,
           ),
           previewer: viewer,
@@ -132,6 +131,6 @@ void main() {
       ),
     );
     await tester.tap(find.text('Open PDF'));
-    expect(viewer.opened, same(bytes));
+    expect(viewer.opened, same(pdf));
   });
 }
