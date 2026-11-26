@@ -6,7 +6,7 @@ Apple M4 Pro laptop (arm64, macOS), 2026-11-19, `mongo:8.0.34` single-node repli
 
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
-cd core && go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
+cd core && GRIDFS_MEMORY_PERF=1 go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
 ```
 
 ### 1 GiB round-trip (`TestIntegrationGridFS1GiBRoundTripMemory`)
@@ -22,7 +22,34 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 
 ### Reading the numbers
 - **Flat live heap:** Every 128 MiB checkpoint across the 1 GiB stream stays at `17.5 MiB` on upload (`uploadBufferSize = 16 MiB` inside `mongo.GridFSUploadStream`) and `17.1 MiB` on download (one driver cursor batch buffer), returning to `0.6–0.7 MiB` after completion.
-- **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire compression buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
+- **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire-message copy buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
+
+## Core memory after transfers
+
+Apple M4 Pro, macOS, Go 1.27.4, MongoDB 8.0.34. The same direct-engine test, with SHA-256 and two forced GCs at each 128 MiB checkpoint, measured:
+
+| Implementation | Upload MiB/s | Download MiB/s | Upload RSS peak | RSS 20 s after disconnect | Upload / download peak live heap |
+|---|---:|---:|---:|---:|---:|
+| Before | 504.5 | 1084.0 | 192.8 MiB | 193.8 MiB | 17.5 / 17.1 MiB |
+| Delayed release, run 1 | 528.3 | 1036.9 | 220.8 MiB | 110.7 MiB | 17.5 / 17.1 MiB |
+| Delayed release, run 2 | 507.1 | 925.7 | 226.1 MiB | 19.5 MiB | 17.5 / 17.1 MiB |
+| Delayed release, strict run 3 | 503.8 | 1073.8 | 198.7 MiB | 199.2 MiB | 17.5 / 17.1 MiB |
+
+Baseline RSS was 17.7–17.8 MiB. macOS RSS remained highly variable: two runs still exceeded the 60 MiB target after release. The application-side 1 GiB gRPC round trip and other platforms have not been remeasured; the combined 150 MB budget is not established. The test measures the Mongo connection directly, not the sidecar process or gRPC buffers, and may fail the 60 MiB margin on macOS even when Go reports that it released the pages.
+
+The runtime reported 173.5 MiB released and 7.7 MiB free immediately after the original download, with 0.7 MiB heap objects; after disconnect it reported 175.9 MiB released, 4.5 MiB free, 1.4 MiB objects, 0.8 MiB heap stacks, 0.2 MiB mspan in use, and 22 goroutines (29 while connected). Go marks unused macOS pages reusable using `MADV_FREE_REUSABLE`; this is not equivalent to an immediate fall in `ps` RSS. The driver closes its pool on connection close. These measurements do not establish whether any small buffers or goroutines remain, but they rule out live Go heap, stacks and mspan accounting for the observed hundreds of MiB.
+
+Sampled allocation profiles show the driver's 16 MiB upload stream, BSON/InsertMany batch construction, the wire-message copy and download cursor reads. The URI builder does not enable compression: the driver's `CompressWireMessage` no-op branch still copies the uncompressed message. Thus the earlier attribution to compression is incorrect for this connection. The 48 MiB gRPC setting is a message limit, not evidence of a preallocated 48 MiB buffer; the direct-engine measurement excludes gRPC entirely. Its contribution to the app measurement remains unmeasured. The gRPC download currently copies each chunk; reusing it safely would require verifying gRPC message lifetime, so it was not changed.
+
+Transfers of at least 32 MiB schedule `debug.FreeOSMemory` five seconds after the last such transfer. This preserves the driver's batching but triggers a process-wide GC and scavenging, potentially increasing CPU use or latency in concurrent work and making a later transfer reacquire memory. The delay coalesces nearby transfers; it cannot guarantee an RSS drop on macOS or prevent scavenging during an unrelated operation. No global memory limit is imposed. Changing the driver's hard-coded buffer would require a driver change or a replacement GridFS implementation with interoperability and cancellation testing.
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait mongo
+cd core
+GRIDFS_MEMORY_PERF=1 GRIDFS_PROFILE_DIR=/tmp go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
+```
+
+The optional profile directory receives human-readable `heap.txt` and `allocs.txt` pprof snapshots. The RSS assertion is intentionally strict; the latest run failed on macOS with 199.2 MiB RSS after disconnect, despite 179.8 MiB reported released. This remains a blocker to claiming the memory target.
 
 ## Lane G: app (profile build)
 

@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"runtime/metrics"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,11 +30,12 @@ import (
 func scratchBucket(t *testing.T, c *Conn) string {
 	t.Helper()
 	name := fmt.Sprintf("gfs_%d", time.Now().UnixNano())
+	client := c.client
 	t.Cleanup(func() {
 		dctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		_ = c.client.Database("queravue").Collection(name + ".files").Drop(dctx)
-		_ = c.client.Database("queravue").Collection(name + ".chunks").Drop(dctx)
+		_ = client.Database("queravue").Collection(name + ".files").Drop(dctx)
+		_ = client.Database("queravue").Collection(name + ".chunks").Drop(dctx)
 	})
 	return name
 }
@@ -580,8 +583,8 @@ func processRSSBytes() uint64 {
 }
 
 func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping 1 GiB round-trip in -short mode")
+	if testing.Short() || os.Getenv("GRIDFS_MEMORY_PERF") == "" {
+		t.Skip("set GRIDFS_MEMORY_PERF=1 to run the 1 GiB memory test")
 	}
 	c := connect(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -601,6 +604,13 @@ func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
 	var base runtime.MemStats
 	runtime.ReadMemStats(&base)
 	baseRSS := processRSSBytes()
+	logMemory := func(label string) {
+		t.Helper()
+		samples := []metrics.Sample{{Name: "/memory/classes/heap/free:bytes"}, {Name: "/memory/classes/heap/released:bytes"}, {Name: "/memory/classes/heap/objects:bytes"}, {Name: "/memory/classes/heap/stacks:bytes"}, {Name: "/memory/classes/metadata/mspan/inuse:bytes"}, {Name: "/sched/goroutines:goroutines"}}
+		metrics.Read(samples)
+		t.Logf("%s: rss=%.1f MiB heap free=%.1f released=%.1f objects=%.1f stacks=%.1f mspan=%.1f MiB goroutines=%d", label, float64(processRSSBytes())/(1<<20), float64(samples[0].Value.Uint64())/(1<<20), float64(samples[1].Value.Uint64())/(1<<20), float64(samples[2].Value.Uint64())/(1<<20), float64(samples[3].Value.Uint64())/(1<<20), float64(samples[4].Value.Uint64())/(1<<20), samples[5].Value.Uint64())
+	}
+	logMemory("baseline")
 
 	var upLivePeak, upRawPeak, upRSSPeak uint64
 	var upSamples []uint64
@@ -684,6 +694,40 @@ func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
 	var postDL runtime.MemStats
 	runtime.ReadMemStats(&postDL)
 	postDLRSS := processRSSBytes()
+	logMemory("after download")
+	if profileDir := os.Getenv("GRIDFS_PROFILE_DIR"); profileDir != "" {
+		for _, name := range []string{"heap", "allocs"} {
+			f, err := os.Create(profileDir + "/" + name + ".txt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := pprof.Lookup(name).WriteTo(f, 1); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := c.client.Database("queravue").Collection(bucket + ".files").Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.client.Database("queravue").Collection(bucket + ".chunks").Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Second)
+	logMemory("20 seconds after disconnect")
+	idleRSS := processRSSBytes()
+	if idleRSS == 0 || baseRSS == 0 {
+		t.Fatal("RSS measurement unavailable")
+	}
+	margin := uint64(60 << 20)
+	if idleRSS > baseRSS+margin {
+		t.Errorf("idle RSS %.1f MiB exceeds baseline %.1f MiB by more than the platform margin", float64(idleRSS)/(1<<20), float64(baseRSS)/(1<<20))
+	}
 
 	if dlTotal != totalBytes {
 		t.Fatalf("downloaded %d bytes, want %d", dlTotal, totalBytes)

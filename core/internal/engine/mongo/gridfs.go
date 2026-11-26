@@ -444,10 +444,12 @@ type downloadStreamReader struct {
 	ds        *mongo.GridFSDownloadStream
 	closeOnce sync.Once
 	closeErr  error
+	readBytes int64
 }
 
 func (r *downloadStreamReader) Read(p []byte) (int, error) {
 	n, err := r.ds.Read(p)
+	r.readBytes += int64(n)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return n, r.conn.classifyDownloadErr(err)
 	}
@@ -456,6 +458,9 @@ func (r *downloadStreamReader) Read(p []byte) (int, error) {
 
 func (r *downloadStreamReader) Close() error {
 	r.closeOnce.Do(func() {
+		if r.readBytes >= reclaimTransferThreshold {
+			scheduleMemoryRelease()
+		}
 		if err := r.ds.Close(); err != nil && !errors.Is(err, mongo.ErrStreamClosed) {
 			r.closeErr = r.conn.fail("download", err)
 		}
@@ -478,6 +483,7 @@ type rangeDownloadReader struct {
 	done          bool
 	closed        bool
 	closeOnce     sync.Once
+	readBytes     int64
 }
 
 func (r *rangeDownloadReader) Read(p []byte) (int, error) {
@@ -503,6 +509,7 @@ func (r *rangeDownloadReader) Read(p []byte) (int, error) {
 		}
 		n := copy(p[bytesCopied:], r.buf[r.bufStart:r.bufEnd])
 		bytesCopied += n
+		r.readBytes += int64(n)
 		r.bufStart += n
 	}
 	return bytesCopied, nil
@@ -566,6 +573,9 @@ func (r *rangeDownloadReader) fillBuffer() error {
 func (r *rangeDownloadReader) Close() error {
 	r.closeOnce.Do(func() {
 		r.closed = true
+		if r.readBytes >= reclaimTransferThreshold {
+			scheduleMemoryRelease()
+		}
 		if r.cur != nil {
 			closeCursor(r.cur)
 		}
@@ -628,6 +638,12 @@ func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (
 		}
 	}
 
+	var transferred int64
+	defer func() {
+		if transferred >= reclaimTransferThreshold {
+			scheduleMemoryRelease()
+		}
+	}()
 	buf := make([]byte, gridfsUploadCopyBuf)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -636,6 +652,7 @@ func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (
 		}
 		n, rerr := r.Read(buf)
 		if n > 0 {
+			transferred += int64(n)
 			if _, werr := us.Write(buf[:n]); werr != nil {
 				abort(false)
 				return engine.GridFSFile{}, c.fail("upload", werr)
