@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "ON refers to \"c\", which is joined later",
+    "offset": 32,
+    "at": "c.y JOIN c ON c.z = b.w"
+  }
+}

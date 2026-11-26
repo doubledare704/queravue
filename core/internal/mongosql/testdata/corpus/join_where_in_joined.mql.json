@@ -1,0 +1,47 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$match": {
+        "c.city": {
+          "$in": [
+            "Kyiv",
+            "Lviv"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$match\":{\"c.city\":{\"$in\":[\"Kyiv\",\"Lviv\"]}}},{\"$project\":{\"order_id\":\"$_id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 39,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 87,
+      "at": "c.city IN ('Kyiv', 'Lviv"
+    }
+  ]
+}

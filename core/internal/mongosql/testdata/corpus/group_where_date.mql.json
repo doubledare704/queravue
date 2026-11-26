@@ -1,0 +1,45 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "created": {
+          "$gte": {
+            "$date": {
+              "$numberLong": "1704067200000"
+            }
+          }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"created\":{\"$gte\":{\"$date\":{\"$numberLong\":\"1704067200000\"}}}}},{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$project\":{\"status\":\"$_id.status\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 47,
+      "at": "created >= DATE '2024-01"
+    }
+  ]
+}

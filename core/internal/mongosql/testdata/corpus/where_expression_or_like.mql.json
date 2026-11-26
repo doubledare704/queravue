@@ -1,0 +1,54 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$match": {
+        "$or": [
+          {
+            "$expr": {
+              "$gt": [
+                {
+                  "$multiply": [
+                    "$price",
+                    "$qty"
+                  ]
+                },
+                {
+                  "$numberInt": "100"
+                }
+              ]
+            }
+          },
+          {
+            "name": {
+              "$regularExpression": {
+                "pattern": "^a",
+                "options": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$match\":{\"$or\":[{\"$expr\":{\"$gt\":[{\"$multiply\":[\"$price\",\"$qty\"]},{\"$numberInt\":\"100\"}]}},{\"name\":{\"$regularExpression\":{\"pattern\":\"^a\",\"options\":\"\"}}}]}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 32,
+      "at": "price * qty > 100 OR nam"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 32,
+      "at": "price * qty > 100 OR nam"
+    },
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 53,
+      "at": "name LIKE 'a%'"
+    }
+  ]
+}

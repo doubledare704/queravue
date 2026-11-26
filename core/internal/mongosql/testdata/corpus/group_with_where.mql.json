@@ -1,0 +1,46 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "total": {
+          "$gt": {
+            "$numberInt": "50"
+          }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "s": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "s": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"total\":{\"$gt\":{\"$numberInt\":\"50\"}}}},{\"$group\":{\"_id\":{\"status\":\"$status\"},\"s\":{\"$sum\":\"$total\"}}},{\"$project\":{\"status\":\"$_id.status\",\"s\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 15,
+      "at": "SUM(total) AS s FROM ord"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 49,
+      "at": "total > 50 GROUP BY stat"
+    }
+  ]
+}

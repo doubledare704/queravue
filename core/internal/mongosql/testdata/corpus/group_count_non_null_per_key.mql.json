@@ -1,0 +1,52 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "noted": {
+          "$sum": {
+            "$cond": [
+              {
+                "$ne": [
+                  {
+                    "$ifNull": [
+                      "$note",
+                      null
+                    ]
+                  },
+                  null
+                ]
+              },
+              {
+                "$numberInt": "1"
+              },
+              {
+                "$numberInt": "0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "noted": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"noted\":{\"$sum\":{\"$cond\":[{\"$ne\":[{\"$ifNull\":[\"$note\",null]},null]},{\"$numberInt\":\"1\"},{\"$numberInt\":\"0\"}]}}}},{\"$project\":{\"status\":\"$_id.status\",\"noted\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "COUNT(f) counts documents where f is neither null nor missing",
+      "offset": 15,
+      "at": "COUNT(note) AS noted FRO"
+    }
+  ]
+}

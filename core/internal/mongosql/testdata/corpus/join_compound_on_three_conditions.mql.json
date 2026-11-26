@@ -1,0 +1,63 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "let": {
+          "v0": "$customer_id",
+          "v1": "$total"
+        },
+        "pipeline": [
+          {
+            "$match": {
+              "$expr": {
+                "$and": [
+                  {
+                    "$eq": [
+                      "$$v0",
+                      "$_id"
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      "$active",
+                      true
+                    ]
+                  },
+                  {
+                    "$gt": [
+                      "$$v1",
+                      {
+                        "$numberInt": "10"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"let\":{\"v0\":\"$customer_id\",\"v1\":\"$total\"},\"pipeline\":[{\"$match\":{\"$expr\":{\"$and\":[{\"$eq\":[\"$$v0\",\"$_id\"]},{\"$eq\":[\"$active\",true]},{\"$gt\":[\"$$v1\",{\"$numberInt\":\"10\"}]}]}}}],\"as\":\"c\"}},{\"$unwind\":\"$c\"}])",
+  "warnings": [
+    {
+      "message": "a JOIN with more than one ON condition becomes $lookup with let and pipeline, which older DocumentDB and Cosmos DB servers reject",
+      "offset": 23,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 43,
+      "at": "o.customer_id = c._id AN"
+    }
+  ]
+}

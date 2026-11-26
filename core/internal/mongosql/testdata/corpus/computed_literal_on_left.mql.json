@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "remaining": {
+          "$subtract": [
+            {
+              "$numberInt": "100"
+            },
+            "$total"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "remaining": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"remaining\":{\"$subtract\":[{\"$numberInt\":\"100\"},\"$total\"]}}},{\"$project\":{\"_id\":true,\"remaining\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "100 - total AS remaining"
+    }
+  ]
+}

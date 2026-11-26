@@ -65,6 +65,25 @@ func findResponse(database, collection string, spec findSpec) (*queravuev1.Trans
 	}, nil
 }
 
+func aggregateResponse(database, collection string, stages []bson.D) (*queravuev1.TranslateMongoSqlResponse, error) {
+	encoded := make([]string, len(stages))
+	for i, stage := range stages {
+		text, err := mongo.CanonicalEJSON(stage)
+		if err != nil {
+			return nil, err
+		}
+		encoded[i] = text
+	}
+	pipeline := "[" + strings.Join(encoded, ",") + "]"
+	return &queravuev1.TranslateMongoSqlResponse{
+		Database:      database,
+		Collection:    collection,
+		Kind:          queravuev1.MongoSqlResultKind_MONGO_SQL_RESULT_KIND_AGGREGATE,
+		PipelineEjson: pipeline,
+		ShellCode:     collectionExpression(database, collection) + ".aggregate(" + pipeline + ")",
+	}, nil
+}
+
 func optionalEJSON(doc bson.D) (string, error) {
 	if len(doc) == 0 {
 		return "", nil

@@ -1,0 +1,37 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "events",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            {
+              "$subtract": [
+                "$ended",
+                "$started"
+              ]
+            },
+            {
+              "$numberInt": "1000"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").events.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[{\"$subtract\":[\"$ended\",\"$started\"]},{\"$numberInt\":\"1000\"}]}}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 27,
+      "at": "ended - started > 1000"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 27,
+      "at": "ended - started > 1000"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+SELECT DISTINCT tier FROM customers ORDER BY tier LIMIT 2

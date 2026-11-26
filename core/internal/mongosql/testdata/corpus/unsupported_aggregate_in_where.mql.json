@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "aggregate functions in WHERE are not valid SQL; use HAVING",
+    "offset": 27,
+    "at": "COUNT(*) > 1"
+  }
+}

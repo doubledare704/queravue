@@ -1,0 +1,54 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "n": {
+          "$sum": {
+            "$cond": [
+              {
+                "$ne": [
+                  {
+                    "$ifNull": [
+                      "$total",
+                      null
+                    ]
+                  },
+                  null
+                ]
+              },
+              {
+                "$numberInt": "1"
+              },
+              {
+                "$numberInt": "0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":null,\"n\":{\"$sum\":{\"$cond\":[{\"$ne\":[{\"$ifNull\":[\"$total\",null]},null]},{\"$numberInt\":\"1\"},{\"$numberInt\":\"0\"}]}}}},{\"$project\":{\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "COUNT(f) counts documents where f is neither null nor missing",
+      "offset": 7,
+      "at": "COUNT(total) AS n FROM o"
+    },
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "COUNT(total) AS n FROM o"
+    }
+  ]
+}

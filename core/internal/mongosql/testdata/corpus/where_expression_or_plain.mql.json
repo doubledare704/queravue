@@ -1,0 +1,56 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "$or": [
+          {
+            "status": "shipped"
+          },
+          {
+            "$expr": {
+              "$gt": [
+                {
+                  "$multiply": [
+                    "$total",
+                    {
+                      "$numberInt": "2"
+                    }
+                  ]
+                },
+                {
+                  "$numberInt": "300"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"$or\":[{\"status\":\"shipped\"},{\"$expr\":{\"$gt\":[{\"$multiply\":[\"$total\",{\"$numberInt\":\"2\"}]},{\"$numberInt\":\"300\"}]}}]}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 29,
+      "at": "status = 'shipped' OR to"
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 51,
+      "at": "total * 2 > 300"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 51,
+      "at": "total * 2 > 300"
+    }
+  ]
+}

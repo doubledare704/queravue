@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "bumped": {
+          "$add": [
+            "$total",
+            {
+              "$numberInt": "5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "bumped": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"bumped\":{\"$add\":[\"$total\",{\"$numberInt\":\"5\"}]}}},{\"$project\":{\"_id\":true,\"bumped\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "total + 5 AS bumped FROM"
+    }
+  ]
+}

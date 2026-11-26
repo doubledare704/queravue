@@ -1,0 +1,49 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$addFields": {
+        "net": {
+          "$subtract": [
+            "$total",
+            "$discount"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "net": true,
+        "customer": "$c.name",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$addFields\":{\"net\":{\"$subtract\":[\"$total\",\"$discount\"]}}},{\"$project\":{\"order_id\":\"$_id\",\"net\":true,\"customer\":\"$c.name\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 26,
+      "at": "o.total - o.discount AS "
+    },
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 88,
+      "at": "JOIN customers c ON o.cu"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$match": {
+        "_id.city": {
+          "$ne": "Kyiv"
+        },
+        "n": {
+          "$gte": {
+            "$numberInt": "2"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$match\":{\"_id.city\":{\"$ne\":\"Kyiv\"},\"n\":{\"$gte\":{\"$numberInt\":\"2\"}}}},{\"$project\":{\"city\":\"$_id.city\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 63,
+      "at": "city <> 'Kyiv' AND COUNT"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 82,
+      "at": "COUNT(*) >= 2"
+    }
+  ]
+}

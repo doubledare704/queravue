@@ -1,0 +1,50 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "score": {
+          "$multiply": [
+            {
+              "$add": [
+                {
+                  "$subtract": [
+                    "$total",
+                    "$discount"
+                  ]
+                },
+                {
+                  "$multiply": [
+                    "$qty",
+                    {
+                      "$numberInt": "2"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "$numberInt": "3"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "score": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"score\":{\"$multiply\":[{\"$add\":[{\"$subtract\":[\"$total\",\"$discount\"]},{\"$multiply\":[\"$qty\",{\"$numberInt\":\"2\"}]}]},{\"$numberInt\":\"3\"}]}}},{\"$project\":{\"_id\":true,\"score\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "((total - discount) + (q"
+    }
+  ]
+}

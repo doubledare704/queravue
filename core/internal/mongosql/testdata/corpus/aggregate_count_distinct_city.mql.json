@@ -1,0 +1,43 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "cities": {
+          "$addToSet": "$city"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "cities": {
+          "$size": {
+            "$setDifference": [
+              "$cities",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "cities": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":null,\"cities\":{\"$addToSet\":\"$city\"}}},{\"$addFields\":{\"cities\":{\"$size\":{\"$setDifference\":[\"$cities\",[null]]}}}},{\"$project\":{\"cities\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "COUNT(DISTINCT city) AS "
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$addFields": {
+        "mixed": {
+          "$add": [
+            "$total",
+            {
+              "$multiply": [
+                "$qty",
+                {
+                  "$numberInt": "2"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "mixed": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$addFields\":{\"mixed\":{\"$add\":[\"$total\",{\"$multiply\":[\"$qty\",{\"$numberInt\":\"2\"}]}]}}},{\"$project\":{\"_id\":true,\"mixed\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "total + qty * 2 AS mixed"
+    }
+  ]
+}

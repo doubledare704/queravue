@@ -1,0 +1,63 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "order_lines",
+        "let": {
+          "v0": "$_id"
+        },
+        "pipeline": [
+          {
+            "$match": {
+              "$expr": {
+                "$and": [
+                  {
+                    "$eq": [
+                      "$order_id",
+                      "$$v0"
+                    ]
+                  },
+                  {
+                    "$gt": [
+                      "$qty",
+                      {
+                        "$numberInt": "1"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "as": "l"
+      }
+    },
+    {
+      "$unwind": "$l"
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "line_id": "$l._id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"order_lines\",\"let\":{\"v0\":\"$_id\"},\"pipeline\":[{\"$match\":{\"$expr\":{\"$and\":[{\"$eq\":[\"$order_id\",\"$$v0\"]},{\"$gt\":[\"$qty\",{\"$numberInt\":\"1\"}]}]}}}],\"as\":\"l\"}},{\"$unwind\":\"$l\"},{\"$project\":{\"order_id\":\"$_id\",\"line_id\":\"$l._id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "a JOIN with more than one ON condition becomes $lookup with let and pipeline, which older DocumentDB and Cosmos DB servers reject",
+      "offset": 57,
+      "at": "JOIN order_lines l ON l."
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 79,
+      "at": "l.order_id = o._id AND l"
+    }
+  ]
+}

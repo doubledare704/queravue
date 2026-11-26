@@ -1,0 +1,44 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "status": "$status"
+        },
+        "n": {
+          "$sum": {
+            "$numberInt": "1"
+          }
+        }
+      }
+    },
+    {
+      "$sort": {
+        "n": {
+          "$numberInt": "-1"
+        },
+        "_id.status": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "status": "$_id.status",
+        "n": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"status\":\"$status\"},\"n\":{\"$sum\":{\"$numberInt\":\"1\"}}}},{\"$sort\":{\"n\":{\"$numberInt\":\"-1\"},\"_id.status\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"status\":\"$_id.status\",\"n\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 66,
+      "at": "COUNT(*) DESC, status"
+    }
+  ]
+}

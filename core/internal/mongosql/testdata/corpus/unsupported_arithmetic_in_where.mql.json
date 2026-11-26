@@ -1,8 +1,0 @@
-{
-  "error": {
-    "kind": "UNSUPPORTED_CONSTRUCT",
-    "message": "arithmetic needs an aggregation pipeline, which SQL mode does not translate yet",
-    "offset": 32,
-    "at": "price * qty > 100"
-  }
-}

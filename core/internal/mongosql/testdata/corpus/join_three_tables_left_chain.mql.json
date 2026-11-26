@@ -1,0 +1,51 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "orders",
+        "localField": "_id",
+        "foreignField": "customer_id",
+        "as": "o"
+      }
+    },
+    {
+      "$unwind": {
+        "path": "$o",
+        "preserveNullAndEmptyArrays": true
+      }
+    },
+    {
+      "$lookup": {
+        "from": "order_lines",
+        "localField": "o._id",
+        "foreignField": "order_id",
+        "as": "l"
+      }
+    },
+    {
+      "$unwind": {
+        "path": "$l",
+        "preserveNullAndEmptyArrays": true
+      }
+    },
+    {
+      "$project": {
+        "cid": "$_id",
+        "order_id": "$o._id",
+        "line_id": "$l._id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$lookup\":{\"from\":\"orders\",\"localField\":\"_id\",\"foreignField\":\"customer_id\",\"as\":\"o\"}},{\"$unwind\":{\"path\":\"$o\",\"preserveNullAndEmptyArrays\":true}},{\"$lookup\":{\"from\":\"order_lines\",\"localField\":\"o._id\",\"foreignField\":\"order_id\",\"as\":\"l\"}},{\"$unwind\":{\"path\":\"$l\",\"preserveNullAndEmptyArrays\":true}},{\"$project\":{\"cid\":\"$_id\",\"order_id\":\"$o._id\",\"line_id\":\"$l._id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 74,
+      "at": "LEFT JOIN orders o ON o."
+    }
+  ]
+}

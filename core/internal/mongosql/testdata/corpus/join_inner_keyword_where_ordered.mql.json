@@ -1,0 +1,54 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$match": {
+        "c.city": "Kyiv"
+      }
+    },
+    {
+      "$sort": {
+        "total": {
+          "$numberInt": "-1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "order_id": "$_id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$match\":{\"c.city\":\"Kyiv\"}},{\"$sort\":{\"total\":{\"$numberInt\":\"-1\"}}},{\"$project\":{\"order_id\":\"$_id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 39,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 87,
+      "at": "c.city = 'Kyiv' ORDER BY"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 112,
+      "at": "o.total DESC"
+    }
+  ]
+}

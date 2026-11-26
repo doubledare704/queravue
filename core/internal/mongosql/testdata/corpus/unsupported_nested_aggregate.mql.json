@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "aggregate functions are valid only in the select list, HAVING and ORDER BY",
+    "offset": 11,
+    "at": "COUNT(*)) AS n FROM orde"
+  }
+}

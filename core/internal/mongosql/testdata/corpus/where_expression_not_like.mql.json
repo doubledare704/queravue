@@ -1,0 +1,55 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$gt": [
+            {
+              "$multiply": [
+                "$price",
+                "$qty"
+              ]
+            },
+            {
+              "$numberInt": "100"
+            }
+          ]
+        },
+        "name": {
+          "$not": {
+            "$regularExpression": {
+              "pattern": "^a",
+              "options": ""
+            }
+          }
+        }
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$match\":{\"$expr\":{\"$gt\":[{\"$multiply\":[\"$price\",\"$qty\"]},{\"$numberInt\":\"100\"}]},\"name\":{\"$not\":{\"$regularExpression\":{\"pattern\":\"^a\",\"options\":\"\"}}}}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 32,
+      "at": "price * qty > 100 AND na"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 32,
+      "at": "price * qty > 100 AND na"
+    },
+    {
+      "message": "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
+      "offset": 54,
+      "at": "name NOT LIKE 'a%'"
+    },
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 54,
+      "at": "name NOT LIKE 'a%'"
+    }
+  ]
+}

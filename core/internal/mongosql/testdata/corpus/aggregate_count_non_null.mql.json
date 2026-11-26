@@ -1,0 +1,54 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "users",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "with_email": {
+          "$sum": {
+            "$cond": [
+              {
+                "$ne": [
+                  {
+                    "$ifNull": [
+                      "$email",
+                      null
+                    ]
+                  },
+                  null
+                ]
+              },
+              {
+                "$numberInt": "1"
+              },
+              {
+                "$numberInt": "0"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "with_email": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").users.aggregate([{\"$group\":{\"_id\":null,\"with_email\":{\"$sum\":{\"$cond\":[{\"$ne\":[{\"$ifNull\":[\"$email\",null]},null]},{\"$numberInt\":\"1\"},{\"$numberInt\":\"0\"}]}}}},{\"$project\":{\"with_email\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "COUNT(f) counts documents where f is neither null nor missing",
+      "offset": 7,
+      "at": "COUNT(email) AS with_ema"
+    },
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "COUNT(email) AS with_ema"
+    }
+  ]
+}

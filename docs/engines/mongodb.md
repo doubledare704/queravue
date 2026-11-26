@@ -86,6 +86,37 @@ The core browses, uploads, downloads, renames and deletes GridFS files (`GridFsS
 - **Safety & errors:** connections flagged `production` require `confirmed=true` for `DeleteFile` and replacing `Upload` (`CONFIRMATION_REQUIRED`, nothing changed); `RenameFile` and new uploads need no confirmation. Unknown sessions return gRPC `NOT_FOUND`; sessions without `gridfs` return `FAILED_PRECONDITION`.
 - **Memory & throughput:** 1 GiB round-trips keep live core heap flat at `17.5 MiB` during upload and `17.1 MiB` during download, returning to `0.6–0.7 MiB` afterwards; see [perf/iteration-12.md](../perf/iteration-12.md).
 
+## SQL mode (translator)
+`core/internal/mongosql` turns one `SELECT` into a `find` or an `aggregate` ([ADR 0022](../adr/0022-mongo-sql-mode.md)). A statement without joins, grouping, aggregates, `DISTINCT` or computed columns stays a `find`; everything else is a pipeline.
+
+Stage order of a pipeline: `$match` (WHERE conditions that read only the FROM collection) → `$lookup` + `$unwind` per JOIN → `$match` (rest of WHERE) → `$group` (+ `$addFields` for `COUNT(DISTINCT)`) → `$match` (HAVING) → `$addFields` (computed columns) → `$sort` → `$replaceWith` / `$project` → `$skip` → `$limit`. `$sort` runs before the final `$project` so `ORDER BY` can use fields that are not selected; after `$group` it addresses the group key (`_id.key`) and accumulator fields, which is how aliases, ordinals and aggregates work in `ORDER BY`.
+
+- **Aggregates:** `COUNT(*)` is `$sum: 1`; `COUNT(f)` sums 1 where `f` is neither null nor missing; `COUNT(DISTINCT f)` is `$addToSet` followed by `$size` of the set without null; `SUM`, `AVG`, `MIN`, `MAX` map to the accumulators of the same name. The same aggregate used twice shares one accumulator.
+- **DISTINCT** is a `$group` on the selected fields. It cannot be combined with `GROUP BY`, `HAVING` or aggregates, and not with `*`.
+- **Computed columns** (`+ - * /`) need an alias and run as `$add`, `$subtract`, `$multiply`, `$divide`. In `WHERE` and `HAVING` a condition with arithmetic, or a comparison of two fields, is written as `$expr`.
+- **JOIN:** `INNER` and `LEFT` only. A single `a.x = b.y` is `$lookup` with `localField` and `foreignField`; any other `ON` (several conditions, a non-equality, a literal) is `$lookup` with `let` and a `pipeline` holding `$match` and `$expr`. An unqualified field belongs to the FROM collection; a field of a joined table lives under its alias, so `SELECT c.name` yields `{c: {name}}` unless it has an alias.
+- **Not supported:** `RIGHT`, `FULL`, `CROSS` and `NATURAL` joins, `USING`, `GROUP BY` expressions, `SUM(DISTINCT …)`, `*` next to columns, grouped `*`, subqueries, CTEs, `UNION`, window functions, writes.
+
+### Where SQL and MQL differ (each has a warning and a corpus case)
+- `IS NULL` also matches a missing field; `<>`, `NOT IN` and `NOT LIKE` also match null and missing.
+- `=` and `IN` on an array field match when any element matches.
+- Range comparisons do not cross BSON type brackets: `age > 30` skips `"40"`.
+- `LIKE` is an anchored, escaped `$regex`; `ILIKE` adds `i`.
+- `ORDER BY` sorts null and missing first (ascending).
+- `COUNT(f)` ignores null and missing. `SUM` over no numbers is `0` (SQL: `NULL`). An aggregate without `GROUP BY` over no documents returns no row (SQL: one row).
+- `GROUP BY` and `DISTINCT` put null and missing values into one group.
+- `/` always returns a double. An operand that is null or missing makes the result null. A string operand makes the server reject the query.
+- Comparisons inside `$expr` rank null and missing below every value, so `a * 2 < 10` also matches documents where `a` is null or missing.
+- `JOIN` with a single equality matches a null or missing key with null or missing keys of the other collection (a `$lookup` rule); a compound `ON` compares with `$eq`, where null equals null but missing equals nothing.
+- A compound `ON` uses `$lookup` with `let` and `pipeline`, which older DocumentDB and Cosmos DB servers reject.
+
+### Corpus and differential test
+`core/internal/mongosql/testdata/corpus` holds one `.sql` and one `.mql.json` golden per case (`go test ./internal/mongosql -update`, then review the diff). `testdata/comparable.txt` lists the cases the differential test runs on both the docker Mongo and in-memory SQLite over one flat fixture without nulls; results are compared as multisets, or as sequences for the cases marked `ordered`. A key missing from a Mongo document counts as NULL, because a `LEFT JOIN` without a match yields exactly that. `semantics_integration_test.go` asserts each difference above against the real server.
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait mongo
+cd core && go test -count=1 -tags=integration ./internal/mongosql/...
+```
+
 ## Limitations
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.

@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "\"name\" must appear in GROUP BY or inside an aggregate function",
+    "offset": 7,
+    "at": "name, COUNT(DISTINCT cit"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "kind": "FIND",
+  "database": "shop",
+  "collection": "customers",
+  "filter": {
+    "age": {
+      "$gt": {
+        "$numberInt": "30"
+      }
+    }
+  },
+  "projection": {
+    "city": true,
+    "_id": false
+  },
+  "shell": "db.getSiblingDB(\"shop\").customers.find({\"age\":{\"$gt\":{\"$numberInt\":\"30\"}}}, {\"city\":true,\"_id\":false})",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 37,
+      "at": "age > 30"
+    }
+  ]
+}

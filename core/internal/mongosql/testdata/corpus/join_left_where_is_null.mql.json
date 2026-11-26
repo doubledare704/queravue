@@ -1,0 +1,45 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "orders",
+        "localField": "_id",
+        "foreignField": "customer_id",
+        "as": "o"
+      }
+    },
+    {
+      "$unwind": {
+        "path": "$o",
+        "preserveNullAndEmptyArrays": true
+      }
+    },
+    {
+      "$match": {
+        "o._id": null
+      }
+    },
+    {
+      "$project": {
+        "name": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$lookup\":{\"from\":\"orders\",\"localField\":\"_id\",\"foreignField\":\"customer_id\",\"as\":\"o\"}},{\"$unwind\":{\"path\":\"$o\",\"preserveNullAndEmptyArrays\":true}},{\"$match\":{\"o._id\":null}},{\"$project\":{\"name\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 39,
+      "at": "LEFT JOIN orders o ON o."
+    },
+    {
+      "message": "IS NULL also matches documents where the field is missing",
+      "offset": 89,
+      "at": "o._id IS NULL"
+    }
+  ]
+}

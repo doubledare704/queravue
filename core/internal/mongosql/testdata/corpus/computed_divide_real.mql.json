@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "products",
+  "pipeline": [
+    {
+      "$addFields": {
+        "half": {
+          "$divide": [
+            "$price",
+            {
+              "$numberInt": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "half": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").products.aggregate([{\"$addFields\":{\"half\":{\"$divide\":[\"$price\",{\"$numberInt\":\"2\"}]}}},{\"$project\":{\"_id\":true,\"half\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 12,
+      "at": "price / 2 AS half FROM p"
+    }
+  ]
+}

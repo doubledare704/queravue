@@ -1,0 +1,62 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "customers",
+        "localField": "customer_id",
+        "foreignField": "_id",
+        "as": "c"
+      }
+    },
+    {
+      "$unwind": "$c"
+    },
+    {
+      "$group": {
+        "_id": {
+          "c_city": "$c.city"
+        },
+        "revenue": {
+          "$sum": "$total"
+        }
+      }
+    },
+    {
+      "$match": {
+        "revenue": {
+          "$gt": {
+            "$numberInt": "300"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.c_city",
+        "revenue": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$lookup\":{\"from\":\"customers\",\"localField\":\"customer_id\",\"foreignField\":\"_id\",\"as\":\"c\"}},{\"$unwind\":\"$c\"},{\"$group\":{\"_id\":{\"c_city\":\"$c.city\"},\"revenue\":{\"$sum\":\"$total\"}}},{\"$match\":{\"revenue\":{\"$gt\":{\"$numberInt\":\"300\"}}}},{\"$project\":{\"city\":\"$_id.c_city\",\"revenue\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 23,
+      "at": "SUM(o.total) AS revenue "
+    },
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 61,
+      "at": "JOIN customers c ON o.cu"
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 126,
+      "at": "SUM(o.total) > 300"
+    }
+  ]
+}

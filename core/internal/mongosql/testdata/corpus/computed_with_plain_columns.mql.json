@@ -1,0 +1,32 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "products",
+  "pipeline": [
+    {
+      "$addFields": {
+        "stock_value": {
+          "$multiply": [
+            "$price",
+            "$stock"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true,
+        "name": true,
+        "stock_value": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").products.aggregate([{\"$addFields\":{\"stock_value\":{\"$multiply\":[\"$price\",\"$stock\"]}}},{\"$project\":{\"_id\":true,\"name\":true,\"stock_value\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 18,
+      "at": "price * stock AS stock_v"
+    }
+  ]
+}

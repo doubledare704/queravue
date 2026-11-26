@@ -1,0 +1,65 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "customer_id": "$customer_id"
+        },
+        "count_distinct_status": {
+          "$addToSet": "$status"
+        },
+        "min_total": {
+          "$min": "$total"
+        }
+      }
+    },
+    {
+      "$addFields": {
+        "count_distinct_status": {
+          "$size": {
+            "$setDifference": [
+              "$count_distinct_status",
+              [
+                null
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$match": {
+        "count_distinct_status": {
+          "$numberInt": "2"
+        },
+        "min_total": {
+          "$lt": {
+            "$numberInt": "50"
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "customer_id": "$_id.customer_id",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":{\"customer_id\":\"$customer_id\"},\"count_distinct_status\":{\"$addToSet\":\"$status\"},\"min_total\":{\"$min\":\"$total\"}}},{\"$addFields\":{\"count_distinct_status\":{\"$size\":{\"$setDifference\":[\"$count_distinct_status\",[null]]}}}},{\"$match\":{\"count_distinct_status\":{\"$numberInt\":\"2\"},\"min_total\":{\"$lt\":{\"$numberInt\":\"50\"}}}},{\"$project\":{\"customer_id\":\"$_id.customer_id\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "= and IN on an array field match when any element matches",
+      "offset": 59,
+      "at": "COUNT(DISTINCT status) ="
+    },
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 90,
+      "at": "MIN(total) < 50"
+    }
+  ]
+}

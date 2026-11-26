@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "lowest": {
+          "$min": "$total"
+        },
+        "highest": {
+          "$max": "$total"
+        }
+      }
+    },
+    {
+      "$project": {
+        "lowest": true,
+        "highest": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":null,\"lowest\":{\"$min\":\"$total\"},\"highest\":{\"$max\":\"$total\"}}},{\"$project\":{\"lowest\":true,\"highest\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "MIN(total) AS lowest, MA"
+    }
+  ]
+}

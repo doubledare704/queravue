@@ -1,0 +1,42 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$eq": [
+            {
+              "$subtract": [
+                "$total",
+                "$discount"
+              ]
+            },
+            {
+              "$numberInt": "90"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"$expr\":{\"$eq\":[{\"$subtract\":[\"$total\",\"$discount\"]},{\"$numberInt\":\"90\"}]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 29,
+      "at": "total - discount = 90"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 29,
+      "at": "total - discount = 90"
+    }
+  ]
+}

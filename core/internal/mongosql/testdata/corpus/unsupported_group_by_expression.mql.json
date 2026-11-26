@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "GROUP BY accepts fields, aliases and column ordinals",
+    "offset": 37,
+    "at": "total + 1"
+  }
+}

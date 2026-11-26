@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "DISTINCT is supported only inside COUNT(DISTINCT ...)",
+    "offset": 7,
+    "at": "SUM(DISTINCT total) FROM"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": {
+          "city": "$city"
+        },
+        "youngest": {
+          "$min": "$age"
+        },
+        "oldest": {
+          "$max": "$age"
+        }
+      }
+    },
+    {
+      "$project": {
+        "city": "$_id.city",
+        "youngest": true,
+        "oldest": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$group\":{\"_id\":{\"city\":\"$city\"},\"youngest\":{\"$min\":\"$age\"},\"oldest\":{\"$max\":\"$age\"}}},{\"$project\":{\"city\":\"$_id.city\",\"youngest\":true,\"oldest\":true,\"_id\":false}}])"
+}

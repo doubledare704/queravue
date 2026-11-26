@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "LIMIT 0 is not supported: MongoDB treats a zero limit as no limit",
+    "offset": 57,
+    "at": "LIMIT 0"
+  }
+}

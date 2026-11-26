@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "PARSE",
+    "message": "unknown qualifier \"x\"",
+    "offset": 7,
+    "at": "x.* FROM orders o JOIN c"
+  }
+}

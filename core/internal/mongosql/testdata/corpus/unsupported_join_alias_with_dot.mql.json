@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "join alias \"a.b\" cannot contain '.' or start with '$'",
+    "offset": 28,
+    "at": "customers \"a.b\" ON o.cus"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$lookup": {
+        "from": "products",
+        "localField": "sku",
+        "foreignField": "sku",
+        "as": "p"
+      }
+    },
+    {
+      "$unwind": "$p"
+    },
+    {
+      "$project": {
+        "line_id": "$_id",
+        "product": "$p.name",
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$lookup\":{\"from\":\"products\",\"localField\":\"sku\",\"foreignField\":\"sku\",\"as\":\"p\"}},{\"$unwind\":\"$p\"},{\"$project\":{\"line_id\":\"$_id\",\"product\":\"$p.name\",\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+      "offset": 62,
+      "at": "JOIN products p ON l.sku"
+    }
+  ]
+}

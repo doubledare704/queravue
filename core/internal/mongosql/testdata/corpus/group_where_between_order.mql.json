@@ -1,0 +1,56 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "customers",
+  "pipeline": [
+    {
+      "$match": {
+        "age": {
+          "$gte": {
+            "$numberInt": "25"
+          },
+          "$lte": {
+            "$numberInt": "50"
+          }
+        }
+      }
+    },
+    {
+      "$group": {
+        "_id": {
+          "tier": "$tier"
+        },
+        "mean_age": {
+          "$avg": "$age"
+        }
+      }
+    },
+    {
+      "$sort": {
+        "_id.tier": {
+          "$numberInt": "1"
+        }
+      }
+    },
+    {
+      "$project": {
+        "tier": "$_id.tier",
+        "mean_age": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").customers.aggregate([{\"$match\":{\"age\":{\"$gte\":{\"$numberInt\":\"25\"},\"$lte\":{\"$numberInt\":\"50\"}}}},{\"$group\":{\"_id\":{\"tier\":\"$tier\"},\"mean_age\":{\"$avg\":\"$age\"}}},{\"$sort\":{\"_id.tier\":{\"$numberInt\":\"1\"}}},{\"$project\":{\"tier\":\"$_id.tier\",\"mean_age\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "range comparisons only match values of the same BSON type: age > 30 skips the string \"40\"",
+      "offset": 55,
+      "at": "age BETWEEN 25 AND 50 GR"
+    },
+    {
+      "message": "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+      "offset": 100,
+      "at": "tier"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$ne": [
+            "$discount",
+            "$qty"
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$match\":{\"$expr\":{\"$ne\":[\"$discount\",\"$qty\"]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
+      "offset": 29,
+      "at": "discount <> qty"
+    },
+    {
+      "message": "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+      "offset": 29,
+      "at": "discount <> qty"
+    }
+  ]
+}

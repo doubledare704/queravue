@@ -1,0 +1,40 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "order_lines",
+  "pipeline": [
+    {
+      "$match": {
+        "$expr": {
+          "$ne": [
+            {
+              "$ifNull": [
+                {
+                  "$multiply": [
+                    "$price",
+                    "$qty"
+                  ]
+                },
+                null
+              ]
+            },
+            null
+          ]
+        }
+      }
+    },
+    {
+      "$project": {
+        "_id": true
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").order_lines.aggregate([{\"$match\":{\"$expr\":{\"$ne\":[{\"$ifNull\":[{\"$multiply\":[\"$price\",\"$qty\"]},null]},null]}}},{\"$project\":{\"_id\":true}}])",
+  "warnings": [
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 34,
+      "at": "price * qty IS NOT NULL"
+    }
+  ]
+}

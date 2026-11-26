@@ -1,0 +1,8 @@
+{
+  "error": {
+    "kind": "UNSUPPORTED_CONSTRUCT",
+    "message": "DISTINCT cannot be combined with GROUP BY, HAVING or aggregate functions",
+    "offset": 7,
+    "at": "DISTINCT status FROM ord"
+  }
+}

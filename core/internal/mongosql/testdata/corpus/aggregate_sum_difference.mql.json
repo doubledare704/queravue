@@ -1,0 +1,44 @@
+{
+  "kind": "AGGREGATE",
+  "database": "shop",
+  "collection": "orders",
+  "pipeline": [
+    {
+      "$group": {
+        "_id": null,
+        "net": {
+          "$sum": {
+            "$subtract": [
+              "$total",
+              "$discount"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "$project": {
+        "net": true,
+        "_id": false
+      }
+    }
+  ],
+  "shell": "db.getSiblingDB(\"shop\").orders.aggregate([{\"$group\":{\"_id\":null,\"net\":{\"$sum\":{\"$subtract\":[\"$total\",\"$discount\"]}}}},{\"$project\":{\"net\":true,\"_id\":false}}])",
+  "warnings": [
+    {
+      "message": "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+      "offset": 7,
+      "at": "SUM(total - discount) AS"
+    },
+    {
+      "message": "SUM of no numeric values is 0, where SQL returns NULL",
+      "offset": 7,
+      "at": "SUM(total - discount) AS"
+    },
+    {
+      "message": "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+      "offset": 11,
+      "at": "total - discount) AS net"
+    }
+  ]
+}

@@ -15,6 +15,13 @@ const (
 	warnLikeRegex
 	warnNegationMatchesMissing
 	warnNullsSortFirst
+	warnCountNonNull
+	warnArithmetic
+	warnExpressionNullOrdering
+	warnCompoundJoin
+	warnJoinNullKey
+	warnEmptyGlobalAggregate
+	warnSumWithoutValues
 )
 
 var warningMessages = map[warningKind]string{
@@ -24,6 +31,13 @@ var warningMessages = map[warningKind]string{
 	warnLikeRegex:              "LIKE becomes an anchored, escaped $regex; ILIKE adds the i option",
 	warnNegationMatchesMissing: "<>, NOT IN, NOT LIKE and negated conditions also match documents where the field is null or missing",
 	warnNullsSortFirst:         "ORDER BY sorts null and missing values first in ascending order and last in descending order",
+	warnCountNonNull:           "COUNT(f) counts documents where f is neither null nor missing",
+	warnArithmetic:             "+ - * / run as $add, $subtract, $multiply and $divide: operands must be numbers, a null or missing operand gives null, and / always returns a double",
+	warnExpressionNullOrdering: "comparisons computed with $expr rank null and missing below every other value, so a null operand can satisfy < and <=",
+	warnCompoundJoin:           "a JOIN with more than one ON condition becomes $lookup with let and pipeline, which older DocumentDB and Cosmos DB servers reject",
+	warnJoinNullKey:            "JOIN matches a null or missing key with null or missing keys in the other collection, which SQL never does",
+	warnEmptyGlobalAggregate:   "an aggregate without GROUP BY over no matching documents returns no row, where SQL returns one",
+	warnSumWithoutValues:       "SUM of no numeric values is 0, where SQL returns NULL",
 }
 
 type warnings struct {
