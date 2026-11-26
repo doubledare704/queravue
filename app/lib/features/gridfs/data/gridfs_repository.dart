@@ -64,13 +64,18 @@ class GrpcGridFsRepository implements GridFsRepository {
 
   @override
   Future<List<String>> listBuckets(GridFsDatabase scope) async {
-    final response = await _conn.gridFsService.listBuckets(
-      pb.ListBucketsRequest(
-        sessionId: scope.sessionId,
-        database: scope.database,
-      ),
-      options: _options,
-    );
+    final pb.ListBucketsResponse response;
+    try {
+      response = await _conn.gridFsService.listBuckets(
+        pb.ListBucketsRequest(
+          sessionId: scope.sessionId,
+          database: scope.database,
+        ),
+        options: _options,
+      );
+    } on GrpcError catch (error) {
+      throw _grpcFailure(error);
+    }
     if (response.hasError()) throw _failure(response.error);
     return [for (final bucket in response.buckets) bucket.name];
   }
@@ -95,10 +100,15 @@ class GrpcGridFsRepository implements GridFsRepository {
       ),
     );
     // Transform the stream directly so subscription cancellation reaches gRPC.
-    yield* call.expand((response) {
-      if (response.hasError()) throw _failure(response.error);
-      return response.batch.files.map(_entry);
-    });
+    yield* call
+        .expand((response) {
+          if (response.hasError()) throw _failure(response.error);
+          return response.batch.files.map(_entry);
+        })
+        .handleError((Object error, StackTrace stack) {
+          if (error is GrpcError) throw _grpcFailure(error);
+          Error.throwWithStackTrace(error, stack);
+        });
   }
 
   @override
@@ -153,6 +163,11 @@ class GrpcGridFsRepository implements GridFsRepository {
           'Incomplete download',
         );
       }
+    } on GrpcError catch (error) {
+      if (cancel.isCancelled && error.code == StatusCode.cancelled) {
+        throw const OperationCancelled();
+      }
+      throw _grpcFailure(error);
     } finally {
       active = false;
     }
@@ -187,8 +202,22 @@ class GrpcGridFsRepository implements GridFsRepository {
       });
     }
 
-    final response = await _conn.uploadGridFsFile(requests(), cancel);
+    final pb.UploadResponse response;
+    try {
+      response = await _conn.uploadGridFsFile(requests(), cancel);
+    } on GrpcError catch (error) {
+      if (cancel.isCancelled && error.code == StatusCode.cancelled) {
+        throw const OperationCancelled();
+      }
+      throw _grpcFailure(error);
+    }
     if (response.hasError()) throw _failure(response.error);
+    if (!response.hasFile()) {
+      throw const GridFsFailure(
+        GridFsFailureKind.corrupt,
+        'Invalid upload response',
+      );
+    }
     return _entry(response.file);
   }
 
@@ -198,31 +227,41 @@ class GrpcGridFsRepository implements GridFsRepository {
     String id, {
     required bool confirmed,
   }) async {
-    final response = await _conn.gridFsService.deleteFile(
-      pb.DeleteFileRequest(
-        sessionId: target.scope.sessionId,
-        database: target.scope.database,
-        bucket: target.bucket,
-        idEjson: id,
-        confirmed: confirmed,
-      ),
-      options: _options,
-    );
+    final pb.DeleteFileResponse response;
+    try {
+      response = await _conn.gridFsService.deleteFile(
+        pb.DeleteFileRequest(
+          sessionId: target.scope.sessionId,
+          database: target.scope.database,
+          bucket: target.bucket,
+          idEjson: id,
+          confirmed: confirmed,
+        ),
+        options: _options,
+      );
+    } on GrpcError catch (error) {
+      throw _grpcFailure(error);
+    }
     if (response.hasError()) throw _failure(response.error);
   }
 
   @override
   Future<void> rename(GridFsTarget target, String id, String filename) async {
-    final response = await _conn.gridFsService.renameFile(
-      pb.RenameFileRequest(
-        sessionId: target.scope.sessionId,
-        database: target.scope.database,
-        bucket: target.bucket,
-        idEjson: id,
-        newFilename: filename,
-      ),
-      options: _options,
-    );
+    final pb.RenameFileResponse response;
+    try {
+      response = await _conn.gridFsService.renameFile(
+        pb.RenameFileRequest(
+          sessionId: target.scope.sessionId,
+          database: target.scope.database,
+          bucket: target.bucket,
+          idEjson: id,
+          newFilename: filename,
+        ),
+        options: _options,
+      );
+    } on GrpcError catch (error) {
+      throw _grpcFailure(error);
+    }
     if (response.hasError()) throw _failure(response.error);
   }
 }
@@ -238,6 +277,27 @@ GridFsEntry _entry(pb.GridFsFile file) => GridFsEntry(
   contentType: file.contentType,
   metadata: file.metadataEjson,
 );
+
+GridFsFailure _grpcFailure(GrpcError error) {
+  final kind = switch (error.code) {
+    StatusCode.unauthenticated ||
+    StatusCode.permissionDenied => GridFsFailureKind.auth,
+    StatusCode.notFound => GridFsFailureKind.notFound,
+    StatusCode.invalidArgument => GridFsFailureKind.parse,
+    StatusCode.failedPrecondition ||
+    StatusCode.unimplemented => GridFsFailureKind.unsupported,
+    StatusCode.deadlineExceeded => GridFsFailureKind.timeout,
+    StatusCode.unavailable => GridFsFailureKind.network,
+    StatusCode.cancelled => GridFsFailureKind.canceled,
+    StatusCode.dataLoss => GridFsFailureKind.corrupt,
+    _ => GridFsFailureKind.server,
+  };
+  final message = error.message;
+  return GridFsFailure(
+    kind,
+    message != null && message.isNotEmpty ? message : error.codeName,
+  );
+}
 
 GridFsFailure _failure(
   pb.GridFsError error,
