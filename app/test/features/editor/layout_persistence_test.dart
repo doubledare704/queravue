@@ -100,6 +100,27 @@ void main() {
   });
 
   group('persistence', () {
+    test(
+      'GridFS tabs restore the database and bucket and reuse open tabs',
+      () async {
+        final workspace = FakeWorkspaceRepository();
+        final first = await start(workspace);
+        await restored(first);
+        final tabs = first.read(editorTabsProvider.notifier);
+        const bucket = TableRef(database: 'archive', table: 'attachments');
+        final opened = tabs.openGridFs('c2', bucket);
+        expect(tabs.openGridFs('c2', bucket).id, opened.id);
+        await first.read(layoutPersistenceProvider).flush();
+
+        final second = await start(workspace);
+        await restored(second);
+        final restoredTab = second.read(editorTabsProvider).tabs.single;
+        expect(restoredTab.kind, TabKind.gridFs);
+        expect(restoredTab.tableRef, bucket);
+        expect(restoredTab.title, 'attachments');
+      },
+    );
+
     test('SQL mode tabs restore their database and SQL draft', () async {
       final workspace = FakeWorkspaceRepository();
       final first = await start(workspace);

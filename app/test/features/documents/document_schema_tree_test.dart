@@ -6,6 +6,8 @@ import 'package:queravue/features/connections/application/connections_controller
 import 'package:queravue/features/connections/domain/models.dart';
 import 'package:queravue/features/editor/application/editor_tabs.dart';
 import 'package:queravue/features/editor/domain/query_models.dart';
+import 'package:queravue/features/gridfs/data/gridfs_repository.dart';
+import 'package:queravue/features/gridfs/domain/gridfs_models.dart';
 import 'package:queravue/features/schema/data/schema_repository.dart';
 import 'package:queravue/features/schema/domain/schema_models.dart';
 import 'package:queravue/features/schema/presentation/schema_tree_view.dart';
@@ -53,6 +55,15 @@ class _MongoSchemaRepo implements SchemaRepository {
         type: SchemaObjectType.collection,
         rowCountEstimate: 1000000,
       ),
+      SchemaObject(
+        name: 'attachments.files',
+        type: SchemaObjectType.collection,
+      ),
+      SchemaObject(
+        name: 'attachments.chunks',
+        type: SchemaObjectType.collection,
+      ),
+      SchemaObject(name: 'unpaired.files', type: SchemaObjectType.collection),
       SchemaObject(name: 'paid.orders', type: SchemaObjectType.view),
       SchemaObject(
         name: 'audit',
@@ -75,17 +86,32 @@ class _MongoSchemaRepo implements SchemaRepository {
 }
 
 class _MongoSession extends ConnectionSessionController {
-  _MongoSession() : super('c1');
+  _MongoSession({this.gridFs = false}) : super('c1');
+
+  final bool gridFs;
 
   @override
-  ConnectionSessionState build() => const ConnectionSessionState(
+  ConnectionSessionState build() => ConnectionSessionState(
     session: SessionInfo(
       id: 's1',
       product: 'MongoDB',
       version: '8.0',
-      capabilities: {'connect', 'schema_inspector', 'document_store'},
+      capabilities: {
+        'connect',
+        'schema_inspector',
+        'document_store',
+        if (gridFs) 'gridfs',
+      },
     ),
   );
+}
+
+class _GridFsRepository extends Fake implements GridFsRepository {
+  @override
+  Future<List<String>> listBuckets(GridFsDatabase scope) async {
+    expect(scope, (sessionId: 's1', database: 'shop'));
+    return ['attachments'];
+  }
 }
 
 void main() {
@@ -130,6 +156,8 @@ void main() {
     expect(find.text('~1.3k docs'), findsOneWidget);
     expect(find.text('~1M docs'), findsOneWidget);
     expect(find.text('paid.orders'), findsOneWidget);
+    expect(find.text('GridFS'), findsNothing);
+    expect(find.text('attachments.files'), findsOneWidget);
 
     // A collection opens a document tab, not a table tab; names with dots work.
     await tester.tap(find.text('paid.orders'));
@@ -149,6 +177,59 @@ void main() {
     expect(c.read(editorTabsProvider).tabs.length, 2);
     // Collections have no column children to expand.
     expect(find.byIcon(Icons.chevron_right), findsNothing);
+  });
+
+  testWidgets('GridFS buckets hide only backing collections and open a tab', (
+    tester,
+  ) async {
+    final c = ProviderContainer(
+      overrides: [
+        schemaRepositoryProvider.overrideWithValue(_MongoSchemaRepo()),
+        gridFsRepositoryProvider.overrideWithValue(_GridFsRepository()),
+        connectionSessionProvider('c1')
+            .overrideWith(() => _MongoSession(gridFs: true)),
+      ],
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 280,
+              child: SingleChildScrollView(
+                child: SchemaTreeView(connectionId: 'c1'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('shop'));
+    await tester.pumpAndSettle();
+    expect(find.text('attachments.files'), findsNothing);
+    expect(find.text('attachments.chunks'), findsNothing);
+    expect(find.text('unpaired.files'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('GridFS options'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Show backing collections'));
+    await tester.pumpAndSettle();
+    expect(find.text('attachments.files'), findsOneWidget);
+    expect(find.text('attachments.chunks'), findsOneWidget);
+
+    await tester.tap(find.text('GridFS'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('attachments'));
+    await tester.pumpAndSettle();
+    final tab = c.read(editorTabsProvider).tabs.single;
+    expect(tab.kind, TabKind.gridFs);
+    expect(
+      tab.tableRef,
+      const TableRef(database: 'shop', table: 'attachments'),
+    );
   });
 
   test('document-only connections hide SQL entry points', () async {

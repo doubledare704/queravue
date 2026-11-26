@@ -10,7 +10,16 @@ import '../../schema/domain/schema_models.dart';
 import '../../workspace/domain/workspace_models.dart';
 import 'query_run.dart';
 
-enum TabKind { query, table, collection, shell, designer, diagram, mongoSql }
+enum TabKind {
+  query,
+  table,
+  collection,
+  shell,
+  designer,
+  diagram,
+  gridFs,
+  mongoSql,
+}
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -47,6 +56,7 @@ class EditorTab {
   bool get isDesigner => kind == TabKind.designer;
   bool get isMongoSql => kind == TabKind.mongoSql;
   bool get isDiagram => kind == TabKind.diagram;
+  bool get isGridFs => kind == TabKind.gridFs;
 
   /// The same tab, with its editor kept, under a new title.
   EditorTab withTitle(String newTitle) =>
@@ -269,6 +279,27 @@ class EditorTabs extends Notifier<EditorTabsState> {
       tabs: [...state.tabs, tab],
       activeByConnection: {...state.activeByConnection, connectionId: tab.id},
     );
+    return tab;
+  }
+
+  EditorTab openGridFs(String connectionId, TableRef bucket) {
+    final existing = state.tabs
+        .where(
+          (tab) =>
+              tab.isGridFs &&
+              tab.connectionId == connectionId &&
+              tab.tableRef == bucket,
+        )
+        .firstOrNull;
+    final tab =
+        existing ??
+        restoreTab(
+          connectionId: connectionId,
+          kind: TabKind.gridFs,
+          title: bucket.table,
+          tableRef: bucket,
+        );
+    select(tab.id);
     return tab;
   }
 

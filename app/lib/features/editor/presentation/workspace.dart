@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../gridfs/presentation/gridfs_tab.dart';
 import '../../../shared/panes/pane_sizes.dart';
 import '../../../shared/shortcuts.dart';
 import '../../connections/application/connection_session.dart';
@@ -415,6 +416,8 @@ class _TabView extends StatelessWidget {
       ? DesignerTabView(tab: tab)
       : tab.isDiagram
       ? DiagramTabView(tab: tab)
+      : tab.isGridFs
+      ? GridFsTab(tab: tab)
       : tab.isCollection
       ? AdminHost(
           tab: tab,
@@ -494,6 +497,8 @@ class _TabButton extends StatelessWidget {
             Icon(
               tab.isShell
                   ? Icons.terminal
+                  : tab.isGridFs
+                  ? Icons.folder_outlined
                   : tab.isCollection
                   ? Icons.data_object
                   : tab.isTable

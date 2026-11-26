@@ -58,3 +58,9 @@ flutter drive --profile -d macos --endless-trace-buffer --driver=test_driver/per
   --target=integration_test/perf_re_editor_test.dart     # or perf_fce_test.dart
 python3 tool/frame_stats.py build/perf
 ```
+
+## pdf/
+
+Iteration 12 spike comparing in-app `pdfrx` rendering (PDFium) against the OS
+system viewer (`open` / `start` / `xdg-open`) for GridFS PDF previews (ADR 0023 §6).
+See [spikes/pdf/README.md](pdf/README.md) for measurements and reproduction steps.
