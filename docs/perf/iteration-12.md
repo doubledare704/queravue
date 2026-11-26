@@ -34,6 +34,7 @@ Apple M4 Pro, macOS, Go 1.27.4, MongoDB 8.0.34. The same direct-engine test, wit
 | Delayed release, run 1 | 528.3 | 1036.9 | 220.8 MiB | 110.7 MiB | 17.5 / 17.1 MiB |
 | Delayed release, run 2 | 507.1 | 925.7 | 226.1 MiB | 19.5 MiB | 17.5 / 17.1 MiB |
 | Delayed release, strict run 3 | 503.8 | 1073.8 | 198.7 MiB | 199.2 MiB | 17.5 / 17.1 MiB |
+| Delayed release + `GOMEMLIMIT=64MiB` | 457.2 | 1109.5 | 108.9 MiB | 109.3 MiB | 17.5 / 17.1 MiB |
 
 Baseline RSS was 17.7–17.8 MiB. macOS RSS remained highly variable: two runs still exceeded the 60 MiB target after release. The application-side 1 GiB gRPC round trip and other platforms have not been remeasured; the combined 150 MB budget is not established. The test measures the Mongo connection directly, not the sidecar process or gRPC buffers, and may fail the 60 MiB margin on macOS even when Go reports that it released the pages.
 
@@ -41,7 +42,7 @@ The runtime reported 173.5 MiB released and 7.7 MiB free immediately after the o
 
 Sampled allocation profiles show the driver's 16 MiB upload stream, BSON/InsertMany batch construction, the wire-message copy and download cursor reads. The URI builder does not enable compression: the driver's `CompressWireMessage` no-op branch still copies the uncompressed message. Thus the earlier attribution to compression is incorrect for this connection. The 48 MiB gRPC setting is a message limit, not evidence of a preallocated 48 MiB buffer; the direct-engine measurement excludes gRPC entirely. Its contribution to the app measurement remains unmeasured. The gRPC download currently copies each chunk; reusing it safely would require verifying gRPC message lifetime, so it was not changed.
 
-Transfers of at least 32 MiB schedule `debug.FreeOSMemory` five seconds after the last such transfer. This preserves the driver's batching but triggers a process-wide GC and scavenging, potentially increasing CPU use or latency in concurrent work and making a later transfer reacquire memory. The delay coalesces nearby transfers; it cannot guarantee an RSS drop on macOS or prevent scavenging during an unrelated operation. No global memory limit is imposed. Changing the driver's hard-coded buffer would require a driver change or a replacement GridFS implementation with interoperability and cancellation testing.
+Transfers of at least 32 MiB schedule `debug.FreeOSMemory` five seconds after the last such transfer. This preserves the driver's batching but triggers a process-wide GC and scavenging, potentially increasing CPU use or latency in concurrent work and making a later transfer reacquire memory. The delay coalesces nearby transfers; it cannot guarantee an RSS drop on macOS or prevent scavenging during an unrelated operation. A trial with `GOMEMLIMIT=64MiB` reduced upload raw heap peak from 129.6 to 67.3 MiB and upload throughput by about 9% against the original run, but RSS still failed the 60 MiB margin at 109.3 MiB after disconnect. No global memory limit is imposed. Changing the driver's hard-coded buffer would require a driver change or a replacement GridFS implementation with interoperability and cancellation testing.
 
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
