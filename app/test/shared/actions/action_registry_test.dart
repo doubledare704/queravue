@@ -124,9 +124,10 @@ void main() {
     }
   });
 
-  test('every registered action has a palette entry with its shortcut', () {
+  test('every visible action has a palette entry with its shortcut', () {
     final container = makeContainer(FakeConnectionsRepository());
     final registry = container.read(actionRegistryProvider);
+    final enabled = container.read(enabledActionIdsProvider);
     final entries = {
       for (final item in container.read(paletteItemsProvider))
         if (item.group == PaletteGroup.action) item.id: item,
@@ -134,6 +135,10 @@ void main() {
     expect(registry.actions, isNotEmpty);
     for (final action in registry.actions) {
       final entry = entries[action.id];
+      if (action.hideWhenDisabled && !enabled.contains(action.id)) {
+        expect(entry, isNull, reason: action.id);
+        continue;
+      }
       expect(entry, isNotNull, reason: action.id);
       expect(entry!.title, action.title);
       expect(entry.trailing, registry.shortcutLabel(action.id));

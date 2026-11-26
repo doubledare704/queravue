@@ -10,8 +10,16 @@ import '../../schema/domain/schema_models.dart';
 import '../../workspace/domain/workspace_models.dart';
 import 'query_run.dart';
 
-/// Distinguishes between SQL query tabs and table browse tabs.
-enum TabKind { query, table, collection, shell, designer, diagram, gridFs }
+enum TabKind {
+  query,
+  table,
+  collection,
+  shell,
+  designer,
+  diagram,
+  gridFs,
+  mongoSql,
+}
 
 /// One workspace tab (SQL editor or Table browser/editor).
 class EditorTab {
@@ -46,6 +54,7 @@ class EditorTab {
   bool get isCollection => kind == TabKind.collection;
   bool get isShell => kind == TabKind.shell;
   bool get isDesigner => kind == TabKind.designer;
+  bool get isMongoSql => kind == TabKind.mongoSql;
   bool get isDiagram => kind == TabKind.diagram;
   bool get isGridFs => kind == TabKind.gridFs;
 
@@ -302,6 +311,23 @@ class EditorTabs extends Notifier<EditorTabsState> {
       connectionId: connectionId,
       title: 'Shell $n',
       kind: TabKind.shell,
+      shellDatabase: database,
+    );
+    _live.add(tab);
+    state = EditorTabsState(
+      tabs: [...state.tabs, tab],
+      activeByConnection: {...state.activeByConnection, connectionId: tab.id},
+    );
+    return tab;
+  }
+
+  EditorTab openMongoSql(String connectionId, {required String database}) {
+    final n = state.tabsFor(connectionId).where((t) => t.isMongoSql).length + 1;
+    final tab = EditorTab(
+      id: 'tab-${++_seq}',
+      connectionId: connectionId,
+      title: 'SQL mode $n',
+      kind: TabKind.mongoSql,
       shellDatabase: database,
     );
     _live.add(tab);

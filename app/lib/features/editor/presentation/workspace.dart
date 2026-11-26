@@ -14,6 +14,7 @@ import '../../designer/presentation/designer_tab_view.dart';
 import '../../diagram/presentation/diagram_tab_view.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
+import '../../mongo_sql/presentation/mongo_sql_tab_view.dart';
 import '../../keyvalue/application/key_value_actions.dart';
 import '../../keyvalue/presentation/key_value_workspace.dart';
 import '../../workspace/application/tab_files.dart';
@@ -409,6 +410,8 @@ class _TabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => tab.isShell
       ? ShellTabView(tab: tab)
+      : tab.isMongoSql
+      ? MongoSqlTabView(tab: tab)
       : tab.isDesigner
       ? DesignerTabView(tab: tab)
       : tab.isDiagram

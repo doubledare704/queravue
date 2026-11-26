@@ -75,7 +75,9 @@ class ActionMenuBar extends ConsumerWidget {
               label: category.label,
               menus: [
                 for (final a in registry.actions)
-                  if (a.category == category && a.inMenu)
+                  if (a.category == category &&
+                      a.inMenu &&
+                      (!a.hideWhenDisabled || enabled.contains(a.id)))
                     PlatformMenuItem(
                       label: a.title,
                       onSelected: enabled.contains(a.id)

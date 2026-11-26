@@ -34,6 +34,14 @@ class QueryBuilderClient {
     options: CallOptions(timeout: timeout),
   );
 
+  ResponseFuture<TranslateMongoSqlResponse> translateMongoSql(
+    TranslateMongoSqlRequest request, {
+    Duration timeout = _defaultTimeout,
+  }) => _conn.queryBuilderService.translateMongoSql(
+    request,
+    options: CallOptions(timeout: timeout),
+  );
+
   Future<GenerateSqlResponse> generateSql(
     GenerateSqlRequest request, {
     Duration timeout = _defaultTimeout,

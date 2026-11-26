@@ -186,7 +186,7 @@ class CursorResultView extends ConsumerWidget {
 
   final CursorKey cursorKey;
   final String title;
-  final double height;
+  final double? height;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -305,7 +305,9 @@ class CursorResultView extends ConsumerWidget {
                     if (n != null) c.setPageSize(n);
                   },
                 ),
-                if (state.isLoading)
+                if (state.showCancel)
+                  TextButton(onPressed: c.cancel, child: const Text('Cancel'))
+                else if (state.isLoading)
                   const SizedBox.square(
                     dimension: 12,
                     child: CircularProgressIndicator(strokeWidth: 2),

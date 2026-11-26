@@ -2,6 +2,7 @@ import 'package:flutter/painting.dart' show Axis;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../keyvalue/application/key_value_actions.dart';
+import '../../mongo_sql/application/mongo_sql_controller.dart';
 import '../../connections/application/connection_session.dart';
 import '../../connections/application/connections_controller.dart';
 import '../domain/query_models.dart';
@@ -67,6 +68,8 @@ Future<void> runActiveTab(WidgetRef ref, ExecuteMode mode) async {
     await ref.read(documentTabProvider(tab.id).notifier).runDraft();
   } else if (tab != null && tab.isShell) {
     await runShellTab(ref, tab);
+  } else if (tab != null && tab.isMongoSql) {
+    await ref.read(mongoSqlControllerProvider(tab).notifier).run();
   } else if (tab != null &&
       tab.isQuery &&
       ref.read(sqlQueryBuilderProvider(tab.id)).inBuilderMode) {
@@ -103,6 +106,8 @@ Future<void> cancelActiveTab(WidgetRef ref) async {
     await ref.read(documentTabProvider(tab.id).notifier).cancel();
   } else if (tab != null && tab.isShell) {
     await ref.read(shellTabProvider(tab.id).notifier).cancel();
+  } else if (tab != null && tab.isMongoSql) {
+    await ref.read(mongoSqlControllerProvider(tab).notifier).cancel();
   } else if (tab != null) {
     await ref.read(editorTabsProvider.notifier).cancel(tab.id);
   }
