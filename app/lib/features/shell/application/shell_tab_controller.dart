@@ -150,6 +150,7 @@ class ShellTabController extends Notifier<ShellTabState> {
     );
     final repo = ref.read(shellRepositoryProvider);
     ref.onDispose(() {
+      _epoch++;
       _cancelTimer?.cancel();
       unawaited(_sub?.cancel());
       final id = _shellId;
@@ -174,7 +175,7 @@ class ShellTabController extends Notifier<ShellTabState> {
       clearConnectionError: true,
     );
     _armCancelButton(epoch);
-    final shellId = await _ensureShell();
+    final shellId = await _ensureShell(epoch);
     if (shellId == null || epoch != _epoch || !ref.mounted) {
       _finish(epoch);
       return;
@@ -216,7 +217,7 @@ class ShellTabController extends Notifier<ShellTabState> {
     state = state.copyWith(phase: ShellPhase.idle, showCancel: false);
   }
 
-  Future<String?> _ensureShell() async {
+  Future<String?> _ensureShell(int epoch) async {
     final existing = state.shellId;
     if (existing != null) return existing;
     final id = _connectionId;
@@ -227,7 +228,7 @@ class ShellTabController extends Notifier<ShellTabState> {
     final session = await ref
         .read(connectionSessionProvider(id).notifier)
         .connect();
-    if (!ref.mounted) return null;
+    if (!ref.mounted || epoch != _epoch) return null;
     if (session == null) {
       _fail(ref.read(connectionSessionProvider(id)).error ?? 'Cannot connect.');
       return null;
@@ -236,14 +237,18 @@ class ShellTabController extends Notifier<ShellTabState> {
       _fail('This connection does not support the shell.');
       return null;
     }
+    final repo = _repo;
     try {
-      final shellId = await _repo.openShell(session.id, _database);
-      if (!ref.mounted) return null;
+      final shellId = await repo.openShell(session.id, _database);
+      if (!ref.mounted || epoch != _epoch) {
+        await repo.closeShell(shellId);
+        return null;
+      }
       _shellId = shellId;
       state = state.copyWith(shellId: shellId);
       return shellId;
     } catch (e) {
-      _fail('Cannot start the shell: $e');
+      if (epoch == _epoch) _fail('Cannot start the shell: $e');
       return null;
     }
   }
@@ -333,6 +338,10 @@ class ShellTabController extends Notifier<ShellTabState> {
 
   /// Interrupts the running script.
   Future<void> cancel() async {
+    if (state.phase == ShellPhase.connecting) {
+      _finish(++_epoch);
+      return;
+    }
     final id = state.shellId;
     if (id == null || !state.busy) return;
     await _repo.cancel(id);

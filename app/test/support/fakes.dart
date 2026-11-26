@@ -1,3 +1,5 @@
+import 'package:queravue/features/connections/domain/cancellation.dart';
+
 import 'dart:async';
 
 import 'package:queravue/core_client/core_connection.dart';
@@ -191,6 +193,12 @@ class FakeCoreConnection implements CoreConnection {
   @override
   GridFsServiceClient get gridFsService =>
       throw UnimplementedError('use a fake GridFsRepository');
+
+  @override
+  Future<UploadResponse> uploadGridFsFile(
+    Stream<UploadRequest> requests,
+    CancellationToken cancel,
+  ) => throw UnimplementedError();
 
   @override
   Future<void> close() async {

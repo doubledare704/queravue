@@ -24,9 +24,38 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 - **Flat live heap:** Every 128 MiB checkpoint across the 1 GiB stream stays at `17.5 MiB` on upload (`uploadBufferSize = 16 MiB` inside `mongo.GridFSUploadStream`) and `17.1 MiB` on download (one driver cursor batch buffer), returning to `0.6–0.7 MiB` after completion.
 - **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire compression buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
 
-### Not measured yet
-- App-side GridFS viewer RSS during 1 GiB upload/download, 32 MiB image preview peak/release, and combined idle memory after a GridFS session (PR 6).
-- App-side SQL mode latency (editor to MQL pane, PR 4); the translator itself is in Lane T.
+## Lane G: app
+
+Apple M4 Pro (arm64, macOS 27.2.1), 2026-11-20. The Flutter macOS profile build used the real sidecar and the Docker Mongo replica set. The test sampled app RSS with `ps` approximately every 50 ms and included the first sample after each operation in its peak. The 1 GiB fixture was a sparse file filled with zeros. The image was a 32 MiB BMP at 4096 × 2700 pixels, decoded to 2048 × 1350 for preview.
+
+| Operation | App RSS before | App RSS peak | App RSS after | Time |
+|---|---:|---:|---:|---:|
+| Upload 1 GiB | 196.2 MiB | 223.1 MiB | 173.3 MiB | 10.0 s |
+| Download 1 GiB | 173.3 MiB | 184.9 MiB | 172.5 MiB | 5.7 s |
+| Preview 32 MiB BMP | 177.4 MiB | 288.5 MiB | 288.5 MiB with preview open | 0.4 s |
+
+App RSS fell to 223.9 MiB 10 seconds after clearing the preview. Flutter's image cache returned to its pre-preview size.
+
+| Idle checkpoint | App RSS | Core RSS | Combined RSS |
+|---|---:|---:|---:|
+| Bucket open before the round trip | 193.2 MiB | 37.2 MiB | 230.4 MiB |
+| 20 seconds after closing the GridFS tab and disconnecting | 222.6 MiB | 258.3 MiB | 480.8 MiB |
+
+The measured session exceeded the 150 MB combined idle RSS budget. The profile build was already above budget before the transfers, and the sidecar alone was above budget at the post-session checkpoint.
+
+From the repository root, build the sidecar and run the profile test against Docker Mongo.
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait mongo
+make core
+cd app
+QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR="$(mktemp -d)" \
+  QUERAVUE_CORE_BIN="$PWD/../core/bin/queravued" \
+  flutter drive --profile -d macos --dart-define=GRIDFS_PERF=true \
+  --driver=test_driver/perf_driver.dart --target=integration_test/gridfs_test.dart
+```
+
+Run the short end-to-end test with the same environment using `flutter test integration_test/gridfs_test.dart -d macos`.
 
 ## Lane T: SQL → MQL translator
 
@@ -43,3 +72,7 @@ cd core && go test ./internal/mongosql -run '^$' -bench Translate -benchtime 300
 | rejected (parse error or unsupported, offset reported) | 95 | 0.8 µs | 2.5 µs |
 
 Even the p95 of the pipeline group is under 10 µs, so translation is negligible next to the RPC round trip.
+
+## Not measured yet
+
+- App-side SQL mode latency (editor to MQL pane, PR 4); the translator itself is in Lane T.

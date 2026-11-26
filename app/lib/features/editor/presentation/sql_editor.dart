@@ -84,8 +84,6 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
       }
     });
     final run = ref.watch(queryRunProvider(widget.tab.id));
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final scheme = Theme.of(context).colorScheme;
 
     // Lines of the statement that ran or failed.
     var markFirst = -1, markLast = -2;
@@ -95,18 +93,53 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
     }
     final failed = run.failedStatement != null && run.phase == RunPhase.failed;
 
-    final editor = CodeEditor(
-      key: Key('sql-editor-${widget.tab.id}'),
+    final editor = SqlCodeEditor(
+      editorKey: Key('sql-editor-${widget.tab.id}'),
       controller: _c,
+      lineMark: (i) =>
+          i >= markFirst && i <= markLast ? (failed ? '✕' : '▸') : ' ',
+    );
+    return CompletionHost(
+      connectionId: widget.tab.connectionId,
+      context: CompletionContext.sql,
+      controller: _c,
+      child: editor,
+    );
+  }
+}
+
+class SqlCodeEditor extends StatelessWidget {
+  const SqlCodeEditor({
+    super.key,
+    required this.editorKey,
+    required this.controller,
+    this.lineMark,
+    this.focusNode,
+  });
+
+  final Key editorKey;
+  final CodeLineEditingController controller;
+  final String Function(int line)? lineMark;
+  final FocusNode? focusNode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CodeEditor(
+      key: editorKey,
+      controller: controller,
+      focusNode: focusNode,
       autofocus: true,
       wordWrap: false,
       style: CodeEditorStyle(
         fontSize: 13,
         fontFamily: 'Menlo',
-        backgroundColor: scheme.surface,
+        backgroundColor: theme.colorScheme.surface,
         codeTheme: CodeHighlightTheme(
           languages: {'sql': CodeHighlightThemeMode(mode: langSql)},
-          theme: dark ? atomOneDarkTheme : atomOneLightTheme,
+          theme: theme.brightness == Brightness.dark
+              ? atomOneDarkTheme
+              : atomOneLightTheme,
         ),
       ),
       indicatorBuilder: (context, editing, chunk, notifier) => Row(
@@ -115,12 +148,7 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
             controller: editing,
             notifier: notifier,
             minNumberCount: 3,
-            customLineIndex2Text: (i) {
-              final mark = i >= markFirst && i <= markLast
-                  ? (failed ? '✕' : '▸')
-                  : ' ';
-              return '$mark${i + 1}';
-            },
+            customLineIndex2Text: (i) => '${lineMark?.call(i) ?? ' '}${i + 1}',
           ),
           DefaultCodeChunkIndicator(
             width: 18,
@@ -129,12 +157,6 @@ class _SqlEditorState extends ConsumerState<SqlEditor> {
           ),
         ],
       ),
-    );
-    return CompletionHost(
-      connectionId: widget.tab.connectionId,
-      context: CompletionContext.sql,
-      controller: _c,
-      child: editor,
     );
   }
 }

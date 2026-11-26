@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../gridfs/presentation/gridfs_tab.dart';
 import '../../../shared/panes/pane_sizes.dart';
 import '../../../shared/shortcuts.dart';
 import '../../connections/application/connection_session.dart';
@@ -13,6 +14,7 @@ import '../../designer/presentation/designer_tab_view.dart';
 import '../../diagram/presentation/diagram_tab_view.dart';
 import '../../documents/presentation/document_tab_view.dart';
 import '../../shell/presentation/shell_tab_view.dart';
+import '../../mongo_sql/presentation/mongo_sql_tab_view.dart';
 import '../../keyvalue/application/key_value_actions.dart';
 import '../../keyvalue/presentation/key_value_workspace.dart';
 import '../../workspace/application/tab_files.dart';
@@ -408,10 +410,14 @@ class _TabView extends StatelessWidget {
   @override
   Widget build(BuildContext context) => tab.isShell
       ? ShellTabView(tab: tab)
+      : tab.isMongoSql
+      ? MongoSqlTabView(tab: tab)
       : tab.isDesigner
       ? DesignerTabView(tab: tab)
       : tab.isDiagram
       ? DiagramTabView(tab: tab)
+      : tab.isGridFs
+      ? GridFsTab(tab: tab)
       : tab.isCollection
       ? AdminHost(
           tab: tab,
@@ -491,6 +497,8 @@ class _TabButton extends StatelessWidget {
             Icon(
               tab.isShell
                   ? Icons.terminal
+                  : tab.isGridFs
+                  ? Icons.folder_outlined
                   : tab.isCollection
                   ? Icons.data_object
                   : tab.isTable

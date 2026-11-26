@@ -8,7 +8,7 @@ One package, `core/internal/engine/mongo`, built on the official `go.mongodb.org
 | `cosmosdb-mongo` | Azure Cosmos DB for MongoDB | [cosmosdb.md](cosmosdb.md) |
 | `documentdb` | DocumentDB (documentdb.io, Amazon DocumentDB) | [documentdb.md](documentdb.md) |
 
-Design: [ADR 0009](../adr/0009-document-model.md) and [ADR 0023](../adr/0023-gridfs.md). The engine declares `connect`, `schema_inspector`, `document_store`, `shell`, `index_manager`, `stats`, `validation`, `schema_graph`, and `gridfs`, not `execute`: a Mongo connection never offers "Run SQL".
+Design: [ADR 0009](../adr/0009-document-model.md) and [ADR 0023](../adr/0023-gridfs.md). The engine declares `connect`, `schema_inspector`, `document_store`, `shell`, `index_manager`, `stats`, `validation`, `schema_graph`, and `gridfs`. SQL mode translates read-only queries through the document and shell capabilities.
 
 ## Connecting
 Fields: hosts (comma list), SRV, replica set, default database, user, password (keychain only), auth source, auth mechanism (`default`, `SCRAM-SHA-256`, `SCRAM-SHA-1`, `MONGODB-X509`), TLS, CA file, client certificate + key, allow invalid certificates, direct connection, read preference.
@@ -28,6 +28,12 @@ mongodb://x509user@host:27017/?tls=true&authMechanism=MONGODB-X509&tlsCertificat
 - **Editing:** insert, replace and field update. Edits send the document as loaded; if the stored document changed meanwhile the write is refused with a conflict that carries the current document (reload, or overwrite). The check is compare-then-guarded-write, not a single atomic operation, so two writers racing inside the same few milliseconds can still lose an update.
 - **Production connections** require a confirmation for deletes (enforced in the core).
 - **Cancel:** every find is cancellable; the server cursor is closed.
+
+## SQL mode
+
+Right-click a database or collection and choose **Query with SQL**, or use **Open SQL mode** in the command palette (⌘/Ctrl+Shift+G). The editor completes collection names and sampled document fields as you write a read-only `SELECT`. The **Generated MQL** pane updates as you type and lets you copy the shell code or Extended JSON. Click a warning to jump to its location in SQL. If translation fails, the editor underlines the error and marks the previous MQL as stale.
+
+**Preview** fetches up to 20 documents. **Run** (⌘/Ctrl+Enter) opens paged results in the table, tree, and JSON views. Press **Esc** to cancel. An aggregate translation can be imported with **Open in pipeline builder**. See [ADR 0022](../adr/0022-mongo-sql-mode.md#6-semantics-are-shown-not-hidden) for the differences between SQL and MongoDB semantics.
 
 ## Shell
 The shell runs mongosh-style JavaScript on an embedded goja runtime in the core (ADR 0010). It works on MongoDB, DocumentDB and Cosmos DB connections and needs no `mongosh` install. Variables, functions and `let`/`const` persist between runs of one shell. Write one command per line or several statements per run; the value of the last expression becomes the result.
@@ -112,7 +118,6 @@ cd core && go test -count=1 -tags=integration ./internal/mongosql/...
 ```
 
 ## Limitations
-- No aggregation builder yet. The validation editor starts from the collection's current validator; "Start from sample" fills it with a `$jsonSchema` inferred from a sample of documents (types per field, `required` for fields every sampled document had), for you to edit. The shell has no autocomplete yet.
 - Table view columns come from a sample of 100 documents (`$sample`, with a fallback to the first documents).
 - Kerberos, LDAP and AWS IAM authentication are not exposed.
 
