@@ -58,6 +58,9 @@ const (
 	KindBlockingRefused
 	// KindCorrupt: GridFS chunks are missing or do not match the file length.
 	KindCorrupt
+	// KindConstraint: the server rejected a write for a unique, not-null,
+	// foreign-key or check constraint, or a collection validator.
+	KindConstraint
 )
 
 // String implements fmt.Stringer.
@@ -105,6 +108,8 @@ func (k Kind) String() string {
 		return "blocking_refused"
 	case KindCorrupt:
 		return "corrupt"
+	case KindConstraint:
+		return "constraint"
 	default:
 		return "unknown"
 	}

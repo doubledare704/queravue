@@ -90,7 +90,7 @@ func New(v Variant) *Engine {
 				{Key: ParamPassword, Label: "Password", Kind: engine.FieldPassword},
 				{Key: ParamTLS, Label: "TLS", Kind: engine.FieldSelect, Default: "preferred", Options: TLSModes},
 			},
-			Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph},
+			Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph, engine.CapBulkLoad},
 		},
 	}
 }
