@@ -5,6 +5,8 @@ Import and mock data insert through `engine.RowLoader` (capability `bulk_load`) 
 ## Contract
 - The loader pulls batches from the source until `io.EOF`. The **source decides the batch size**, in bytes, not rows: about 1 MiB is a good target. Loaders do not coalesce batches.
 - Each batch commits on its own. When ctx is cancelled or the source fails, the loader stops before committing the next batch and returns the committed `LoadStats` together with the error. A source error is wrapped with `%w`, so `errors.Is` still finds it.
+- `LoadStats.Rows` counts rows the server reports as inserted, not rows sent: a table that skips rows (SQLite `ON CONFLICT IGNORE`, a Postgres trigger returning NULL) counts fewer.
+- A load never ends a transaction the caller has open. Postgres and CockroachDB refuse with `KindUnsupported` while one is open; MySQL and SQLite do not need to (see below).
 - Rows and documents are never logged, and error messages never quote them: constraint messages name the table, key or constraint only.
 - Errors are `*engine.Error`. A rejected constraint (unique, not null, foreign key, check, collection validator) is `KindConstraint`; a cancelled load is `KindCanceled`; a malformed document is `KindParse` with the index of the document in its batch.
 
@@ -22,10 +24,13 @@ Import and mock data insert through `engine.RowLoader` (capability `bulk_load`) 
 - Server messages outside the classes that only name objects (`08 23 25 28 3D 40 42 53 54 55 57`) are replaced by a message with the SQLSTATE, because messages such as "invalid input syntax for type integer" quote the value.
 
 ### SQLite
+- A transaction the caller has open makes the load fail, because SQLite does not nest them.
 - `engine.Value` bool is stored as 0 or 1 and reads back as an integer. Decimals and UUIDs go into text columns.
 
 ### MySQL family
-- Statements run on a context that cancelling ctx does not reach, because the driver closes the socket on cancel. A watcher sends `KILL QUERY` on the second connection instead, and the batch rolls back.
+- A load takes a connection of its own from the pool (three connections: statements, `KILL QUERY`, load), because `START TRANSACTION` would otherwise commit the caller's open transaction.
+- Tables on a storage engine that cannot roll back (MyISAM, MEMORY, Aria, ARCHIVE, CSV, …) are refused with `KindUnsupported` before anything is written, since a failed batch would leave part of it behind with no way to count it.
+- Statements, and the `max_allowed_packet` lookup, run on a context that cancelling ctx does not reach, because the driver closes the socket on cancel. A watcher sends `KILL QUERY` instead, and cuts the socket if the kill fails, as `Execute` does. The batch rolls back.
 - Duplicate-key messages are rebuilt from the key name, since MySQL's own message quotes the value.
 
 ### Mongo family

@@ -3,6 +3,8 @@
 package mysql
 
 import (
+	"context"
+	"io"
 	"math"
 	"testing"
 	"time"
@@ -87,4 +89,65 @@ func TestIntegrationRowLoaderMariaDB(t *testing.T) {
 
 func TestIntegrationRowLoaderTiDB(t *testing.T) {
 	enginetest.RunRowLoader(t, rowLoaderTarget(VariantTiDB, "TIDB", "4000", "root", "", "TiDB", true))
+}
+
+func TestIntegrationRowLoaderRejectsNonTransactionalTable(t *testing.T) {
+	tg := target(VariantMySQL, "MYSQL", "3306", "queravue", "queravue", "MySQL")
+	ctx := context.Background()
+	conn, err := tg.Engine.Connect(ctx, tg.Config, tg.Secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	run := func(sql string) {
+		t.Helper()
+		if _, err := conn.(engine.Executor).Execute(ctx, engine.Statement{SQL: sql}, nopSink{}); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	run("DROP TABLE IF EXISTS qv_load_myisam")
+	run("CREATE TABLE qv_load_myisam (id INT PRIMARY KEY, label VARCHAR(50)) ENGINE=MyISAM")
+	t.Cleanup(func() { run("DROP TABLE IF EXISTS qv_load_myisam") })
+
+	rows := [][]engine.Value{{engine.Int(1), engine.Text("a")}, {engine.Int(1), engine.Text("b")}}
+	stats, err := conn.(engine.RowLoader).LoadRows(ctx, engine.LoadTarget{Database: tg.Database, Table: "qv_load_myisam"},
+		[]string{"id", "label"}, &fixedBatch{rows: rows})
+	if engine.KindOf(err) != engine.KindUnsupported || stats.Rows != 0 {
+		t.Fatalf("stats = %+v, err = %v; want an unsupported error before anything is written", stats, err)
+	}
+	var stored int64
+	sink := &firstValueSink{}
+	if _, err := conn.(engine.Executor).Execute(ctx, engine.Statement{SQL: "SELECT COUNT(*) FROM qv_load_myisam"}, sink); err != nil {
+		t.Fatal(err)
+	}
+	stored = sink.value
+	if stored != 0 {
+		t.Errorf("%d rows were written to the MyISAM table", stored)
+	}
+}
+
+type nopSink struct{}
+
+func (nopSink) Columns([]engine.Column) error { return nil }
+func (nopSink) Batch([][]engine.Value) error  { return nil }
+
+type firstValueSink struct{ value int64 }
+
+func (*firstValueSink) Columns([]engine.Column) error { return nil }
+func (s *firstValueSink) Batch(rows [][]engine.Value) error {
+	s.value = rows[0][0].Int
+	return nil
+}
+
+type fixedBatch struct {
+	rows [][]engine.Value
+	done bool
+}
+
+func (s *fixedBatch) Next(context.Context) ([][]engine.Value, error) {
+	if s.done {
+		return nil, io.EOF
+	}
+	s.done = true
+	return s.rows, nil
 }

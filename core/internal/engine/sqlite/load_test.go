@@ -96,3 +96,41 @@ func (s *oneBatch) Next(context.Context) ([][]engine.Value, error) {
 	s.done = true
 	return s.rows, nil
 }
+
+func TestLoadRowsCountsOnlyRowsTheTableKept(t *testing.T) {
+	c, err := connect(t, map[string]string{ParamPath: filepath.Join(t.TempDir(), "ignore.db"), ParamCreateIfMissing: "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.(engine.Executor).Execute(context.Background(),
+		engine.Statement{SQL: "CREATE TABLE ignoring (id INTEGER, UNIQUE (id) ON CONFLICT IGNORE)"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	rows := [][]engine.Value{{engine.Int(1)}, {engine.Int(1)}, {engine.Int(2)}}
+	stats, err := c.(engine.RowLoader).LoadRows(context.Background(), engine.LoadTarget{Table: "ignoring"}, []string{"id"}, &oneBatch{rows: rows})
+	if err != nil || stats.Rows != 2 {
+		t.Fatalf("stats = %+v, err = %v; the table kept 2 of 3 rows", stats, err)
+	}
+}
+
+func TestLoadRowsKeepsTheCallersOpenTransaction(t *testing.T) {
+	c, err := connect(t, map[string]string{ParamPath: filepath.Join(t.TempDir(), "open.db"), ParamCreateIfMissing: "true"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := func(sql string) {
+		t.Helper()
+		if _, err := c.(engine.Executor).Execute(context.Background(), engine.Statement{SQL: sql}, nil); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	run("CREATE TABLE kept (id INTEGER)")
+	run("BEGIN")
+	run("INSERT INTO kept VALUES (0)")
+	stats, loadErr := c.(engine.RowLoader).LoadRows(context.Background(), engine.LoadTarget{Table: "kept"}, []string{"id"},
+		&oneBatch{rows: [][]engine.Value{{engine.Int(1)}}})
+	run("ROLLBACK")
+	if loadErr == nil || stats.Rows != 0 {
+		t.Errorf("stats = %+v, err = %v; want the load refused while a transaction is open", stats, loadErr)
+	}
+}

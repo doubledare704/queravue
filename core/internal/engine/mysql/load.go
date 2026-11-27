@@ -38,18 +38,22 @@ func (c *Conn) LoadRows(ctx context.Context, t engine.LoadTarget, columns []stri
 	if len(columns) > maxPlaceholders {
 		return engine.LoadStats{}, engine.Errorf(engine.KindInvalidConfig, c.id, op, "too many columns")
 	}
-	conn, err := c.live(op)
+	session, err := c.loadSession(ctx, op)
 	if err != nil {
 		return engine.LoadStats{}, err
 	}
+	defer session.close()
 	run := &loadRun{
-		c: c, conn: conn, columns: columns,
+		c: c, session: session, columns: columns,
 		table:            sqldialect.MySQL.QualifyTable(schemaOf(t), t.Table),
 		rowsPerStatement: min(maxRowsPerInsert, maxPlaceholders/len(columns)),
 		statements:       map[int]*sql.Stmt{},
 	}
 	defer run.closeStatements()
-	run.statementBytes = statementBudget(c.maxAllowedPacket(ctx, conn))
+	if err := run.rejectNonTransactionalTable(ctx, t); err != nil {
+		return engine.LoadStats{}, err
+	}
+	run.statementBytes = statementBudget(run.maxAllowedPacket(ctx))
 	return engine.DriveLoad(ctx, c.id, op, src.Next, func(rows [][]engine.Value) int { return len(rows) }, run.commitBatch)
 }
 
@@ -64,17 +68,47 @@ func statementBudget(maxPacket int64) int {
 	return int(min(maxPacket/packetBudgetDivisor, maxStatementBytes))
 }
 
-func (c *Conn) maxAllowedPacket(ctx context.Context, conn *sql.Conn) int64 {
-	var n int64
-	if err := conn.QueryRowContext(context.WithoutCancel(ctx), "SELECT @@max_allowed_packet").Scan(&n); err != nil || n <= 0 {
-		return fallbackMaxPacket
-	}
+func (r *loadRun) maxAllowedPacket(ctx context.Context) int64 {
+	n := int64(fallbackMaxPacket)
+	_ = r.session.cancellable(ctx, func(qctx context.Context) error {
+		var got int64
+		if err := r.session.conn.QueryRowContext(qctx, "SELECT @@max_allowed_packet").Scan(&got); err == nil && got > 0 {
+			n = got
+		}
+		return nil
+	})
 	return n
+}
+
+// nonTransactionalEngines cannot roll back a failed batch, so a partial write
+// could not be reported in LoadStats.
+var nonTransactionalEngines = map[string]bool{
+	"MYISAM": true, "MRG_MYISAM": true, "MEMORY": true, "HEAP": true, "ARCHIVE": true,
+	"CSV": true, "BLACKHOLE": true, "ARIA": true, "FEDERATED": true,
+}
+
+func (r *loadRun) rejectNonTransactionalTable(ctx context.Context, t engine.LoadTarget) error {
+	var storage sql.NullString
+	err := r.session.cancellable(ctx, func(qctx context.Context) error {
+		return r.session.conn.QueryRowContext(qctx,
+			"SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = COALESCE(NULLIF(?, ''), DATABASE()) AND TABLE_NAME = ?",
+			schemaOf(t), t.Table).Scan(&storage)
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return r.c.loadError(ctx, err)
+	}
+	if nonTransactionalEngines[strings.ToUpper(storage.String)] {
+		return engine.Errorf(engine.KindUnsupported, r.c.id, "load rows", "table uses the %s storage engine, which cannot roll back a failed batch", storage.String)
+	}
+	return nil
 }
 
 type loadRun struct {
 	c                *Conn
-	conn             *sql.Conn
+	session          *loadSession
 	columns          []string
 	table            string
 	rowsPerStatement int
@@ -106,7 +140,7 @@ func (r *loadRun) statement(ctx context.Context, rows int) (*sql.Stmt, error) {
 	if len(r.statements) >= cachedStatementCap {
 		r.closeStatements()
 	}
-	s, err := r.conn.PrepareContext(ctx, r.insertSQL(rows))
+	s, err := r.session.conn.PrepareContext(ctx, r.insertSQL(rows))
 	if err != nil {
 		return nil, fmt.Errorf("prepare insert: %w", err)
 	}
@@ -127,62 +161,69 @@ func (r *loadRun) commitBatch(ctx context.Context, rows [][]engine.Value) (engin
 			return engine.LoadStats{}, engine.Errorf(engine.KindInvalidConfig, r.c.id, "load rows", "row %d has %d values for %d columns", i, len(row), len(r.columns))
 		}
 	}
-	stop := r.c.killQueryOnCancel(ctx)
-	err := r.insertInTransaction(ctx, rows)
-	stop()
+	var inserted uint64
+	err := r.session.cancellable(ctx, func(qctx context.Context) (err error) {
+		inserted, err = r.insertInTransaction(ctx, qctx, rows)
+		return err
+	})
 	if err != nil {
 		return engine.LoadStats{}, r.c.loadError(ctx, err)
 	}
-	return engine.LoadStats{Rows: uint64(len(rows)), Batches: 1}, nil
+	return engine.LoadStats{Rows: inserted, Batches: 1}, nil
 }
 
-// The statements run on a context that ctx does not cancel: the driver reacts
-// to cancellation by closing the socket, which would lose the session.
-func (r *loadRun) insertInTransaction(ctx context.Context, rows [][]engine.Value) error {
-	qctx := context.WithoutCancel(ctx)
-	tx, err := r.conn.BeginTx(qctx, nil)
+func (r *loadRun) insertInTransaction(ctx, qctx context.Context, rows [][]engine.Value) (uint64, error) {
+	tx, err := r.session.conn.BeginTx(qctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin: %w", err)
+		return 0, fmt.Errorf("begin: %w", err)
 	}
-	if err := r.insertChunks(ctx, qctx, tx, rows); err != nil {
+	inserted, err := r.insertChunks(ctx, qctx, tx, rows)
+	if err != nil {
 		_ = tx.Rollback()
-		return err
+		return 0, err
 	}
 	if err := ctx.Err(); err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("cancelled before commit: %w", err)
+		return 0, fmt.Errorf("cancelled before commit: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit: %w", err)
+		return 0, fmt.Errorf("commit: %w", err)
 	}
-	return nil
+	return inserted, nil
 }
 
-func (r *loadRun) insertChunks(ctx, qctx context.Context, tx *sql.Tx, rows [][]engine.Value) error {
+func (r *loadRun) insertChunks(ctx, qctx context.Context, tx *sql.Tx, rows [][]engine.Value) (uint64, error) {
+	var inserted uint64
 	args := make([]any, 0, r.rowsPerStatement*len(r.columns))
 	for start := 0; start < len(rows); {
 		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("cancelled between statements: %w", err)
+			return 0, fmt.Errorf("cancelled between statements: %w", err)
 		}
 		end := r.chunkEnd(rows, start)
 		stmt, err := r.statement(qctx, end-start)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		args = args[:0]
 		for _, row := range rows[start:end] {
 			rowArgs, err := toArgs(row)
 			if err != nil {
-				return &engine.Error{Kind: engine.KindInvalidConfig, Engine: r.c.id, Op: "load rows", Msg: err.Error()}
+				return 0, &engine.Error{Kind: engine.KindInvalidConfig, Engine: r.c.id, Op: "load rows", Msg: err.Error()}
 			}
 			args = append(args, rowArgs...)
 		}
-		if _, err := tx.StmtContext(qctx, stmt).ExecContext(qctx, args...); err != nil {
-			return fmt.Errorf("insert: %w", err)
+		res, err := tx.StmtContext(qctx, stmt).ExecContext(qctx, args...)
+		if err != nil {
+			return 0, fmt.Errorf("insert: %w", err)
 		}
+		changed, err := res.RowsAffected()
+		if err != nil {
+			return 0, fmt.Errorf("rows affected: %w", err)
+		}
+		inserted += uint64(changed) //nolint:gosec // a row count is non-negative
 		start = end
 	}
-	return nil
+	return inserted, nil
 }
 
 // chunkEnd returns where the statement starting at start ends: at the row
@@ -217,10 +258,48 @@ func estimatedWireBytes(row []engine.Value) int {
 	return n
 }
 
-// killQueryOnCancel ends the running statement when ctx is cancelled. The
-// returned stop waits for the watcher, so a late KILL cannot hit a later
-// statement on this connection.
-func (c *Conn) killQueryOnCancel(ctx context.Context) (stop func()) {
+// loadSession is a connection of its own for one load, so the load can neither
+// end the caller's open transaction nor be mixed up with it.
+type loadSession struct {
+	c      *Conn
+	conn   *sql.Conn
+	connID uint64
+}
+
+func (c *Conn) loadSession(ctx context.Context, op string) (*loadSession, error) {
+	if _, err := c.live(op); err != nil {
+		return nil, err
+	}
+	c.mu.Lock()
+	db := c.db
+	c.mu.Unlock()
+	if db == nil {
+		return nil, &engine.Error{Kind: engine.KindConnectionLost, Engine: c.id, Op: op, Msg: "connection is closed"}
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return nil, c.loadError(ctx, err)
+	}
+	s := &loadSession{c: c, conn: conn}
+	if err := s.cancellable(ctx, func(qctx context.Context) error {
+		return conn.QueryRowContext(qctx, "SELECT CONNECTION_ID()").Scan(&s.connID)
+	}); err != nil {
+		_ = conn.Close()
+		return nil, c.loadError(ctx, err)
+	}
+	return s, nil
+}
+
+func (s *loadSession) close() { _ = s.conn.Close() }
+
+// cancellable runs fn on a context that cancelling ctx does not reach, because
+// the driver reacts to that by closing the socket and losing the session.
+// Instead a watcher sends KILL QUERY, and cuts the socket if that fails. It
+// waits for the watcher before returning, so a late KILL cannot hit a later
+// statement.
+func (s *loadSession) cancellable(ctx context.Context, fn func(qctx context.Context) error) error {
+	qctx, cutSocket := context.WithCancel(context.WithoutCancel(ctx))
+	defer cutSocket()
 	done := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -228,14 +307,16 @@ func (c *Conn) killQueryOnCancel(ctx context.Context) (stop func()) {
 		defer wg.Done()
 		select {
 		case <-ctx.Done():
-			_ = c.killQuery()
+			if err := s.c.killConnectionQuery(s.connID); err != nil {
+				cutSocket()
+			}
 		case <-done:
 		}
 	}()
-	return func() {
-		close(done)
-		wg.Wait()
-	}
+	err := fn(qctx)
+	close(done)
+	wg.Wait()
+	return err
 }
 
 var duplicateKeyRe = regexp.MustCompile(`for key '([^']*)'$`)

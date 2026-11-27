@@ -76,7 +76,8 @@ func commitBatch(ctx context.Context, db *sql.DB, insert insertBuilder, rows [][
 	if err != nil {
 		return engine.LoadStats{}, loadError(ctx, err)
 	}
-	if err := insertRows(ctx, tx, insert, rows); err != nil {
+	inserted, err := insertRows(ctx, tx, insert, rows)
+	if err != nil {
 		_ = tx.Rollback()
 		return engine.LoadStats{}, err
 	}
@@ -84,16 +85,19 @@ func commitBatch(ctx context.Context, db *sql.DB, insert insertBuilder, rows [][
 		_ = tx.Rollback()
 		return engine.LoadStats{}, loadError(ctx, err)
 	}
-	return engine.LoadStats{Rows: uint64(len(rows)), Batches: 1}, nil
+	return engine.LoadStats{Rows: inserted, Batches: 1}, nil
 }
 
-func insertRows(ctx context.Context, tx *sql.Tx, insert insertBuilder, rows [][]engine.Value) error {
+// insertRows returns how many rows the table kept, which is fewer than it was
+// given when the table says ON CONFLICT IGNORE.
+func insertRows(ctx context.Context, tx *sql.Tx, insert insertBuilder, rows [][]engine.Value) (uint64, error) {
 	statements := map[int]*sql.Stmt{}
 	defer func() {
 		for _, s := range statements {
 			_ = s.Close()
 		}
 	}()
+	var inserted uint64
 	args := make([]any, 0, insert.rowsPerStatement*len(insert.columns))
 	for start := 0; start < len(rows); start += insert.rowsPerStatement {
 		chunk := rows[start:min(start+insert.rowsPerStatement, len(rows))]
@@ -101,7 +105,7 @@ func insertRows(ctx context.Context, tx *sql.Tx, insert insertBuilder, rows [][]
 		if !ok {
 			var err error
 			if stmt, err = tx.PrepareContext(ctx, insert.sql(len(chunk))); err != nil {
-				return loadError(ctx, err)
+				return 0, loadError(ctx, err)
 			}
 			statements[len(chunk)] = stmt
 		}
@@ -109,15 +113,21 @@ func insertRows(ctx context.Context, tx *sql.Tx, insert insertBuilder, rows [][]
 		for _, row := range chunk {
 			rowArgs, err := toArgs(row)
 			if err != nil {
-				return &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "load rows", Msg: err.Error()}
+				return 0, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "load rows", Msg: err.Error()}
 			}
 			args = append(args, rowArgs...)
 		}
-		if _, err := stmt.ExecContext(ctx, args...); err != nil {
-			return loadError(ctx, err)
+		res, err := stmt.ExecContext(ctx, args...)
+		if err != nil {
+			return 0, loadError(ctx, err)
 		}
+		changed, err := res.RowsAffected()
+		if err != nil {
+			return 0, loadError(ctx, err)
+		}
+		inserted += uint64(changed) //nolint:gosec // a row count is non-negative
 	}
-	return nil
+	return inserted, nil
 }
 
 // loadError classifies a failed load. Messages name columns and constraints

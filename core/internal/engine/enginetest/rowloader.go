@@ -51,6 +51,7 @@ func RunRowLoader(t *testing.T, tg RowLoaderTarget) {
 	t.Run("SourceErrorMidLoad", func(t *testing.T) { rowSourceError(t, tg) })
 	t.Run("ConstraintViolationMidBatch", func(t *testing.T) { rowConstraintViolation(t, tg) })
 	t.Run("ColumnCountMismatch", func(t *testing.T) { rowColumnMismatch(t, tg) })
+	t.Run("CallersOpenTransactionIsNotCommitted", func(t *testing.T) { rowOpenTransaction(t, tg) })
 }
 
 type loaderSession struct {
@@ -259,6 +260,19 @@ func rowColumnMismatch(t *testing.T, tg RowLoaderTarget) {
 	}
 	if n := s.count(t, qualified); n != 0 {
 		t.Errorf("%d rows stored", n)
+	}
+}
+
+func rowOpenTransaction(t *testing.T, tg RowLoaderTarget) {
+	s := openRowLoader(t, tg)
+	const name = "qv_load_open_transaction"
+	qualified := s.keyedTable(t, name)
+	exec(t, s.conn, s.dialect.Begin())
+	exec(t, s.conn, "INSERT INTO "+qualified+" (id, label) VALUES (1, 'caller')")
+	stats, loadErr := s.load(context.Background(), name, keyedColumns, &rowSource{batches: keyedBatches(1, sequentialKeys)})
+	exec(t, s.conn, "ROLLBACK")
+	if n := s.count(t, qualified); n != stats.Rows {
+		t.Errorf("after the caller's ROLLBACK %d rows remain; the load reported %d (error: %v)", n, stats.Rows, loadErr)
 	}
 }
 

@@ -135,8 +135,10 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 			Msg: engine.Redact(err.Error(), secret), Err: err}
 	}
 	db := sql.OpenDB(connector)
-	// One connection runs statements; a second one is for KILL QUERY.
-	db.SetMaxOpenConns(2)
+	// One connection runs statements, one is for KILL QUERY, and one is
+	// for a bulk load, which needs its own session so it cannot end the
+	// caller's open transaction.
+	db.SetMaxOpenConns(3)
 	db.SetConnMaxLifetime(0)
 	conn, err := db.Conn(ctx)
 	if err != nil {

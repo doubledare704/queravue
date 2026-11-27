@@ -24,6 +24,7 @@ const (
 	copyChunkBytes  = 64 << 10
 	rollbackTimeout = 5 * time.Second
 	timestampLayout = "2006-01-02T15:04:05.999999Z07:00"
+	txStatusIdle    = 'I'
 )
 
 // LoadRows implements engine.RowLoader with COPY ... FROM STDIN in text
@@ -39,6 +40,9 @@ func (c *Conn) LoadRows(ctx context.Context, t engine.LoadTarget, columns []stri
 	c.mu.Unlock()
 	if conn == nil {
 		return engine.LoadStats{}, &engine.Error{Kind: engine.KindConnectionLost, Engine: c.id, Op: op, Msg: "connection is closed"}
+	}
+	if conn.PgConn().TxStatus() != txStatusIdle {
+		return engine.LoadStats{}, engine.Errorf(engine.KindUnsupported, c.id, op, "a transaction is open on this connection; commit or roll it back before loading")
 	}
 	copySQL := copyStatement(t, columns)
 	commit := func(ctx context.Context, rows [][]engine.Value) (engine.LoadStats, error) {
@@ -66,7 +70,8 @@ func (c *Conn) copyBatch(ctx context.Context, conn *pgx.Conn, copySQL string, wi
 		return engine.LoadStats{}, c.loadError(ctx, err)
 	}
 	reader := &copyTextReader{rows: rows, octalBytea: c.variant == VariantCockroach}
-	if _, err := tx.Conn().PgConn().CopyFrom(ctx, reader, copySQL); err != nil {
+	tag, err := tx.Conn().PgConn().CopyFrom(ctx, reader, copySQL)
+	if err != nil {
 		rollback(tx)
 		if reader.err != nil {
 			return engine.LoadStats{}, reader.err
@@ -77,7 +82,7 @@ func (c *Conn) copyBatch(ctx context.Context, conn *pgx.Conn, copySQL string, wi
 		rollback(tx)
 		return engine.LoadStats{}, c.loadError(ctx, err)
 	}
-	return engine.LoadStats{Rows: uint64(len(rows)), Batches: 1}, nil
+	return engine.LoadStats{Rows: uint64(tag.RowsAffected()), Batches: 1}, nil //nolint:gosec // a row count is non-negative
 }
 
 func rollback(tx pgx.Tx) {
