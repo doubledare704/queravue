@@ -153,3 +153,117 @@ Order: PR 1, 2 and 5 can start as soon as PR 0 merges; PR 5 develops against a f
 1. Should mock specs and import mappings be saveable in the workspace (ADR 0011), for example `*.mock.json`? Proposed: yes for mock specs in PR 7, and import mappings later with the task manager (It. 15).
 2. Scheduled exports in It. 15 will run in core without a save dialog. Proposed: keep the bytes-over-gRPC rule for now and decide a core-owned export directory in the It. 15 ADR.
 3. Excel (`.xlsx`) import/export is not in the PRD; leave it out unless asked.
+
+## Batch 1 prompts (after PR 0)
+
+**Base:** `main` at `6eec1e1` (PR 0 merged as #81). The contract, the stub `TransferService` and `MockDataService`, `engine.RowLoader` / `engine.DocumentLoader`, the capabilities `bulk_load` / `document_load` and protocol version 13 are on main.
+
+| Job | PR | Area | Depends on | Can run now |
+|---|---|---|---|---|
+| F1 | 1 | `core/internal/dataformat` (new), `core/internal/results` | — | yes |
+| L1 | 2 | `core/internal/engine/{postgres,sqlite,mysql,mongo,enginetest}` | — | yes |
+| M1 | 5 | `core/internal/mockdata` (new), `core/internal/api/mockdata_service.go` | L1 for the real run; uses a fake loader until then | yes |
+| A1 | 6 | `app/lib/features/transfer/` (new), `app/lib/core_client/` upload helper | F2 (PR 4) for real data; builds on fakes | yes |
+| A2 | 7 | `app/lib/features/mock_data/` (new) | M1 for real data; builds on fakes | yes |
+
+PR 3 (L2: SQL Server, Oracle, ClickHouse, DuckDB loaders) starts when L1's conformance suite is merged. PR 4 (F2: `TransferService`) starts when F1 and L1 are merged. Both go in batch 2.
+
+**Shared files:**
+- A1 and A2 both touch `app/lib/features/editor/application/editor_tabs.dart` (`TabKind`), `app/lib/features/schema/presentation/schema_tree_view.dart` (context menu) and `app/lib/features/command_palette/application/builtin_actions.dart`. Keep edits there additive (one enum value, one menu entry, one action each); whichever merges second rebases.
+- L1 and M1 both read `engine/load.go` and must not change it. A contract change goes through a separate PR.
+- No job changes anything under `proto/`.
+
+### Prompt F1 — PR 1: streaming file formats
+
+```text
+Repository: Queravue (Flutter desktop UI in app/, Go core in core/, gRPC contract in proto/). Read AGENTS.md and CLAUDE.md first and follow them: names over comments, ctx first, wrapped errors, table-driven tests, no new dependencies without a reason in the PR. Do NOT change anything under proto/.
+
+Context: Iteration 13 adds import and export. Read docs/adr/0024-import-export.md (§2 formats, §6 errors), docs/plans/iteration-13.md (PR 1 row, Testing), core/internal/results/format.go (the current TSV/CSV/JSON Formatter used by QueryService.CopyRange) and core/internal/engine/execute.go (engine.Value kinds).
+
+Task: implement PR 1 on a new branch `iteration-13-pr1-dataformat` from the latest origin/main.
+1. New package core/internal/dataformat with streaming readers and writers. A Writer takes columns once, then batches of []engine.Value rows, writing to an io.Writer. A Reader reads from an io.Reader and yields batches of rows. Neither holds more than one batch. Cap batches by bytes (about 1 MiB) as well as rows (500).
+2. Formats: CSV and TSV (RFC 4180 quoting; configurable delimiter, quote and null text; header on/off; UTF-8 with optional BOM; any other encoding is a clear error with the byte offset), JSON array and NDJSON of objects keyed by column name, and an SQL dump writer that emits INSERT statements through sqldialect (QuoteIdent, QualifyTable, FormatLiteral), multi-row up to a byte cap, with optional CREATE TABLE from the existing DDL builder. Document readers/writers for Mongo are relaxed or canonical EJSON per line or array; reuse the EJSON helpers in core/internal/engine/mongo or move the minimum needed to a shared place.
+3. Type sniffing for tabular files: from the first N rows, infer a ValueKind per column (bool, int, float, decimal, timestamp, uuid, json, text) and nullability. Mixed columns fall back to text with a warning. This feeds InferImport in PR 4.
+4. Bad rows: the reader reports line and column for every error and can continue after one (the SKIP policy), never panicking.
+5. Move results.Formatter behind the new Writer interface so CopyRange and export share one encoder. CopyRange output must stay byte-identical; prove it with the existing tests plus a golden test.
+6. Tests: goldens per format in core/internal/dataformat/testdata (quoting, embedded newlines, empty vs NULL, unicode, wide rows, every engine.Value kind) regenerated with -update; Go fuzz tests for the CSV and NDJSON readers; a test that reads a generated 1 GiB CSV from an io.Reader with flat heap (sample runtime/metrics and assert the live-heap peak stays under a few MiB).
+
+Done when: `cd core && go build ./... && go vet ./... && go test ./... && golangci-lint run` are green and a PR titled "Iteration 13 PR 1: streaming file formats" is open against main with the 1 GiB read numbers in its description.
+```
+
+### Prompt L1 — PR 2: bulk loaders on Postgres, SQLite, MySQL and Mongo
+
+```text
+Repository: Queravue. Read AGENTS.md and CLAUDE.md first and follow them. Do NOT change anything under proto/ or core/internal/engine/load.go.
+
+Context: Iteration 13 needs one fast insert path for import and mock data. Read docs/adr/0024-import-export.md §8 (loader capabilities), docs/adr/0003-engine-interface.md, core/internal/engine/load.go (RowLoader, DocumentLoader, RowBatchSource, DocumentBatchSource, LoadStats), core/internal/engine/descriptor.go (CapBulkLoad, CapDocumentLoad, CapabilityInterfaces), the engine packages postgres, sqlite, mysql and mongo, core/internal/engine/enginetest and docs/perf/iteration-12.md (why batches are sized in bytes and gates use the RSS peak).
+
+Task: implement PR 2 on a new branch `iteration-13-pr2-loaders` from the latest origin/main.
+1. RowLoader on Postgres and every Postgres-wire variant it serves (CockroachDB included) with pgx CopyFrom; on SQLite with a prepared multi-row insert inside a transaction per batch; on MySQL with multi-row INSERT batches sized below max_allowed_packet (read it once per load). Declare CapBulkLoad on those descriptors.
+2. DocumentLoader on Mongo and its variants (DocumentDB, Cosmos DB) with unordered InsertMany in batches of about 1–2 MiB of BSON. Declare CapDocumentLoad.
+3. Contract of every loader: pull batches from the source until io.EOF; commit per batch; on ctx cancel or a source error, stop after the current batch and return the committed LoadStats together with the error; map server errors to engine errors (constraint violations as their own kind so PR 4 can report CONSTRAINT); never log row values.
+4. Conformance suite in core/internal/engine/enginetest (a RowLoader suite and a DocumentLoader suite): load a fixture with every engine.Value kind the engine supports and read it back through Execute/Find; empty source; cancel mid-load leaves only whole committed batches; a unique violation in the middle of a batch returns stats plus a constraint error. Wire it into each engine's integration tests (//go:build integration, docker DBs from dev/docker-compose.yml).
+5. Perf test (integration, opt-in env like GRIDFS_MEMORY_PERF): 1M generated rows into Postgres and 1M documents into Mongo from a fixed in-memory source. Record rows/s and the core RSS peak (sample ps -o rss= every 100 ms) and assert the peak ≤ baseline + 60 MiB. Put the numbers in docs/perf/iteration-13.md under "Lane L".
+
+Done when: core build/vet/tests/lint are green; the integration suites pass on the docker Postgres, CockroachDB, MySQL, SQLite and Mongo (and DocumentDB Local via make test-docdb if available); Postgres ≥ 50k rows/s and Mongo ≥ 30k docs/s; and a PR titled "Iteration 13 PR 2: bulk loaders (Postgres, SQLite, MySQL, Mongo)" is open against main.
+```
+
+### Prompt M1 — PR 5: mock data generator in core
+
+```text
+Repository: Queravue. Read AGENTS.md and CLAUDE.md first and follow them. Do NOT change anything under proto/ or core/internal/engine/load.go.
+
+Context: Read docs/adr/0025-mock-data.md, docs/plans/iteration-13.md (PR 5 row, exit criteria), proto/queravue/v1/mockdata.proto (MockSpec, MockColumnRule and the rule messages, MockError kinds), core/internal/api/mockdata_service.go (stub), core/internal/engine/load.go, core/internal/engine/graph.go (RelationLister), core/internal/engine/schema.go (DescribeTable) and DocumentStore.SampleFieldPaths in core/internal/engine/document.go. Real loaders land in PR 2 on another branch; until it merges, test against a fake RowLoader/DocumentLoader.
+
+Task: implement PR 5 on a new branch `iteration-13-pr5-mockdata` from the latest origin/main.
+1. New package core/internal/mockdata: one generator per rule (faker kind, sequence, int/float/decimal range, time range, weighted values, constant, pattern, foreign key, embedded document, array, skip), plus null_ratio and unique. Everything is deterministic for a seed: derive one source per target and column from the seed, so the preview equals the first rows of a run and adding a column does not change other columns.
+2. Faker: add github.com/brianvoe/gofakeit/v7 (MIT) and give the reason in the PR. Expose a fixed list of supported faker kinds. Write in-house any kind that is not deterministic with a seeded source.
+3. Default rules: heuristics from column name and type (email, name, phone, city, country, url, *_at / *_date → time range in the last two years, identity/serial/default columns → skip, booleans, numerics, uuid, json) and from sampled Mongo field paths, including nested documents and arrays.
+4. FK planner: order targets topologically with RelationLister; FK columns get a foreign_key rule; report cycles as MockCycle with edges and nullability; draw child keys from keys generated in this run (compact set) or from a capped sample of existing parent keys. Unique rules use sequences or bounded retries, then fail with UNIQUE_EXHAUSTED and the column.
+5. MockDataService: SuggestMockSpec, PreviewMock (default 20 rows, max 200, nothing written) and RunMock (progress per target throttled to about 4 per second, target_done, summary; cancel stops after the current batch; production connections need confirmed, otherwise CONFIRMATION_REQUIRED). Use the RowLoader/DocumentLoader the session's Conn exposes; FAILED_PRECONDITION without one.
+6. Tests: unit tests per rule (ranges, null ratio within tolerance on 100k rows, uniqueness, patterns), seed determinism, planner order and cycle reports, and service tests with a fake loader. After PR 2 is on main, rebase and add an integration test that generates 1M rows into a Postgres table with an FK and 1M documents into Mongo. Assert Postgres ≤ 20 s, Mongo ≤ 35 s and core RSS peak ≤ baseline + 60 MiB, and record the numbers in docs/perf/iteration-13.md under "Lane M".
+
+Done when: core build/vet/tests/lint are green, the integration test meets the exit numbers (or, if PR 2 is not merged yet, the PR says so and the fake-loader tests are green), and a PR titled "Iteration 13 PR 5: mock data generator (core)" is open against main.
+```
+
+### Prompt A1 — PR 6: import and export in the app
+
+```text
+Repository: Queravue. Read AGENTS.md and CLAUDE.md first and follow them: Riverpod plain Notifiers (ADR 0002), feature-first folders, no business logic in widgets, keyboard-first, capability gating with no engine ids in Dart, golden tests for key widgets. Do NOT change anything under proto/ or core/.
+
+Context: Read docs/adr/0024-import-export.md, docs/plans/iteration-13.md (PR 6 row), proto/queravue/v1/transfer.proto (generated Dart in app/lib/core_client/gen/queravue/v1/transfer.*), app/lib/core_client/core_connection.dart (transferService) and app/lib/core_client/gridfs_upload.dart (own HTTP/2 transport for client streams, because grpc-dart queues client messages ahead of flow control). Look at app/lib/features/gridfs (save/open dialogs, temp files, progress and cancel) and app/lib/features/grid/application/copy_service.dart. The core TransferService is a stub until PR 4; build against a fake repository and the real contract.
+
+Task: implement PR 6 on a new branch `iteration-13-pr6-transfer-ui` from the latest origin/main.
+1. Generalise gridfs_upload.dart into one client-streaming / bidirectional helper for any method path, keeping its auth, flow-control, error and cancel behaviour and its tests. Import is a bidirectional stream: send header + ≤1 MiB chunks read from the file while reading ImportResponse events. Keep GridFS upload working through the helper.
+2. app/lib/features/transfer: a repository over TransferService (ListFormats, the three exports, InferImport, Import), a controller per flow and the UI.
+   - Export from the result grid, a table (schema tree) and a collection: format picker limited to ListFormats, format options, save dialog, progress with cancel (cancel visible after 300 ms), a summary.
+   - Import wizard from the schema tree, a table and a collection: open dialog; InferImport over the first few MiB; a preview grid with inferred types; column mapping; target (existing table, new table with editable columns and a DDL review step, or collection); error policy; single transaction; production confirmation; progress, cancel and a row-error report with line numbers.
+3. Gate on capabilities: import into tables needs bulk_load, into collections document_load; export needs execute or document_store. Parquet appears only when ListFormats lists it.
+4. Command palette entries and shortcuts for Export… and Import…; keep shared-file edits additive (see "Shared files" in the plan).
+5. Tests: unit tests for the helper with an in-process HTTP/2 server (bidi events, trailers-only errors, cancel), controller tests with a fake repository, widget tests and goldens for the export dialog, the mapping step and the error report. When PR 4 has merged, add an e2e test (integration_test) for CSV import → grid → export on SQLite and the docker Postgres.
+
+Done when: `cd app && flutter analyze && flutter test` are green, GridFS upload still passes its tests, and a PR titled "Iteration 13 PR 6: import and export UI" is open against main, noting whether the e2e test ran against a real PR 4 core.
+```
+
+### Prompt A2 — PR 7: mock data designer in the app
+
+```text
+Repository: Queravue. Read AGENTS.md and CLAUDE.md first and follow them (Riverpod plain Notifiers, feature-first, no business logic in widgets, keyboard-first, capability gating, goldens for key widgets). Do NOT change anything under proto/ or core/.
+
+Context: Read docs/adr/0025-mock-data.md, docs/plans/iteration-13.md (PR 7 row), proto/queravue/v1/mockdata.proto (generated Dart in app/lib/core_client/gen/queravue/v1/mockdata.*) and app/lib/core_client/core_connection.dart (mockDataService). Look at an existing tool tab such as app/lib/features/query_builder or app/lib/features/gridfs for tab wiring, and at the result grid for showing preview rows. The core MockDataService is a stub until PR 5; build against a fake repository.
+
+Task: implement PR 7 on a new branch `iteration-13-pr7-mock-data-ui` from the latest origin/main.
+1. app/lib/features/mock_data: repository over MockDataService, a controller holding the MockSpec, and a mock data tab opened from the schema tree (tables or collections, multi-select) and from the command palette.
+2. UI:
+   - A target list in FK order with row counts and a cycle banner that names the edges and offers "set nullable FK to NULL" or "leave table out".
+   - A per-column rule editor: the rule kind plus its fields, faker kind from faker_kinds, null ratio, unique, and nested rules for documents and arrays.
+   - Seed and a "new seed" action.
+   - A preview grid (PreviewMock, refreshed after edits with a debounce).
+   - Run with per-target progress, rows/s, cancel (visible after 300 ms), production confirmation and a summary.
+3. Gate on capabilities: tables need bulk_load and schema_inspector; collections need document_load.
+4. Save and load the spec as a workspace file `*.mock.json` (ADR 0011) if it fits in this PR; otherwise leave it out and say so in the PR.
+5. Command palette entry and shortcut; keep shared-file edits additive (see "Shared files" in the plan).
+6. Tests: controller tests with a fake repository (rule edits, cycle handling, run progress, cancel), widget tests and goldens for the rule editor and the target list. When PR 5 has merged, add an e2e test that generates 10k rows into the seeded Postgres and Mongo.
+
+Done when: `cd app && flutter analyze && flutter test` are green and a PR titled "Iteration 13 PR 7: mock data designer" is open against main, noting whether the e2e test ran against a real PR 5 core.
+```
