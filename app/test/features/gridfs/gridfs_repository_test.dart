@@ -16,16 +16,22 @@ class _Connection extends Fake implements CoreConnection {
   _Service get gridFsService => service;
   final service = _Service();
   final uploads = <pb.UploadRequest>[];
+  pb.UploadResponse? nextUploadResponse;
+  Object? nextUploadError;
 
   @override
   Future<pb.UploadResponse> uploadGridFsFile(
     Stream<pb.UploadRequest> requests,
     CancellationToken cancel,
   ) async {
+    if (nextUploadError != null) {
+      throw nextUploadError!;
+    }
     await for (final request in requests) {
       uploads.add(request);
     }
-    return pb.UploadResponse(file: pb.GridFsFile(idEjson: '"file"'));
+    return nextUploadResponse ??
+        pb.UploadResponse(file: pb.GridFsFile(idEjson: '"file"'));
   }
 }
 
@@ -181,4 +187,41 @@ void main() {
       expect(result.id, '"file"');
     },
   );
+
+  test('upload maps GrpcError.unauthenticated and empty responses', () async {
+    connection.nextUploadError = const GrpcError.unauthenticated('bad token');
+    await expectLater(
+      repository.upload(
+        _target,
+        const GridFsUpload(filename: 'picture'),
+        const Stream.empty(),
+        cancel: CancellationToken(),
+        confirmed: false,
+      ),
+      throwsA(
+        isA<GridFsFailure>()
+            .having((e) => e.kind, 'kind', GridFsFailureKind.auth)
+            .having((e) => e.message, 'message', 'bad token'),
+      ),
+    );
+
+    connection.nextUploadError = null;
+    connection.nextUploadResponse = pb.UploadResponse();
+    await expectLater(
+      repository.upload(
+        _target,
+        const GridFsUpload(filename: 'picture'),
+        const Stream.empty(),
+        cancel: CancellationToken(),
+        confirmed: false,
+      ),
+      throwsA(
+        isA<GridFsFailure>().having(
+          (e) => e.kind,
+          'kind',
+          GridFsFailureKind.corrupt,
+        ),
+      ),
+    );
+  });
 }

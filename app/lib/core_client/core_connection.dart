@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 
@@ -122,7 +121,7 @@ class GrpcCoreConnection implements CoreConnection {
   GrpcCoreConnection._(
     this._channel,
     this._openChannel,
-    this._address,
+    this._endpoint,
     this._token,
   ) : _client = CoreServiceClient(_channel),
       _auth = CallOptions(metadata: {'authorization': 'Bearer $_token'}) {
@@ -149,13 +148,10 @@ class GrpcCoreConnection implements CoreConnection {
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
   /// establishes it.
   static Future<CoreConnection> connect(CoreHandle handle) async {
-    final address = InternetAddress(
-      handle.socketPath,
-      type: InternetAddressType.unix,
-    );
+    final endpoint = CoreEndpoint.parse(handle.socketPath);
     ClientChannel openChannel() => ClientChannel(
-      address,
-      port: 0,
+      endpoint.address,
+      port: endpoint.port,
       options: const ChannelOptions(
         credentials: ChannelCredentials.insecure(),
         // Fail fast instead of retrying a dead socket; the supervisor
@@ -166,7 +162,7 @@ class GrpcCoreConnection implements CoreConnection {
     return GrpcCoreConnection._(
       openChannel(),
       openChannel,
-      address,
+      endpoint,
       handle.token,
     );
   }
@@ -174,7 +170,7 @@ class GrpcCoreConnection implements CoreConnection {
   static const _clientVersion = '0.1.0';
 
   final ClientChannel _channel;
-  final InternetAddress _address;
+  final CoreEndpoint _endpoint;
   final String _token;
   final ClientChannel Function() _openChannel;
   final _scanChannels = <ClientChannel>{};
@@ -281,7 +277,13 @@ class GrpcCoreConnection implements CoreConnection {
   Future<UploadResponse> uploadGridFsFile(
     Stream<UploadRequest> requests,
     CancellationToken cancel,
-  ) => uploadGridFs(_address, _token, requests, cancel);
+  ) => uploadGridFs(
+    _endpoint.address,
+    _token,
+    requests,
+    cancel,
+    port: _endpoint.port,
+  );
 
   @override
   Future<CoreInfo> hello() async {
