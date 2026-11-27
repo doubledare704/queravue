@@ -204,7 +204,7 @@ void main() {
                 tester.widget<RawImage>(finder).image != null;
           });
           expect(
-            state().selection?.preview?.bytes?.length,
+            state().selection?.preview?.file?.lengthSync(),
             32 * gridFsChunkBytes,
           );
         });

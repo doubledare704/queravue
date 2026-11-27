@@ -9,6 +9,7 @@ import '../../documents/application/document_tab_controller.dart'
     show kCancelDelay;
 import '../../editor/application/editor_tabs.dart';
 import '../data/gridfs_file_io.dart';
+import '../data/gridfs_preview_files.dart';
 import '../data/gridfs_repository.dart';
 import '../domain/gridfs_models.dart';
 import 'gridfs_preview.dart';
@@ -109,6 +110,9 @@ class GridFsController extends Notifier<GridFsState> {
 
   final String tabId;
   late GridFsRepository _repository;
+  late GridFsPreviewFiles _previewFiles;
+  File? _imageFile;
+  final _pdfFiles = <File>[];
   CancellationToken? _operation;
   CancellationToken? _preview;
   String _filter = '';
@@ -118,11 +122,17 @@ class GridFsController extends Notifier<GridFsState> {
   GridFsState build() {
     final target = ref.watch(gridFsTargetProvider(tabId));
     _repository = ref.watch(gridFsRepositoryProvider);
+    final previewFiles = _previewFiles = ref.watch(gridFsPreviewFilesProvider);
     ref.onDispose(() {
       _operation?.cancel();
       _operation = null;
       _preview?.cancel();
       _preview = null;
+      for (final file in [?_imageFile, ..._pdfFiles]) {
+        unawaited(previewFiles.delete(file));
+      }
+      _imageFile = null;
+      _pdfFiles.clear();
     });
     if (target != null) {
       scheduleMicrotask(() {
@@ -208,9 +218,12 @@ class GridFsController extends Notifier<GridFsState> {
   Future<void> select(GridFsEntry? file) async {
     _preview?.cancel();
     _preview = null;
+    final superseded = _imageFile;
+    _imageFile = null;
     state = state.select(
       file == null ? null : (file: file, preview: null, error: null),
     );
+    if (superseded != null) unawaited(_previewFiles.delete(superseded));
     final target = state.target;
     if (target == null || file == null) return;
     final cancel = _preview = CancellationToken();
@@ -220,9 +233,13 @@ class GridFsController extends Notifier<GridFsState> {
         target,
         file,
         cancel,
+        _previewFiles,
       );
       if (ref.mounted && identical(_preview, cancel)) {
+        _keepPreviewFile(preview);
         state = state.select((file: file, preview: preview, error: null));
+      } else if (preview.file case final stale?) {
+        unawaited(_previewFiles.delete(stale));
       }
     } on Object catch (error) {
       if (ref.mounted && identical(_preview, cancel)) {
@@ -230,6 +247,16 @@ class GridFsController extends Notifier<GridFsState> {
       }
     } finally {
       if (identical(_preview, cancel)) _preview = null;
+    }
+  }
+
+  void _keepPreviewFile(GridFsPreview preview) {
+    final file = preview.file;
+    if (file == null) return;
+    if (preview.kind == GridFsPreviewKind.pdf) {
+      _pdfFiles.add(file);
+    } else {
+      _imageFile = file;
     }
   }
 

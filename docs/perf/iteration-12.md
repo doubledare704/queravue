@@ -24,7 +24,7 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 - **Flat live heap:** Every 128 MiB checkpoint across the 1 GiB stream stays at `17.5 MiB` on upload (`uploadBufferSize = 16 MiB` inside `mongo.GridFSUploadStream`) and `17.1 MiB` on download (one driver cursor batch buffer), returning to `0.6–0.7 MiB` after completion.
 - **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire compression buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
 
-## Lane G: app
+## Lane G: app (profile build)
 
 Apple M4 Pro (arm64, macOS 27.2.1), 2026-11-20. The Flutter macOS profile build used the real sidecar and the Docker Mongo replica set. The test sampled app RSS with `ps` approximately every 50 ms and included the first sample after each operation in its peak. The 1 GiB fixture was a sparse file filled with zeros. The image was a 32 MiB BMP at 4096 × 2700 pixels, decoded to 2048 × 1350 for preview.
 
@@ -56,6 +56,69 @@ QUERAVUE_E2E=1 QUERAVUE_CONFIG_DIR="$(mktemp -d)" \
 ```
 
 Run the short end-to-end test with the same environment using `flutter test integration_test/gridfs_test.dart -d macos`.
+
+## Lane G: app (release build)
+
+Apple M4 Pro (arm64, macOS 27.2.1), 2026-11-26, Flutter 3.47.9. A release build of `app/perf/release_memory_main.dart` (the real app and `QueravueApp`, plus a scripted scenario that drives the same providers the UI uses) with the real sidecar, the Docker Mongo replica set seeded by `mongo-seed`, a temporary empty config dir, and `QUERAVUE_E2E=1` so the window is drawn. Integration tests cannot run in release mode, so the scenario is the release-mode driver.
+
+```bash
+make perf-idle-release
+```
+
+The script (`dev/perf-release-app.sh`) builds the sidecar and the release app, runs the scenario, and prints a Markdown table; it also writes `app/build/perf/release-memory.md.categories.txt` with the `footprint` category breakdown of every checkpoint. Each checkpoint waits as stated (30 s after launch, 10 s after closing or clearing, 20 s after disconnecting) and samples `ps -o rss=` and `footprint -p` for the app and `ps` for the sidecar.
+
+### Which number to read
+`footprint` (physical footprint, what Activity Monitor shows) is the stable measure. RSS on macOS swings by tens of MiB between identical runs because the OS compresses idle pages (the `origin/main` run below reads 132.6 MiB RSS with a 184.1 MiB footprint). The footprint tool also returned a transient wrong value twice (marked †; RSS in the same row was normal).
+
+### Before and after
+Before is `origin/main` (496b154) run through the same scenario; after is this change. App values in MiB.
+
+| Checkpoint | Footprint before | Footprint after | RSS before | RSS after | Core RSS after |
+|---|---:|---:|---:|---:|---:|
+| Idle 30 s after launch | 177.8 | 341.7 † | 182.6 | 185.1 | 33.2 |
+| Mongo connection open | 184.4 | 177.1 | 186.9 | 188.9 | 36.1 |
+| GridFS bucket open | 187.5 | 195.9 | 190.6 | 193.0 | 37.9 |
+| GridFS tab closed | 184.1 | 189.9 | 132.6 | 194.1 | 38.0 |
+| 32 MiB image preview open | 271.4 | 273.0 | 208.8 | 263.1 | 195.1 |
+| Preview cleared, 10 s | 261.8 | 262.8 | 214.3 | 267.7 | 195.1 |
+| Same, after a forced Dart GC | 231.1 | 231.3 | 183.6 | 236.3 | 195.1 |
+| Second 32 MiB preview open | | 273.0 | | 263.2 | 195.1 |
+| Second preview cleared, 10 s | | 262.3 | | 267.3 | 195.1 |
+| After 1 GiB upload and download | 239.1 | 237.4 | 172.1 | 201.4 | 217.1 |
+| GridFS closed and disconnected, 20 s | 227.1 | 414.5 † | 165.8 | 212.7 | 217.8 |
+| SQL mode tab with results open | 249.6 | 250.9 | 180.1 | 213.1 | 221.4 |
+| SQL mode tab closed, 10 s | 243.9 | 245.3 | 181.4 | 214.5 | 221.4 |
+| SQL mode closed and disconnected | 237.6 | 238.7 | 182.1 | 214.9 | 221.4 |
+
+| Transfer (app RSS) | Before → peak → after | After → peak → after |
+|---|---|---|
+| Upload 1 GiB | 183.6 → 204.4 → 189.2 | 237.0 → 261.0 → 207.0 |
+| Download 1 GiB | 189.4 → 203.4 → 170.2 | 207.2 → 218.5 → 198.4 |
+
+The "GC probe" rows come from the harness allocating and dropping 400 MiB of `Uint8List`s, which makes the Dart VM collect; the app itself never does this.
+
+### What the app retains
+The `footprint` categories at idle, with the 32 MiB preview open, after clearing it, and at the end:
+
+| Category (MiB) | Idle | Preview open | Cleared | Cleared, GC probe | End |
+|---|---:|---:|---:|---:|---:|
+| IOSurface (window drawables) | 53 | 53 | 53 | 53 | 53 |
+| Malloc Large | 48 | 80 | 80 | 80 | 80 |
+| Malloc Small | 22 | 31 | 32 | 32 | 44 |
+| Untagged (Dart heap) | 15 | 47 | 52 | 20 | 26 |
+
+- **Closing tabs does dispose their state.** `GridFsController`, `MongoSqlController`, `shellTabProvider` (invalidated when its tab closes), `documentPreviewProvider` and `cursorPageProvider` are all disposed or invalidated; the SQL mode tab adds about 13 MiB of footprint while open and gives it back on close. The image cache is empty 10 s after the preview clears (`Image cache` column in the raw report).
+- **Dart garbage lags the GC.** The 32 MiB preview streams through 1 MiB gRPC chunks, and the Dart heap keeps about 31 MiB of it until a collection; the probe row shows it is garbage, not a reference. Decoding images from a temp file instead of an in-memory `Uint8List` did not change this, because the chunks still pass through Dart.
+- **`Malloc Large` keeps the 32 MiB it used for decoding.** macOS keeps freed large malloc blocks counted in the footprint. A standalone probe (allocate and free 96 MiB, call `malloc_zone_pressure_relief`, wait 15 s) stayed at the high-water mark, so it cannot be returned from Dart. It is a reusable cache, not a leak: a second 32 MiB preview adds nothing (263.2 vs 263.1 MiB RSS).
+- **`Malloc Small` grows by about 20 MiB** over the session (gRPC, protobuf, widgets) and does not shrink.
+- **Idle itself is about 165 to 180 MiB of footprint here** (53 MiB of window surfaces, 48 MiB of large malloc), against 139.4 MiB combined in the iteration 10 empty-profile run. `origin/main` measures the same, so this is not from this change; a smaller default window or surface count is the lever and is not part of this PR.
+
+So after closing the GridFS and SQL mode tabs the app is about 60 MiB above its post-launch idle, not within 10 MiB: roughly 32 MiB is the allocator's large-block cache, 20 MiB small-malloc growth and 10 MiB one-time UI warm-up (first bucket open adds 5 to 10 MiB). The same session reaches a combined RSS above the 150 MB idle budget before any preview, and the sidecar alone holds 195 to 220 MiB after the 1 GiB transfers (the core job covers that).
+
+### Changes in this PR
+- Image and PDF previews stream into a private temp file (`GridFsPreviewFiles`) instead of a `Uint8List` held in state; images decode from the file at display size and the file is deleted when the selection changes, PDFs when the tab closes (ADR 0023 §6).
+- `PaintingBinding.imageCache` is capped at 32 MiB and 20 images (`limitImageCache`).
+- The harness above, so later iterations can rerun it.
 
 ## Lane T: SQL → MQL translator
 

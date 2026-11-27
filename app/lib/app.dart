@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core_client/core_providers.dart';
 import 'features/editor/application/layout_persistence.dart';
 import 'features/editor/presentation/workspace.dart';
-import 'features/gridfs/data/pdf_previewer.dart';
+import 'features/gridfs/data/gridfs_preview_files.dart';
 import 'features/keybindings/application/keybindings_controller.dart';
 import 'features/workspace/presentation/left_sidebar.dart';
 import 'shared/actions/action_shortcuts.dart';
@@ -35,7 +35,7 @@ class _QueravueAppState extends ConsumerState<QueravueApp> {
 
   Future<AppExitResponse> _onExitRequested() async {
     await ref.read(layoutPersistenceProvider).flush();
-    await ref.read(pdfPreviewerProvider).dispose();
+    await ref.read(gridFsPreviewFilesProvider).dispose();
     await ref.read(coreSupervisorProvider).dispose();
     return AppExitResponse.exit;
   }
