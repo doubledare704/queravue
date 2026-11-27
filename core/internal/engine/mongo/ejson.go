@@ -173,3 +173,19 @@ func CanonicalEJSON(doc any) (string, error) {
 	}
 	return string(b), nil
 }
+
+// TranscodeEJSON changes the flavor using the same BSON conversion as document editing.
+func TranscodeEJSON(text string, requireCanonical, emitCanonical bool) (string, error) {
+	raw, err := parseDocument(text, requireCanonical, engine.InputDocument)
+	if err != nil {
+		return "", err
+	}
+	if emitCanonical {
+		return toEJSON(raw)
+	}
+	b, err := bson.MarshalExtJSON(raw, false, false)
+	if err != nil {
+		return "", fmt.Errorf("mongo: encode relaxed document: %w", err)
+	}
+	return string(b), nil
+}
