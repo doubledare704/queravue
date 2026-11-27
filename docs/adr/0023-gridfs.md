@@ -47,6 +47,10 @@ Implementation note for the GridFS viewer: stream `≤ 1 MiB` download chunks st
 ### 8. Errors
 Failures the user can act on are in-band `GridFsError` with the kinds of `DocumentErrorKind` plus `CORRUPT` (missing or short chunks). Unknown sessions are gRPC `NOT_FOUND`; a session without the capability is `FAILED_PRECONDITION`.
 
+## Implementation notes
+
+- Core uploads use Queravue's own spec-compliant GridFS chunk writer. It targets 2 MiB of chunk payload per batch, allows one chunk per batch when the configured chunk size exceeds that target, and inserts the file document after all chunks are written. See [Iteration 12 measurements](../perf/iteration-12.md).
+
 ## Consequences
 - New `GridFsService` in `gridfs.proto`; protocol version 12 (shared with ADR 0022).
 - Memory stays flat for any file size; the cost is a copy through gRPC instead of a direct file write in core.
