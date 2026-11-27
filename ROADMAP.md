@@ -137,6 +137,8 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 - Mock data generator: per-column faker rules, FK-aware, bulk insert with progress.
 - **Done when:** you can generate 1M realistic rows into Postgres and Mongo in reasonable time.
 
+**Plan:** `docs/plans/iteration-13.md`. Decisions in ADRs 0024 (import and export) and 0025 (mock data); the additive contract (`TransferService`, `MockDataService`, capabilities `bulk_load` and `document_load`, protocol version 13) landed in PR 0.
+
 ### It. 14 — Profiler, monitoring, clusters
 - Explain-plan visualizer (Postgres, MySQL, Mongo, SQL Server).
 - Server monitoring dashboard (connections, ops/sec, slow queries, cache hit).

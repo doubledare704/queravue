@@ -1,0 +1,369 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/query.proto";
+import "queravue/v1/schema.proto";
+import "queravue/v1/transfer.proto";
+
+// MockDataService generates realistic rows and documents and loads them
+// through the engine's bulk loader (ADR 0025).
+//
+// Generation is deterministic for a seed, so a preview equals the first rows
+// of a run. Failures the user can act on are returned in-band as MockError.
+// Unknown sessions are NOT_FOUND and sessions without "bulk_load" or
+// "document_load" are FAILED_PRECONDITION.
+service MockDataService {
+  // SuggestMockSpec proposes rules for the given tables or collections from
+  // their columns or sampled field paths, orders tables by foreign keys and
+  // reports cycles.
+  rpc SuggestMockSpec(SuggestMockSpecRequest) returns (SuggestMockSpecResponse);
+
+  // PreviewMock generates the first rows of each target without writing.
+  rpc PreviewMock(PreviewMockRequest) returns (PreviewMockResponse);
+
+  // RunMock generates and loads every target in order. Cancelling the call
+  // stops after the current batch; finished tables stay committed.
+  rpc RunMock(RunMockRequest) returns (stream RunMockResponse);
+}
+
+// MockErrorKind classifies a mock data failure.
+enum MockErrorKind {
+  // Unclassified failure.
+  MOCK_ERROR_KIND_UNSPECIFIED = 0;
+  // A rule is malformed, e.g. an empty range or an unknown faker kind.
+  MOCK_ERROR_KIND_PARSE = 1;
+  // The targets' foreign keys form a cycle with no nullable edge set to null.
+  MOCK_ERROR_KIND_CYCLE = 2;
+  // A unique rule ran out of distinct values.
+  MOCK_ERROR_KIND_UNIQUE_EXHAUSTED = 3;
+  // The server rejected a row for a constraint.
+  MOCK_ERROR_KIND_CONSTRAINT = 4;
+  // The connection is flagged production and the request did not set
+  // confirmed. Nothing was changed.
+  MOCK_ERROR_KIND_CONFIRMATION_REQUIRED = 5;
+  // Bad credentials or not permitted.
+  MOCK_ERROR_KIND_AUTH = 6;
+  // Server unreachable or connection lost.
+  MOCK_ERROR_KIND_NETWORK = 7;
+  // The operation exceeded its time limit.
+  MOCK_ERROR_KIND_TIMEOUT = 8;
+  // The run was cancelled.
+  MOCK_ERROR_KIND_CANCELED = 9;
+  // The engine or a column type is not supported.
+  MOCK_ERROR_KIND_UNSUPPORTED = 10;
+  // The server rejected the operation.
+  MOCK_ERROR_KIND_SERVER = 11;
+}
+
+// MockError is a typed failure. The message never contains secrets or row
+// data.
+message MockError {
+  // Failure class.
+  MockErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+  // Target the failure belongs to, when there is one.
+  MockTargetRef target = 3;
+  // Column or field path the failure belongs to, when there is one.
+  string column = 4;
+}
+
+// MockTargetRef names a table or a collection.
+message MockTargetRef {
+  // Target.
+  oneof target {
+    // A table.
+    TableRef table = 1;
+    // A collection.
+    CollectionRef collection = 2;
+  }
+}
+
+// FakerRule draws from a named faker kind, e.g. "email" or "city".
+message FakerRule {
+  // One of SuggestMockSpecResponse.faker_kinds.
+  string kind = 1;
+}
+
+// SequenceRule counts from start by step.
+message SequenceRule {
+  // First value.
+  int64 start = 1;
+  // Increment; 0 means 1.
+  int64 step = 2;
+}
+
+// IntRangeRule draws integers uniformly from [min, max].
+message IntRangeRule {
+  // Smallest value.
+  int64 min = 1;
+  // Largest value.
+  int64 max = 2;
+}
+
+// FloatRangeRule draws floats uniformly from [min, max).
+message FloatRangeRule {
+  // Smallest value.
+  double min = 1;
+  // Upper bound, exclusive.
+  double max = 2;
+}
+
+// DecimalRangeRule draws exact decimals from [min, max] with a scale.
+message DecimalRangeRule {
+  // Smallest value as decimal text.
+  string min = 1;
+  // Largest value as decimal text.
+  string max = 2;
+  // Digits after the decimal point.
+  uint32 scale = 3;
+}
+
+// TimeRangeRule draws instants uniformly from [from_ms, to_ms].
+message TimeRangeRule {
+  // Earliest instant, Unix milliseconds.
+  int64 from_ms = 1;
+  // Latest instant, Unix milliseconds.
+  int64 to_ms = 2;
+  // Truncate to whole days, for date columns.
+  bool date_only = 3;
+}
+
+// WeightedValuesRule picks one of values with the given weights.
+message WeightedValuesRule {
+  // Candidate values.
+  repeated Value values = 1;
+  // One weight per value; empty means equal weights.
+  repeated double weights = 2;
+}
+
+// ConstantRule always produces the same value.
+message ConstantRule {
+  // The value.
+  Value value = 1;
+}
+
+// PatternRule fills a pattern: "#" becomes a digit, "?" a letter, "\\"
+// escapes the next character.
+message PatternRule {
+  // Pattern text.
+  string pattern = 1;
+}
+
+// ForeignKeyRule draws values from a parent table's key column.
+message ForeignKeyRule {
+  // Parent table.
+  TableRef parent = 1;
+  // Parent column.
+  string parent_column = 2;
+  // Draw from the parent's existing rows instead of the rows generated in
+  // this run.
+  bool from_existing_rows = 3;
+}
+
+// DocumentRule builds an embedded document from rules for its fields.
+message DocumentRule {
+  // Rules for the fields; paths are relative to this document.
+  repeated MockColumnRule fields = 1;
+}
+
+// ArrayRule builds an array whose elements follow one rule.
+message ArrayRule {
+  // Fewest elements.
+  uint32 min_length = 1;
+  // Most elements.
+  uint32 max_length = 2;
+  // Rule for each element; its column_or_path is ignored.
+  MockColumnRule element = 3;
+}
+
+// SkipRule leaves the column to the server: a default or identity value.
+message SkipRule {}
+
+// MockColumnRule says how one column or field path is generated.
+message MockColumnRule {
+  // Column name, or dotted field path for documents.
+  string column_or_path = 1;
+  // Share of NULLs (or missing fields for documents), 0 to 1.
+  double null_ratio = 2;
+  // Values must not repeat within the run.
+  bool unique = 3;
+  // Generator.
+  oneof rule {
+    // Faker kind.
+    FakerRule faker = 4;
+    // Counter.
+    SequenceRule sequence = 5;
+    // Integer range.
+    IntRangeRule int_range = 6;
+    // Float range.
+    FloatRangeRule float_range = 7;
+    // Decimal range.
+    DecimalRangeRule decimal_range = 8;
+    // Date or timestamp range.
+    TimeRangeRule time_range = 9;
+    // Weighted list.
+    WeightedValuesRule weighted_values = 10;
+    // Constant.
+    ConstantRule constant = 11;
+    // Pattern.
+    PatternRule pattern = 12;
+    // Foreign key.
+    ForeignKeyRule foreign_key = 13;
+    // Embedded document.
+    DocumentRule document = 14;
+    // Array.
+    ArrayRule array = 15;
+    // Left to the server.
+    SkipRule skip = 16;
+  }
+}
+
+// MockTarget is one table or collection to fill.
+message MockTarget {
+  // Table or collection.
+  MockTargetRef target = 1;
+  // Rows or documents to generate.
+  uint64 rows = 2;
+  // Rules; columns without a rule are skipped.
+  repeated MockColumnRule rules = 3;
+}
+
+// MockSpec is a whole generation run.
+message MockSpec {
+  // Random seed; the same seed and spec give the same rows.
+  uint64 seed = 1;
+  // Targets in load order.
+  repeated MockTarget targets = 2;
+}
+
+// MockCycleEdge is one foreign key in a cycle.
+message MockCycleEdge {
+  // Referencing table.
+  TableRef child = 1;
+  // Referenced table.
+  TableRef parent = 2;
+  // Foreign key name.
+  string constraint_name = 3;
+  // True when every column of the key is nullable, so it can be set to NULL.
+  bool nullable = 4;
+}
+
+// MockCycle is a foreign-key cycle among the targets.
+message MockCycle {
+  // Edges in cycle order.
+  repeated MockCycleEdge edges = 1;
+}
+
+// SuggestMockSpecRequest selects targets.
+message SuggestMockSpecRequest {
+  // Session id.
+  string session_id = 1;
+  // Tables to fill.
+  repeated TableRef tables = 2;
+  // Collections to fill.
+  repeated CollectionRef collections = 3;
+  // Rows per target in the suggestion; 0 means 1000.
+  uint64 rows = 4;
+}
+
+// SuggestMockSpecResponse is a ready-to-run spec.
+message SuggestMockSpecResponse {
+  // Spec with default rules, targets in foreign-key order.
+  MockSpec spec = 1;
+  // Cycles that block a run until broken.
+  repeated MockCycle cycles = 2;
+  // Faker kinds this core supports.
+  repeated string faker_kinds = 3;
+  // Notes, e.g. a column type without a default rule.
+  repeated string warnings = 4;
+  // Set when the targets could not be described.
+  MockError error = 5;
+}
+
+// PreviewMockRequest asks for sample rows.
+message PreviewMockRequest {
+  // Session id.
+  string session_id = 1;
+  // Spec to preview.
+  MockSpec spec = 2;
+  // Rows per target; 0 means 20, at most 200.
+  uint32 rows = 3;
+}
+
+// MockPreview holds sample rows for one target.
+message MockPreview {
+  // Target.
+  MockTargetRef target = 1;
+  // Column names in the order of the rows' values, for tables.
+  repeated string columns = 2;
+  // Rows, for tables.
+  RowBatch rows = 3;
+  // Documents as canonical EJSON, for collections.
+  repeated string documents_ejson = 4;
+}
+
+// PreviewMockResponse holds one preview per target.
+message PreviewMockResponse {
+  // Previews in spec order.
+  repeated MockPreview previews = 1;
+  // Set when the spec is invalid.
+  MockError error = 2;
+}
+
+// RunMockRequest starts a run.
+message RunMockRequest {
+  // Session id.
+  string session_id = 1;
+  // Spec to run.
+  MockSpec spec = 2;
+  // Required on connections flagged production.
+  bool confirmed = 3;
+}
+
+// MockProgress reports one target's progress.
+message MockProgress {
+  // Target being loaded.
+  MockTargetRef target = 1;
+  // Rows committed so far.
+  uint64 rows = 2;
+  // Recent load rate.
+  double rows_per_second = 3;
+}
+
+// MockTargetDone reports a finished target.
+message MockTargetDone {
+  // Target.
+  MockTargetRef target = 1;
+  // Rows committed.
+  uint64 rows = 2;
+  // Time spent, milliseconds.
+  uint64 elapsed_ms = 3;
+}
+
+// MockSummary ends a run, completely or after a failure or cancel.
+message MockSummary {
+  // Rows committed across all targets.
+  uint64 rows = 1;
+  // Time spent, milliseconds.
+  uint64 elapsed_ms = 2;
+  // Targets that finished, in order.
+  repeated MockTargetDone done = 3;
+}
+
+// RunMockResponse is one event of a run: progress and finished targets, then
+// a summary, or an error followed by a summary.
+message RunMockResponse {
+  // Event.
+  oneof event {
+    // Throttled progress.
+    MockProgress progress = 1;
+    // A target finished.
+    MockTargetDone target_done = 2;
+    // Last event.
+    MockSummary summary = 3;
+    // Failure that stopped the run.
+    MockError error = 4;
+  }
+}

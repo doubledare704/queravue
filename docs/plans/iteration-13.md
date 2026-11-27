@@ -1,6 +1,6 @@
 # Iteration 13 plan — Import/export + mock data
 
-**Status:** Planned · 2026-11-27 · Protocol version 13
+**Status:** In progress · 2026-11-27 · Protocol version 13 · PR 0 (ADRs 0024 and 0025, contract) done
 
 ## Goal (from ROADMAP)
 - Import/export CSV, JSON/NDJSON, SQL dump, Parquet (DuckDB).
@@ -100,12 +100,12 @@ Added exit criteria, so the import/export half has one too:
 
 ## Contract (PR 0)
 - `proto/queravue/v1/transfer.proto`, `TransferService`:
-  - `ExportResult` and `ExportTable` / `ExportCollection` are server streams: a header, byte chunks of at most 1 MiB, then a summary or an error.
   - `ListFormats` returns the import and export formats this core build supports (Parquet only with the `duckdb` tag).
+  - `ExportResult`, `ExportTable` and `ExportCollection` are server streams of `ExportEvent`: a header, byte chunks of at most 1 MiB with progress, then a summary or an error.
   - `InferImport` is a client stream of the first bytes; it returns the format, columns, types and a preview.
-  - `Import` is a client stream (a header with the target, mapping, format options, error policy and `confirmed`, then chunks). It returns a summary with committed rows and row errors.
+  - `Import` is a bidirectional stream: the app sends a header (target: existing table, new table or collection; mappings; format options; error policy; `single_transaction`; `confirmed`) and then chunks; core streams back progress and a summary with committed rows and row errors, and a summary may follow an error.
   - Typed `TransferError` kinds: PARSE, MAPPING, CONSTRAINT, CONFIRMATION_REQUIRED, AUTH, NETWORK, TIMEOUT, CANCELED, UNSUPPORTED, SERVER.
-- `proto/queravue/v1/mockdata.proto`, `MockDataService`, as in ADR 0025 §6.
+- `proto/queravue/v1/mockdata.proto`, `MockDataService` (`SuggestMockSpec`, `PreviewMock`, `RunMock`), as in ADR 0025 §6. A `MockSpec` is a seed and targets, each with rows and `MockColumnRule`s (faker kind as a string, sequence, ranges, weighted values, constant, pattern, foreign key, embedded document, array, skip).
 - Capabilities `bulk_load` and `document_load` mapped in `CapabilityInterfaces`; no descriptor declares them until its loader lands.
 - Protocol version 13. Stub services return `UNIMPLEMENTED`. Generated Go and Dart code is committed.
 

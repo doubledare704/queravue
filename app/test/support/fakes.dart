@@ -9,6 +9,8 @@ import 'package:queravue/core_client/gen/queravue/v1/connections.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/design.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/document.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/gridfs.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/mockdata.pbgrpc.dart';
+import 'package:queravue/core_client/gen/queravue/v1/transfer.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/history.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/index.pbgrpc.dart';
 import 'package:queravue/core_client/gen/queravue/v1/keyvalue.pbgrpc.dart';
@@ -193,6 +195,14 @@ class FakeCoreConnection implements CoreConnection {
   @override
   GridFsServiceClient get gridFsService =>
       throw UnimplementedError('use a fake GridFsRepository');
+
+  @override
+  TransferServiceClient get transferService =>
+      throw UnimplementedError('use a fake transfer repository');
+
+  @override
+  MockDataServiceClient get mockDataService =>
+      throw UnimplementedError('use a fake mock data repository');
 
   @override
   Future<UploadResponse> uploadGridFsFile(
