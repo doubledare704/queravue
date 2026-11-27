@@ -4,10 +4,12 @@ import 'package:queravue/features/mongo_sql/domain/mongo_sql_translation.dart';
 import 'package:queravue/features/mongo_sql/presentation/mql_pane.dart';
 import 'package:queravue/shared/theme.dart';
 
+import '../../support/builder_golden_comparator.dart';
 import 'fixtures.dart';
 
 void main() {
   testWidgets('generated MQL pane in EJSON format', (tester) async {
+    useBuilderGoldenComparator();
     await tester.pumpWidget(
       MaterialApp(
         theme: lightTheme,
