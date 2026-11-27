@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
@@ -22,11 +23,12 @@ import (
 var _ engine.GridFS = (*Conn)(nil)
 
 const (
-	// Strictly below MongoDB's 16 MiB BSON limit and the driver's 16 MiB upload buffer.
+	// Leave room for the chunk document inside MongoDB's 16 MiB BSON limit.
 	maxGridFSChunkSize       = (16 << 20) - 4096
 	maxCheapBucketCount      = 10_000
 	gridfsCleanupTimeout     = 10 * time.Second
-	gridfsUploadCopyBuf      = 256 << 10
+	gridfsUploadBatchBytes   = 2 << 20
+	defaultGridFSChunkSize   = 255 << 10
 	gridfsDownloadBatchBytes = 4 << 20
 )
 
@@ -537,6 +539,150 @@ func (r *rangeDownloadReader) Close() error {
 	return nil
 }
 
+func prepareGridFSIndexes(ctx context.Context, b *mongo.GridFSBucket) error {
+	files := b.GetFilesCollection()
+	primary := files.Clone(options.Collection().SetReadPreference(readpref.Primary()))
+	_, err := primary.FindOne(ctx, bson.D{}, options.FindOne().SetProjection(bson.D{{Key: "_id", Value: 1}})).Raw()
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		if err != nil {
+			return fmt.Errorf("check gridfs files: %w", err)
+		}
+		return nil
+	}
+	for _, index := range []struct {
+		collection *mongo.Collection
+		keys       bson.D
+		unique     bool
+	}{
+		{files, bson.D{{Key: "filename", Value: int32(1)}, {Key: "uploadDate", Value: int32(1)}}, false},
+		{b.GetChunksCollection(), bson.D{{Key: "files_id", Value: int32(1)}, {Key: "n", Value: int32(1)}}, true},
+	} {
+		cursor, err := index.collection.Indexes().List(ctx)
+		if err != nil {
+			return fmt.Errorf("list gridfs indexes: %w", err)
+		}
+		found := false
+		for cursor.Next(ctx) {
+			var doc struct {
+				Key bson.D `bson:"key"`
+			}
+			if err := cursor.Decode(&doc); err != nil {
+				_ = cursor.Close(ctx)
+				return fmt.Errorf("decode gridfs index: %w", err)
+			}
+			if len(doc.Key) == len(index.keys) {
+				found = true
+				for i, key := range doc.Key {
+					if key.Key != index.keys[i].Key || !numericIndexOne(key.Value) {
+						found = false
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+		}
+		if err := cursor.Err(); err != nil {
+			_ = cursor.Close(ctx)
+			return fmt.Errorf("read gridfs indexes: %w", err)
+		}
+		_ = cursor.Close(ctx)
+		if !found {
+			model := mongo.IndexModel{Keys: index.keys}
+			if index.unique {
+				model.Options = options.Index().SetUnique(true)
+			}
+			if _, err := index.collection.Indexes().CreateOne(ctx, model); err != nil {
+				return fmt.Errorf("create gridfs index: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func numericIndexOne(value any) bool {
+	switch n := value.(type) {
+	case int32:
+		return n == 1
+	case int64:
+		return n == 1
+	case float64:
+		return n == 1
+	default:
+		return false
+	}
+}
+
+func readGridFSChunk(ctx context.Context, r io.Reader, data []byte) (int, bool, error) {
+	total, emptyReads := 0, 0
+	for total < len(data) {
+		if err := ctx.Err(); err != nil {
+			return 0, false, fmt.Errorf("gridfs upload context: %w", err)
+		}
+		n, err := r.Read(data[total:])
+		total += n
+		if errors.Is(err, io.EOF) {
+			return total, true, nil
+		}
+		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return 0, false, fmt.Errorf("gridfs upload context: %w", ctxErr)
+			}
+			return 0, false, fmt.Errorf("read gridfs chunk: %w", err)
+		}
+		if n == 0 {
+			emptyReads++
+			if emptyReads >= 100 {
+				return 0, false, fmt.Errorf("read gridfs chunk: %w", io.ErrNoProgress)
+			}
+		} else {
+			emptyReads = 0
+		}
+	}
+	return total, false, nil
+}
+
+func writeGridFSChunks(ctx context.Context, chunks *mongo.Collection, fileID bson.ObjectID, chunkSize int, r io.Reader) (int64, error) {
+	batchChunks := max(1, gridfsUploadBatchBytes/chunkSize)
+	buffer := make([]byte, batchChunks*chunkSize)
+	docs := make([]any, 0, batchChunks)
+	var length int64
+	var sequence int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return 0, fmt.Errorf("gridfs upload context: %w", err)
+		}
+		data := buffer[len(docs)*chunkSize : (len(docs)+1)*chunkSize]
+		n, done, err := readGridFSChunk(ctx, r, data)
+		if err != nil {
+			return 0, err
+		}
+		if n > 0 {
+			if sequence > math.MaxInt32 {
+				return 0, fmt.Errorf("gridfs: too many chunks")
+			}
+			docs = append(docs, bson.D{
+				{Key: "_id", Value: bson.NewObjectID()}, {Key: "files_id", Value: fileID},
+				{Key: "n", Value: int32(sequence)}, {Key: "data", Value: bson.Binary{Subtype: 0, Data: data[:n]}},
+			})
+			sequence++
+			length += int64(n)
+		}
+		if len(docs) == batchChunks || done {
+			if len(docs) > 0 {
+				if _, writeErr := chunks.InsertMany(ctx, docs); writeErr != nil {
+					return 0, fmt.Errorf("insert gridfs chunks: %w", writeErr)
+				}
+				docs = docs[:0]
+			}
+		}
+		if done {
+			return length, nil
+		}
+	}
+}
+
 // Upload implements engine.GridFS.
 func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (engine.GridFSFile, error) {
 	b, err := c.gridfsBucket("upload", u.Database, u.Bucket)
@@ -567,62 +713,41 @@ func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (
 		return engine.GridFSFile{}, c.parseErr(err)
 	}
 
-	uploadOpts := options.GridFSUpload()
-	if u.ChunkSizeBytes > 0 {
-		uploadOpts.SetChunkSizeBytes(int32(u.ChunkSizeBytes))
+	fileID := bson.NewObjectID()
+	chunkSize := int(u.ChunkSizeBytes)
+	if chunkSize == 0 {
+		chunkSize = defaultGridFSChunkSize
+	}
+	if err := prepareGridFSIndexes(ctx, b); err != nil {
+		return engine.GridFSFile{}, c.fail("upload", err)
+	}
+	cleanup := func() {
+		cleanCtx, cancel := context.WithTimeout(context.Background(), gridfsCleanupTimeout)
+		defer cancel()
+		_, _ = b.GetChunksCollection().DeleteMany(cleanCtx, bson.D{{Key: "files_id", Value: fileID}})
+		_, _ = b.GetFilesCollection().DeleteOne(cleanCtx, bson.D{{Key: "_id", Value: fileID}})
+	}
+	length, err := writeGridFSChunks(ctx, b.GetChunksCollection(), fileID, chunkSize, r)
+	if err != nil {
+		cleanup()
+		return engine.GridFSFile{}, c.fail("upload", err)
+	}
+	fileDoc := bson.D{
+		{Key: "_id", Value: fileID},
+		{Key: "length", Value: length},
+		{Key: "chunkSize", Value: int32(chunkSize)},
+		{Key: "uploadDate", Value: bson.NewDateTimeFromTime(time.Now())},
+		{Key: "filename", Value: u.Filename},
 	}
 	if meta != nil {
-		uploadOpts.SetMetadata(meta)
+		fileDoc = append(fileDoc, bson.E{Key: "metadata", Value: meta})
 	}
-
-	us, err := b.OpenUploadStream(ctx, u.Filename, uploadOpts)
-	if err != nil {
+	if _, err := b.GetFilesCollection().InsertOne(ctx, fileDoc); err != nil {
+		cleanup()
 		return engine.GridFSFile{}, c.fail("upload", err)
 	}
 
-	abort := func(removeFileDoc bool) {
-		// Driver Abort() reuses the upload ctx, which fails if ctx was cancelled; fall back to a fresh ctx.
-		if aerr := us.Abort(); aerr != nil || ctx.Err() != nil {
-			cleanCtx, cancel := context.WithTimeout(context.Background(), gridfsCleanupTimeout)
-			defer cancel()
-			_, _ = b.GetChunksCollection().DeleteMany(cleanCtx, bson.D{{Key: "files_id", Value: bson.D{{Key: "$eq", Value: us.FileID}}}})
-			if removeFileDoc {
-				_, _ = b.GetFilesCollection().DeleteOne(cleanCtx, bson.D{{Key: "_id", Value: bson.D{{Key: "$eq", Value: us.FileID}}}})
-			}
-		}
-	}
-
-	buf := make([]byte, gridfsUploadCopyBuf)
-	for {
-		if err := ctx.Err(); err != nil {
-			abort(false)
-			return engine.GridFSFile{}, c.fail("upload", err)
-		}
-		n, rerr := r.Read(buf)
-		if n > 0 {
-			if _, werr := us.Write(buf[:n]); werr != nil {
-				abort(false)
-				return engine.GridFSFile{}, c.fail("upload", werr)
-			}
-		}
-		if errors.Is(rerr, io.EOF) {
-			break
-		}
-		if rerr != nil {
-			abort(false)
-			if cerr := ctx.Err(); cerr != nil {
-				return engine.GridFSFile{}, c.fail("upload", cerr)
-			}
-			return engine.GridFSFile{}, c.fail("upload", rerr)
-		}
-	}
-
-	if err := us.Close(); err != nil {
-		abort(true)
-		return engine.GridFSFile{}, c.fail("upload", err)
-	}
-
-	raw, err := b.GetFilesCollection().FindOne(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$eq", Value: us.FileID}}}}).Raw()
+	raw, err := b.GetFilesCollection().FindOne(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$eq", Value: fileID}}}}).Raw()
 	if err != nil {
 		return engine.GridFSFile{}, c.fail("upload", err)
 	}

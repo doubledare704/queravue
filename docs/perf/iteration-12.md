@@ -26,51 +26,34 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 
 ## Core memory after transfers
 
-Apple M4 Pro, macOS, Go 1.27.4, MongoDB 8.0.34. The same direct-engine test, with SHA-256 and two forced GCs at each 128 MiB checkpoint, measured:
+Apple M4 Pro, macOS 27.2.1, Go 1.27.4, MongoDB 8.0.34. The direct-engine test transfers 1 GiB in each direction, hashes the bytes and forces two GCs at each 128 MiB checkpoint to measure live heap. RSS is sampled with `ps` approximately every 25 ms during the transfer, so short peaks between samples may be missed. It checks that the sampled peak is at most 60 MiB above the pre-transfer baseline; it logs but does not gate RSS after disconnect. The test runs without a memory limit or explicit OS memory release.
 
-| Implementation | Upload MiB/s | Download MiB/s | Upload RSS peak | RSS 20 s after disconnect | Upload / download peak live heap |
+| Implementation | Upload MiB/s | Download MiB/s | RSS peak | RSS 20 s after disconnect | Upload / download peak live heap |
 |---|---:|---:|---:|---:|---:|
-| Before | 504.5 | 1084.0 | 192.8 MiB | 193.8 MiB | 17.5 / 17.1 MiB |
-| Delayed release, run 1 | 528.3 | 1036.9 | 220.8 MiB | 110.7 MiB | 17.5 / 17.1 MiB |
-| Delayed release, run 2 | 507.1 | 925.7 | 226.1 MiB | 19.5 MiB | 17.5 / 17.1 MiB |
-| Delayed release, strict run 3 | 503.8 | 1073.8 | 198.7 MiB | 199.2 MiB | 17.5 / 17.1 MiB |
-| Delayed release + `GOMEMLIMIT=64MiB` | 457.2 | 1109.5 | 108.9 MiB | 109.3 MiB | 17.5 / 17.1 MiB |
+| Stock upload, bounded download (before) | 547.5 | 918.4 | 194.7 MiB (upload checkpoints) | 195.2 MiB | 17.5 / 5.2 MiB |
+| Bounded writer, run 1 | 206.9 | 949.3 | 49.5 MiB | 49.5 MiB | 3.3 / 5.3 MiB |
+| Bounded writer, run 2 | 202.2 | 848.0 | 54.7 MiB | 54.7 MiB | 3.4 / 5.3 MiB |
+| Bounded writer, run 3 | 208.5 | 793.8 | 49.7 MiB | 49.7 MiB | 3.3 / 5.3 MiB |
 
-Baseline RSS was 17.7–17.8 MiB. macOS RSS remained highly variable: two runs still exceeded the 60 MiB target after release. These runs excluded the application-side 1 GiB gRPC round trip and other platforms; the later rebased release-mode run is recorded below. The test measures the Mongo connection directly, not the sidecar process or gRPC buffers, and may fail the 60 MiB margin on macOS even when Go reports that it released the pages.
+The bounded runs started at 17.5–18.1 MiB RSS. The before peak was measured at 128 MiB checkpoints, rather than by the new periodic sampler; it is a lower bound on the actual peak. The writer reuses a buffer sized for a target of 2 MiB of chunk payload per batch, writes the file document last, and preserves larger configured chunk sizes by using at least one chunk per batch. Full and ranged downloads use a validated cursor targeting 4 MiB per batch. Document encoding and MongoDB's wire buffers add overhead to these payload sizes.
 
-The runtime reported 173.5 MiB released and 7.7 MiB free immediately after the original download, with 0.7 MiB heap objects; after disconnect it reported 175.9 MiB released, 4.5 MiB free, 1.4 MiB objects, 0.8 MiB heap stacks, 0.2 MiB mspan in use, and 22 goroutines (29 while connected). Go marks unused macOS pages reusable using `MADV_FREE_REUSABLE`; this is not equivalent to an immediate fall in `ps` RSS. The driver closes its pool on connection close. These measurements do not establish whether any small buffers or goroutines remain, but they rule out live Go heap, stacks and mspan accounting for the observed hundreds of MiB.
+On this macOS version Go can mark pages reusable with `madvise` without an immediate fall in `ps` RSS or footprint. In the earlier stock-driver run, the runtime reported 175.9 MiB released and 1.4 MiB live heap after disconnect while RSS remained about 195 MiB. RSS after a transfer therefore does not measure live Go heap alone. Allocation profiles showed the driver's fixed 16 MiB upload buffer, batch encoding and wire-message copies; compression is not enabled on this connection. The driver pool closes with the connection, and the 48 MiB gRPC message limit does not by itself allocate a 48 MiB buffer. No driver fork, `GOMEMLIMIT`, `debug.SetMemoryLimit`, or `debug.FreeOSMemory` is used.
 
-Sampled allocation profiles show the driver's 16 MiB upload stream, BSON/InsertMany batch construction, the wire-message copy and download cursor reads. The URI builder does not enable compression: the driver's `CompressWireMessage` no-op branch still copies the uncompressed message. Thus the earlier attribution to compression is incorrect for this connection. The 48 MiB gRPC setting is a message limit, not evidence of a preallocated 48 MiB buffer; the direct-engine measurement excludes gRPC entirely. Its isolated contribution to the app measurement remains unmeasured. The gRPC download currently copies each chunk; reusing it safely would require verifying gRPC message lifetime, so it was not changed.
-
-The delayed `debug.FreeOSMemory` prototype was removed after the inconsistent runs above: it imposes a process-wide GC and scavenging without consistently reducing macOS RSS, potentially affecting unrelated work and later transfers. A trial with `GOMEMLIMIT=64MiB` reduced upload raw heap peak from 129.6 to 67.3 MiB and upload throughput by about 9% against the original run, but RSS still failed the 60 MiB margin at 109.3 MiB after disconnect. No global memory limit is imposed. Changing the driver's hard-coded buffer would require a driver change or a replacement GridFS implementation with interoperability and cancellation testing.
-
-### Rebased investigation (2026-11-27)
-
-Full and ranged downloads now use the existing validated chunks cursor, with a target of 4 MiB of chunk payloads per batch (one chunk minimum). This is a target, not a hard memory limit: MongoDB document overhead and explicitly larger GridFS chunks add to it. In a direct-engine round-trip with the stock driver and the earlier delayed release still enabled, download peak live heap fell from 17.1 to 5.2 MiB; download throughput was 978.7 MiB/s versus 1084.0 MiB/s before. Upload RSS dominated: 193.8 MiB peak and 194.3 MiB 20 seconds after disconnect. The final implementation removes delayed release: the strict run measured 17.6 MiB baseline, 194.7 MiB upload peak, and 195.2 MiB RSS 20 seconds after disconnect, with 547.5 MiB/s upload and 918.4 MiB/s download. The 60 MiB RSS delta assertion failed.
-
-A temporary local copy of mongo-driver v2.9.3 was used only to explore a smaller upload buffer. It dynamically sized the buffer to the greater of the batch target or the requested GridFS chunk size and used the buffer length for flush bookkeeping. No fork or memory limit is included in the branch. These are individual direct-engine runs, not a validated default or sidecar benchmark:
-
-| Upload batch | Download batch target | `GOMEMLIMIT` | Upload / download MiB/s | RSS 20 s after close | Outcome |
-|---|---:|---:|---:|---:|---|
-| 2 MiB | Driver default | unset | 247.8 / 1111.6 | 100.4 MiB | Failed RSS margin; upload ~51% below baseline |
-| 8 MiB | 2 MiB | unset | 488.2 / 759.1 | 123.0 MiB | Failed RSS margin; download ~30% below baseline |
-| 4 MiB | 2 MiB | unset | 364.0 / 857.6 | 78.9 MiB | Failed RSS margin; upload ~28% below baseline |
-| 8 MiB | 4 MiB | 48 MiB | 441.8 / 968.5 | 86.8 MiB | Failed RSS margin |
-| 8 MiB | 4 MiB | 40 MiB | 407.0 / 929.4 | 66.6 MiB | Passed 60 MiB *delta*, but exceeded 60 MiB absolute RSS |
-| 8 MiB | 4 MiB | 32 MiB | 381.8 / 1127.1 | 66.1 MiB | Passed delta; upload ~24% below baseline |
-| Stock 16 MiB | 4 MiB | 40 MiB | 426.5 / 913.3 | 106.8 MiB | Failed RSS margin |
-
-The merged release-mode harness was also run against the rebased branch (`QUERAVUE_PERF_OUT=/tmp/queravue-core-memory-release.md make perf-idle-release`). It completed its GridFS and SQL-mode scenarios. Before transfers, app RSS was 154.6 MiB and core RSS 33.6 MiB; with the GridFS bucket open, core RSS was 37.7 MiB. After the 1 GiB upload and download, core RSS was 258.0 MiB; 20 seconds after closing GridFS and disconnecting, it was 258.1 MiB, with 227.2 MiB app RSS (485.3 MiB combined). The sidecar was already at 152.5 MiB during the 32 MiB image-preview scenario. The app-side transfers took approximately 9 seconds each. This confirms the direct-engine failure also occurs in the real sidecar, while the app alone remains above budget after the session.
-
-The 40 MiB prototype result needs repeatability, concurrency and application-level validation before a process-wide limit or a maintained driver fork can be justified. A soft limit is not a hard cap and can cause significant garbage-collection overhead when other workloads have larger live heaps. The upload driver still uses its 16 MiB buffer in the actual branch, so the post-transfer RSS target remains unresolved.
+Reproduction:
 
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
 cd core
-GRIDFS_MEMORY_PERF=1 GRIDFS_PROFILE_DIR=/tmp go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
+GRIDFS_MEMORY_PERF=1 go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
 ```
 
-The optional profile directory receives human-readable `heap.txt` and `allocs.txt` pprof snapshots. The RSS assertion is intentionally strict; inconsistent macOS resident-page accounting remains a blocker to claiming the memory target.
+Set `GRIDFS_PROFILE_DIR` to a writable directory to save heap and allocation profiles. For the release application and real sidecar:
+
+```bash
+QUERAVUE_PERF_OUT=/tmp/queravue-core-memory-release.md make perf-idle-release
+```
+
+The release-app run measured sidecar RSS at 33.3 MiB after launch, 37.6 MiB with the GridFS bucket open, 77.0 MiB after the 32 MiB preview scenarios, and a sampled peak of 87.5 MiB during both 1 GiB upload and download (100 ms sampling). It was 87.7 MiB 20 seconds after closing GridFS and disconnecting, compared with 258.1 MiB in the earlier release run. Upload took 10 s and download 9 s. The app and sidecar together were 188.9 MiB at idle before any transfer, above the PRD's 150 MB combined idle budget; after disconnect they were 316.9 MiB. These values include the preview scenarios and are not directly comparable to the isolated engine test.
 
 ## Lane G: app (profile build)
 
