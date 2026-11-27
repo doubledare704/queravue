@@ -70,18 +70,20 @@ class RssReport {
 
   Future<void> finish() => _write([
     '',
-    '| Operation | App MiB before | App MiB peak | App MiB after | Seconds |',
-    '|---|---:|---:|---:|---:|',
+    '| Operation | App MiB before | App MiB peak | App MiB after | Core MiB peak | Seconds |',
+    '|---|---:|---:|---:|---:|---:|',
     ..._peakRows,
   ]);
 
   Future<void> peakDuring(String label, Future<void> Function() run) async {
     final before = await residentKiB(pid);
     var peak = before;
+    var corePeak = await residentKiB(corePid);
     var running = true;
     final sampler = Future<void>(() async {
       while (running) {
         peak = math.max(peak, await residentKiB(pid));
+        corePeak = math.max(corePeak, await residentKiB(corePid));
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
     });
@@ -93,9 +95,10 @@ class RssReport {
       await sampler;
     }
     final after = await residentKiB(pid);
+    corePeak = math.max(corePeak, await residentKiB(corePid));
     _peakRows.add(
       '| $label | ${_mib(before)} | ${_mib(math.max(peak, after))} '
-      '| ${_mib(after)} | ${elapsed.elapsed.inSeconds} |',
+      '| ${_mib(after)} | ${_mib(corePeak)} | ${elapsed.elapsed.inSeconds} |',
     );
   }
 

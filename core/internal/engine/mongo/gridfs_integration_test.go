@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"runtime/metrics"
+	"runtime/pprof"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,11 +30,12 @@ import (
 func scratchBucket(t *testing.T, c *Conn) string {
 	t.Helper()
 	name := fmt.Sprintf("gfs_%d", time.Now().UnixNano())
+	client := c.client
 	t.Cleanup(func() {
 		dctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		_ = c.client.Database("queravue").Collection(name + ".files").Drop(dctx)
-		_ = c.client.Database("queravue").Collection(name + ".chunks").Drop(dctx)
+		_ = client.Database("queravue").Collection(name + ".files").Drop(dctx)
+		_ = client.Database("queravue").Collection(name + ".chunks").Drop(dctx)
 	})
 	return name
 }
@@ -212,6 +215,79 @@ func TestIntegrationGridFSBucketDiscoveryAndCRUD(t *testing.T) {
 	}
 }
 
+func TestIntegrationGridFSChunkBoundaries(t *testing.T) {
+	c := connect(t)
+	ctx := context.Background()
+	bucket := scratchBucket(t, c)
+	const chunkSize = 4096
+	for _, size := range []int{0, chunkSize, 3*chunkSize + 1} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			data := bytes.Repeat([]byte{0x65}, size)
+			file, err := c.Upload(ctx, engine.GridFSUpload{Database: "queravue", Bucket: bucket, Filename: "boundary", ChunkSizeBytes: chunkSize}, bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if file.Length != uint64(size) {
+				t.Fatalf("length = %d, want %d", file.Length, size)
+			}
+			_, got := readAllGridFS(ctx, t, c, "queravue", bucket, file.ID, 0)
+			if !bytes.Equal(got, data) {
+				t.Fatal("round-trip mismatch")
+			}
+			id, err := parseValue(file.ID, engine.InputDocument)
+			if err != nil {
+				t.Fatal(err)
+			}
+			count, err := c.client.Database("queravue").Collection(bucket+".chunks").CountDocuments(ctx, rawIDFilter("files_id", id))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := int64((size + chunkSize - 1) / chunkSize); count != want {
+				t.Fatalf("chunks = %d, want %d", count, want)
+			}
+		})
+	}
+}
+
+func TestIntegrationGridFSUploadCreatesIndexes(t *testing.T) {
+	c := connect(t)
+	ctx := context.Background()
+	bucket := scratchBucket(t, c)
+	_, err := c.Upload(ctx, engine.GridFSUpload{Database: "queravue", Bucket: bucket, Filename: "empty"}, bytes.NewReader(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		collection string
+		name       string
+		unique     bool
+	}{
+		{bucket + ".files", "filename_1_uploadDate_1", false},
+		{bucket + ".chunks", "files_id_1_n_1", true},
+	} {
+		cursor, err := c.client.Database("queravue").Collection(tc.collection).Indexes().List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for cursor.Next(ctx) {
+			if cursor.Current.Lookup("name").StringValue() == tc.name {
+				found = true
+				if tc.unique && !cursor.Current.Lookup("unique").Boolean() {
+					t.Fatalf("index %s is not unique", tc.name)
+				}
+			}
+		}
+		if err := cursor.Err(); err != nil {
+			t.Fatal(err)
+		}
+		_ = cursor.Close(ctx)
+		if !found {
+			t.Fatalf("index %s not found", tc.name)
+		}
+	}
+}
+
 func TestIntegrationGridFSRangedDownload(t *testing.T) {
 	c := connect(t)
 	ctx := context.Background()
@@ -315,6 +391,35 @@ func TestIntegrationGridFSCorruptDetection(t *testing.T) {
 	expectCorrupt(f3.ID, 192<<10)
 }
 
+func TestIntegrationGridFSDownloadDetectsCorruptionAfterFirstBatch(t *testing.T) {
+	c := connect(t)
+	ctx := context.Background()
+	bucket := scratchBucket(t, c)
+	payload := bytes.Repeat([]byte{0x7e}, 5<<20)
+	file, err := c.Upload(ctx, engine.GridFSUpload{
+		Database: "queravue", Bucket: bucket, Filename: "corrupt-later.bin", ChunkSizeBytes: 64 << 10,
+	}, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := parseValue(file.ID, engine.InputDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunks := c.client.Database("queravue").Collection(bucket + ".chunks")
+	if _, err := chunks.DeleteOne(ctx, bson.D{{Key: "files_id", Value: id}, {Key: "n", Value: int32(65)}}); err != nil {
+		t.Fatal(err)
+	}
+	_, reader, err := c.OpenDownload(ctx, "queravue", bucket, file.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close() }()
+	if _, err := io.Copy(io.Discard, reader); engine.KindOf(err) != engine.KindCorrupt {
+		t.Fatalf("download error = %v, want corrupt", err)
+	}
+}
+
 // gatedChunkReader emits >16 MiB so the driver flushes at least one chunk
 // batch to MongoDB, waits until chunks appear in the collection, and then
 // triggers fn().
@@ -355,7 +460,7 @@ func TestIntegrationGridFSUploadCancelAndReaderErrorLeavesNoOrphans(t *testing.T
 	filesColl := c.client.Database("queravue").Collection(bucket + ".files")
 	chunksColl := c.client.Database("queravue").Collection(bucket + ".chunks")
 
-	// Cancel mid-upload after >16 MiB flushed to MongoDB.
+	// Cancel after chunks have been flushed to MongoDB.
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	r1 := &gatedChunkReader{
@@ -378,7 +483,7 @@ func TestIntegrationGridFSUploadCancelAndReaderErrorLeavesNoOrphans(t *testing.T
 	}
 
 	// Reader failure mid-upload after chunks flushed.
-	readBoom := errors.New("read boom")
+	readBoom := io.ErrUnexpectedEOF
 	r2 := &gatedChunkReader{
 		remaining: 20 << 20,
 		chunks:    chunksColl,
@@ -512,6 +617,7 @@ func TestIntegrationGridFSInteropExternalClient(t *testing.T) {
 		Bucket:      bucketName,
 		Filename:    "from-conn.txt",
 		ContentType: "text/plain",
+		Metadata:    `{"client":"queravue"}`,
 	}, bytes.NewReader(connData))
 	if err != nil {
 		t.Fatal(err)
@@ -520,12 +626,18 @@ func TestIntegrationGridFSInteropExternalClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var extBuf bytes.Buffer
-	if _, err := extBucket.DownloadToStream(ctx, idVal, &extBuf); err != nil {
-		t.Fatalf("external DownloadToStream: %v", err)
+	stream, err := extBucket.OpenDownloadStream(ctx, idVal)
+	if err != nil {
+		t.Fatalf("external OpenDownloadStream: %v", err)
 	}
-	if !bytes.Equal(extBuf.Bytes(), connData) {
-		t.Errorf("external read = %q", extBuf.Bytes())
+	defer func() { _ = stream.Close() }()
+	metadata := stream.GetFile().Metadata
+	if metadata.Lookup("contentType").StringValue() != "text/plain" || metadata.Lookup("client").StringValue() != "queravue" {
+		t.Fatalf("external metadata = %v", metadata)
+	}
+	got, err := io.ReadAll(stream)
+	if err != nil || !bytes.Equal(got, connData) {
+		t.Errorf("external read = %q, error = %v", got, err)
 	}
 }
 
@@ -580,8 +692,8 @@ func processRSSBytes() uint64 {
 }
 
 func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping 1 GiB round-trip in -short mode")
+	if testing.Short() || os.Getenv("GRIDFS_MEMORY_PERF") == "" {
+		t.Skip("set GRIDFS_MEMORY_PERF=1 to run the 1 GiB memory test")
 	}
 	c := connect(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -601,6 +713,30 @@ func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
 	var base runtime.MemStats
 	runtime.ReadMemStats(&base)
 	baseRSS := processRSSBytes()
+	logMemory := func(label string) {
+		t.Helper()
+		samples := []metrics.Sample{{Name: "/memory/classes/heap/free:bytes"}, {Name: "/memory/classes/heap/released:bytes"}, {Name: "/memory/classes/heap/objects:bytes"}, {Name: "/memory/classes/heap/stacks:bytes"}, {Name: "/memory/classes/metadata/mspan/inuse:bytes"}, {Name: "/sched/goroutines:goroutines"}}
+		metrics.Read(samples)
+		t.Logf("%s: rss=%.1f MiB heap free=%.1f released=%.1f objects=%.1f stacks=%.1f mspan=%.1f MiB goroutines=%d", label, float64(processRSSBytes())/(1<<20), float64(samples[0].Value.Uint64())/(1<<20), float64(samples[1].Value.Uint64())/(1<<20), float64(samples[2].Value.Uint64())/(1<<20), float64(samples[3].Value.Uint64())/(1<<20), float64(samples[4].Value.Uint64())/(1<<20), samples[5].Value.Uint64())
+	}
+	logMemory("baseline")
+
+	stopRSS := make(chan struct{})
+	rssResult := make(chan uint64, 1)
+	go func() {
+		peak := baseRSS
+		ticker := time.NewTicker(25 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				peak = max(peak, processRSSBytes())
+			case <-stopRSS:
+				rssResult <- max(peak, processRSSBytes())
+				return
+			}
+		}
+	}()
 
 	var upLivePeak, upRawPeak, upRSSPeak uint64
 	var upSamples []uint64
@@ -684,6 +820,42 @@ func TestIntegrationGridFS1GiBRoundTripMemory(t *testing.T) {
 	var postDL runtime.MemStats
 	runtime.ReadMemStats(&postDL)
 	postDLRSS := processRSSBytes()
+	close(stopRSS)
+	peakRSS := <-rssResult
+	logMemory("after download")
+	if profileDir := os.Getenv("GRIDFS_PROFILE_DIR"); profileDir != "" {
+		for _, name := range []string{"heap", "allocs"} {
+			f, err := os.Create(profileDir + "/" + name + ".txt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := pprof.Lookup(name).WriteTo(f, 1); err != nil {
+				t.Fatal(err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := c.client.Database("queravue").Collection(bucket + ".files").Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.client.Database("queravue").Collection(bucket + ".chunks").Drop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(20 * time.Second)
+	logMemory("20 seconds after disconnect")
+	if peakRSS == 0 || baseRSS == 0 {
+		t.Fatal("RSS measurement unavailable")
+	}
+	// macOS may keep madvised pages resident after a transfer.
+	t.Logf("transfer peak RSS: %.1f MiB; baseline: %.1f MiB", float64(peakRSS)/(1<<20), float64(baseRSS)/(1<<20))
+	if peakRSS > baseRSS+(60<<20) {
+		t.Errorf("peak RSS %.1f MiB exceeds baseline %.1f MiB by more than 60 MiB", float64(peakRSS)/(1<<20), float64(baseRSS)/(1<<20))
+	}
 
 	if dlTotal != totalBytes {
 		t.Fatalf("downloaded %d bytes, want %d", dlTotal, totalBytes)

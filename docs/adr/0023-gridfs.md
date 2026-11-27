@@ -8,14 +8,14 @@ Iteration 12 adds a GridFS viewer: browse buckets, preview images, text and PDF,
 ## Decision
 
 ### 1. Capability
-`CapGridFS = "gridfs"` with `engine.GridFS` on the Mongo `Conn` (`ListBuckets`, `ListFiles`, `Download`, `Upload`, `Delete`, `Rename`), mapped in `CapabilityInterfaces` and declared by all Mongo variants once implemented. It is built on the driver's `gridfs` bucket API. The UI shows GridFS from this name only.
+`CapGridFS = "gridfs"` with `engine.GridFS` on the Mongo `Conn` (`ListBuckets`, `ListFiles`, `Download`, `Upload`, `Delete`, `Rename`), mapped in `CapabilityInterfaces` and declared by all Mongo variants once implemented. It uses the driver's GridFS bucket API for bucket operations and spec-compatible collection access for transfers. The UI shows GridFS from this name only.
 
 ### 2. Buckets
 A bucket is a pair of collections `<name>.files` and `<name>.chunks`. The tree shows buckets under a "GridFS" node per database and hides the two collections behind it, with a toggle to show them as ordinary collections.
 
 ### 3. Bytes travel over gRPC; the app owns the filesystem
-- `Download` is a server stream: a header with the file, then chunks of at most 1 MiB. It takes an optional `offset` and `length`, which preview uses.
-- `Upload` is a client stream: a header (filename, content type, metadata, optional file to replace), then chunks.
+- `Download` is a server stream: a header with the file, then chunks of at most 1 MiB. It takes an optional `offset` and `length`, which preview uses. Full and ranged reads use the same validated chunks cursor with a target of 4 MiB of chunk data per batch; a single larger GridFS chunk still requires its full size.
+- `Upload` is a client stream: a header (filename, content type, metadata, optional file to replace), then chunks. Core writes GridFS chunk documents in bounded batches and inserts the file document last; this avoids the driver's fixed 16 MiB upload buffer and the larger encoding buffers it induces.
 - The app reads and writes local files through its open and save dialogs. Back-pressure comes from the streams, and neither side buffers a whole file.
 
 Rejected: core reading or writing paths sent by the UI. It widens what core can touch on disk, and it does not fit a scheduled or remote core.

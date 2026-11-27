@@ -6,7 +6,7 @@ Apple M4 Pro laptop (arm64, macOS), 2026-11-19, `mongo:8.0.34` single-node repli
 
 ```bash
 docker compose -f dev/docker-compose.yml up -d --wait mongo
-cd core && go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
+cd core && GRIDFS_MEMORY_PERF=1 go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
 ```
 
 ### 1 GiB round-trip (`TestIntegrationGridFS1GiBRoundTripMemory`)
@@ -22,7 +22,38 @@ A second run inside the full `./internal/engine/mongo/` GridFS integration run m
 
 ### Reading the numbers
 - **Flat live heap:** Every 128 MiB checkpoint across the 1 GiB stream stays at `17.5 MiB` on upload (`uploadBufferSize = 16 MiB` inside `mongo.GridFSUploadStream`) and `17.1 MiB` on download (one driver cursor batch buffer), returning to `0.6–0.7 MiB` after completion.
-- **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire compression buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
+- **Transient batch churn:** Pre-GC `rawPeak` during upload (`129.6–151.2 MiB`) reflects temporary per-16 MiB `InsertMany` BSON encoding and wire-message copy buffers before GC collects them; this stays within the PRD's `+200 MB` large-result budget and does not grow with file size.
+
+## Core memory after transfers
+
+Apple M4 Pro, macOS 27.2.1, Go 1.27.4, MongoDB 8.0.34. The direct-engine test transfers 1 GiB in each direction, hashes the bytes and forces two GCs at each 128 MiB checkpoint to measure live heap. RSS is sampled with `ps` approximately every 25 ms during the transfer, so short peaks between samples may be missed. It checks that the sampled peak is at most 60 MiB above the pre-transfer baseline; it logs but does not gate RSS after disconnect. The test runs without a memory limit or explicit OS memory release.
+
+| Implementation | Upload MiB/s | Download MiB/s | RSS peak | RSS 20 s after disconnect | Upload / download peak live heap |
+|---|---:|---:|---:|---:|---:|
+| Stock upload, bounded download (before) | 547.5 | 918.4 | 194.7 MiB (upload checkpoints) | 195.2 MiB | 17.5 / 5.2 MiB |
+| Bounded writer, run 1 | 206.9 | 949.3 | 49.5 MiB | 49.5 MiB | 3.3 / 5.3 MiB |
+| Bounded writer, run 2 | 202.2 | 848.0 | 54.7 MiB | 54.7 MiB | 3.4 / 5.3 MiB |
+| Bounded writer, run 3 | 208.5 | 793.8 | 49.7 MiB | 49.7 MiB | 3.3 / 5.3 MiB |
+
+The bounded runs started at 17.5–18.1 MiB RSS. The before peak was measured at 128 MiB checkpoints, rather than by the new periodic sampler; it is a lower bound on the actual peak. The writer reuses a buffer sized for a target of 2 MiB of chunk payload per batch, writes the file document last, and preserves larger configured chunk sizes by using at least one chunk per batch. Full and ranged downloads use a validated cursor targeting 4 MiB per batch. Document encoding and MongoDB's wire buffers add overhead to these payload sizes.
+
+On this macOS version Go can mark pages reusable with `madvise` without an immediate fall in `ps` RSS or footprint. In the earlier stock-driver run, the runtime reported 175.9 MiB released and 1.4 MiB live heap after disconnect while RSS remained about 195 MiB. RSS after a transfer therefore does not measure live Go heap alone. Allocation profiles showed the driver's fixed 16 MiB upload buffer, batch encoding and wire-message copies; compression is not enabled on this connection. The driver pool closes with the connection, and the 48 MiB gRPC message limit does not by itself allocate a 48 MiB buffer. No driver fork, `GOMEMLIMIT`, `debug.SetMemoryLimit`, or `debug.FreeOSMemory` is used.
+
+Reproduction:
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait mongo
+cd core
+GRIDFS_MEMORY_PERF=1 go test -count=1 -tags=integration -v -run '^TestIntegrationGridFS1GiBRoundTripMemory$' ./internal/engine/mongo/
+```
+
+Set `GRIDFS_PROFILE_DIR` to a writable directory to save heap and allocation profiles. For the release application and real sidecar:
+
+```bash
+QUERAVUE_PERF_OUT=/tmp/queravue-core-memory-release.md make perf-idle-release
+```
+
+The release-app run measured sidecar RSS at 33.3 MiB after launch, 37.6 MiB with the GridFS bucket open, 77.0 MiB after the 32 MiB preview scenarios, and a sampled peak of 87.5 MiB during both 1 GiB upload and download (100 ms sampling). It was 87.7 MiB 20 seconds after closing GridFS and disconnecting, compared with 258.1 MiB in the earlier release run. Upload took 10 s and download 9 s. The app and sidecar together were 188.9 MiB at idle before any transfer, above the PRD's 150 MB combined idle budget; after disconnect they were 316.9 MiB. These values include the preview scenarios and are not directly comparable to the isolated engine test.
 
 ## Lane G: app (profile build)
 
