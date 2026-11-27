@@ -128,7 +128,7 @@ A follow-up closed the layout gaps: tabs drag between groups, `⌘1` to `⌘4` f
 
 **Known gaps (carry forward):**
 
-- **App idle memory remains over budget.** The release harness measured 185.1 MiB app RSS 30 s after launch and about 218 MiB combined RSS, against the 150 MB combined budget. Iteration 10 measured 139.4 MiB combined at idle. PR #76 fixed the core GridFS memory issue: sidecar RSS fell from 258.1 MiB to 87.7 MiB at the 20 s checkpoint after closing GridFS and disconnecting. In isolated 1 GiB round trips, core RSS peaked at about 50–55 MiB and upload throughput was about 205 MiB/s with the custom chunk writer. See [Iteration 12 measurements](docs/perf/iteration-12.md) and the [Iteration 10 baseline](docs/perf/iteration-10.md).
+- **App idle memory remains over budget.** A release build idles at about 154–164 MiB app RSS plus 33 MiB sidecar RSS 30 s after launch, against the 150 MB combined budget. This has not regressed: release builds of the It. 10 close-out and of main idle within 3 MiB of each other. The earlier 185.1 MiB sample was taken while macOS reallocated the window's drawables, and the It. 10 figure of 139.4 MiB does not reproduce at its own commit. Next: one sampling method (footprint with categories, several launches, untouched window) and a profile of the ~325 MB launch-time peak. PR #76 fixed the core GridFS memory issue: sidecar RSS fell from 258.1 MiB to 87.7 MiB at the 20 s checkpoint after closing GridFS and disconnecting, and 1 GiB round trips peak at about 50–55 MiB core RSS with upload at about 205 MiB/s. See [app idle memory, It. 10 vs main](docs/perf/iteration-12-app-idle.md) and [Iteration 12 measurements](docs/perf/iteration-12.md).
 
 ## Phase D — Data tooling (it. 13–16)
 
