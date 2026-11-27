@@ -23,10 +23,11 @@ var _ engine.GridFS = (*Conn)(nil)
 
 const (
 	// Strictly below MongoDB's 16 MiB BSON limit and the driver's 16 MiB upload buffer.
-	maxGridFSChunkSize   = (16 << 20) - 4096
-	maxCheapBucketCount  = 10_000
-	gridfsCleanupTimeout = 10 * time.Second
-	gridfsUploadCopyBuf  = 256 << 10
+	maxGridFSChunkSize       = (16 << 20) - 4096
+	maxCheapBucketCount      = 10_000
+	gridfsCleanupTimeout     = 10 * time.Second
+	gridfsUploadCopyBuf      = 256 << 10
+	gridfsDownloadBatchBytes = 4 << 20
 )
 
 var errNoMoreRangeChunks = errors.New("no more range chunks")
@@ -389,17 +390,10 @@ func (c *Conn) OpenDownload(ctx context.Context, database, bucket string, id eng
 	if file.Length == 0 || offset >= file.Length {
 		return file, io.NopCloser(bytes.NewReader(nil)), nil
 	}
-	if offset == 0 {
-		ds, err := b.OpenDownloadStream(ctx, idv)
-		if err != nil {
-			return engine.GridFSFile{}, nil, c.fail("download", err)
-		}
-		return file, &downloadStreamReader{conn: c, ds: ds}, nil
-	}
-	return c.openRangedDownload(ctx, b, idv, file, offset)
+	return c.openChunkDownload(ctx, b, idv, file, offset)
 }
 
-func (c *Conn) openRangedDownload(ctx context.Context, b *mongo.GridFSBucket, idv bson.RawValue, file engine.GridFSFile, offset uint64) (engine.GridFSFile, io.ReadCloser, error) {
+func (c *Conn) openChunkDownload(ctx context.Context, b *mongo.GridFSBucket, idv bson.RawValue, file engine.GridFSFile, offset uint64) (engine.GridFSFile, io.ReadCloser, error) {
 	chunkSize := uint64(file.ChunkSize)
 	startChunk := offset / chunkSize
 	skipInFirst := int(offset % chunkSize) //nolint:gosec // modulo by chunkSize <= maxGridFSChunkSize
@@ -415,7 +409,8 @@ func (c *Conn) openRangedDownload(ctx context.Context, b *mongo.GridFSBucket, id
 		{Key: "files_id", Value: bson.D{{Key: "$eq", Value: idv}}},
 		{Key: "n", Value: bson.D{{Key: "$gte", Value: startVal}}},
 	}
-	cur, err := b.GetChunksCollection().Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "n", Value: 1}}))
+	batchSize := int32(max(1, gridfsDownloadBatchBytes/file.ChunkSize)) //nolint:gosec // bounded by gridfsDownloadBatchBytes
+	cur, err := b.GetChunksCollection().Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "n", Value: 1}}).SetBatchSize(batchSize))
 	if err != nil {
 		return engine.GridFSFile{}, nil, c.fail("download", err)
 	}
@@ -430,42 +425,6 @@ func (c *Conn) openRangedDownload(ctx context.Context, b *mongo.GridFSBucket, id
 		expectedChunk: startChunk,
 		skipInFirst:   skipInFirst,
 	}, nil
-}
-
-func (c *Conn) classifyDownloadErr(err error) error {
-	if strings.Contains(err.Error(), "element not found") {
-		return &engine.Error{Kind: engine.KindCorrupt, Engine: c.id, Op: "download", Msg: err.Error(), Err: err}
-	}
-	return c.fail("download", err)
-}
-
-type downloadStreamReader struct {
-	conn      *Conn
-	ds        *mongo.GridFSDownloadStream
-	closeOnce sync.Once
-	closeErr  error
-	readBytes int64
-}
-
-func (r *downloadStreamReader) Read(p []byte) (int, error) {
-	n, err := r.ds.Read(p)
-	r.readBytes += int64(n)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return n, r.conn.classifyDownloadErr(err)
-	}
-	return n, err //nolint:wrapcheck // io.Reader contract requires raw io.EOF
-}
-
-func (r *downloadStreamReader) Close() error {
-	r.closeOnce.Do(func() {
-		if r.readBytes >= reclaimTransferThreshold {
-			scheduleMemoryRelease()
-		}
-		if err := r.ds.Close(); err != nil && !errors.Is(err, mongo.ErrStreamClosed) {
-			r.closeErr = r.conn.fail("download", err)
-		}
-	})
-	return r.closeErr
 }
 
 type rangeDownloadReader struct {
@@ -483,7 +442,6 @@ type rangeDownloadReader struct {
 	done          bool
 	closed        bool
 	closeOnce     sync.Once
-	readBytes     int64
 }
 
 func (r *rangeDownloadReader) Read(p []byte) (int, error) {
@@ -509,7 +467,6 @@ func (r *rangeDownloadReader) Read(p []byte) (int, error) {
 		}
 		n := copy(p[bytesCopied:], r.buf[r.bufStart:r.bufEnd])
 		bytesCopied += n
-		r.readBytes += int64(n)
 		r.bufStart += n
 	}
 	return bytesCopied, nil
@@ -573,9 +530,6 @@ func (r *rangeDownloadReader) fillBuffer() error {
 func (r *rangeDownloadReader) Close() error {
 	r.closeOnce.Do(func() {
 		r.closed = true
-		if r.readBytes >= reclaimTransferThreshold {
-			scheduleMemoryRelease()
-		}
 		if r.cur != nil {
 			closeCursor(r.cur)
 		}
@@ -638,12 +592,6 @@ func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (
 		}
 	}
 
-	var transferred int64
-	defer func() {
-		if transferred >= reclaimTransferThreshold {
-			scheduleMemoryRelease()
-		}
-	}()
 	buf := make([]byte, gridfsUploadCopyBuf)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -652,7 +600,6 @@ func (c *Conn) Upload(ctx context.Context, u engine.GridFSUpload, r io.Reader) (
 		}
 		n, rerr := r.Read(buf)
 		if n > 0 {
-			transferred += int64(n)
 			if _, werr := us.Write(buf[:n]); werr != nil {
 				abort(false)
 				return engine.GridFSFile{}, c.fail("upload", werr)

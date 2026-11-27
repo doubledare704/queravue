@@ -318,6 +318,35 @@ func TestIntegrationGridFSCorruptDetection(t *testing.T) {
 	expectCorrupt(f3.ID, 192<<10)
 }
 
+func TestIntegrationGridFSDownloadDetectsCorruptionAfterFirstBatch(t *testing.T) {
+	c := connect(t)
+	ctx := context.Background()
+	bucket := scratchBucket(t, c)
+	payload := bytes.Repeat([]byte{0x7e}, 5<<20)
+	file, err := c.Upload(ctx, engine.GridFSUpload{
+		Database: "queravue", Bucket: bucket, Filename: "corrupt-later.bin", ChunkSizeBytes: 64 << 10,
+	}, bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := parseValue(file.ID, engine.InputDocument)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunks := c.client.Database("queravue").Collection(bucket + ".chunks")
+	if _, err := chunks.DeleteOne(ctx, bson.D{{Key: "files_id", Value: id}, {Key: "n", Value: int32(65)}}); err != nil {
+		t.Fatal(err)
+	}
+	_, reader, err := c.OpenDownload(ctx, "queravue", bucket, file.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = reader.Close() }()
+	if _, err := io.Copy(io.Discard, reader); engine.KindOf(err) != engine.KindCorrupt {
+		t.Fatalf("download error = %v, want corrupt", err)
+	}
+}
+
 // gatedChunkReader emits >16 MiB so the driver flushes at least one chunk
 // batch to MongoDB, waits until chunks appear in the collection, and then
 // triggers fn().

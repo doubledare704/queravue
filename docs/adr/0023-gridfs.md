@@ -14,7 +14,7 @@ Iteration 12 adds a GridFS viewer: browse buckets, preview images, text and PDF,
 A bucket is a pair of collections `<name>.files` and `<name>.chunks`. The tree shows buckets under a "GridFS" node per database and hides the two collections behind it, with a toggle to show them as ordinary collections.
 
 ### 3. Bytes travel over gRPC; the app owns the filesystem
-- `Download` is a server stream: a header with the file, then chunks of at most 1 MiB. It takes an optional `offset` and `length`, which preview uses.
+- `Download` is a server stream: a header with the file, then chunks of at most 1 MiB. It takes an optional `offset` and `length`, which preview uses. Full and ranged reads use the same validated chunks cursor with a target of 4 MiB of chunk data per batch; a single larger GridFS chunk still requires its full size.
 - `Upload` is a client stream: a header (filename, content type, metadata, optional file to replace), then chunks.
 - The app reads and writes local files through its open and save dialogs. Back-pressure comes from the streams, and neither side buffers a whole file.
 
