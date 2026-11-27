@@ -180,7 +180,10 @@ func (c *Conn) finish(ctx context.Context, sum engine.Summary, rows *sql.Rows, k
 }
 
 // killQuery stops the statement running on the session connection.
-func (c *Conn) killQuery() error {
+func (c *Conn) killQuery() error { return c.killConnectionQuery(c.connID) }
+
+// killConnectionQuery stops the statement running on the server connection id.
+func (c *Conn) killConnectionQuery(connID uint64) error {
 	c.mu.Lock()
 	db := c.db
 	c.mu.Unlock()
@@ -189,7 +192,7 @@ func (c *Conn) killQuery() error {
 	}
 	kctx, cancel := context.WithTimeout(context.Background(), killTimeout)
 	defer cancel()
-	if _, err := db.ExecContext(kctx, "KILL QUERY "+strconv.FormatUint(c.connID, 10)); err != nil {
+	if _, err := db.ExecContext(kctx, "KILL QUERY "+strconv.FormatUint(connID, 10)); err != nil {
 		return fmt.Errorf("%s: kill query: %w", c.id, err)
 	}
 	return nil
