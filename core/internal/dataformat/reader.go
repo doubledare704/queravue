@@ -32,7 +32,7 @@ func openInput(ctx context.Context, src io.Reader) (*input, error) {
 	}
 	b, err := in.Peek(4)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return nil, in.pos.failure(fmt.Errorf("read encoding prefix: %w", err))
+		return nil, fmt.Errorf("dataformat: read encoding prefix: %w", err)
 	}
 	switch {
 	case len(b) >= 2 && (string(b[:2]) == "\xff\xfe" || string(b[:2]) == "\xfe\xff"),
@@ -106,7 +106,8 @@ func (b *batchReader[T]) next(ctx context.Context, maxRows int) ([]T, error) {
 		}
 		value, cost, err := b.read(ctx)
 		if err != nil {
-			if len(batch) == 0 {
+			var parse *ParseError
+			if len(batch) == 0 || !errors.Is(err, io.EOF) && !errors.As(err, &parse) {
 				return nil, err
 			}
 			b.pendingErr = err
@@ -128,9 +129,10 @@ type Reader struct {
 	readHeader func(context.Context) error
 	columns    []string
 	ready      bool
+	format     Format
 }
 
-// NewReader discovers columns when columns is nil.
+// NewReader discovers columns when no column names are supplied.
 func NewReader(ctx context.Context, src io.Reader, opts Options, columns []string) (*Reader, error) {
 	if err := opts.normalize(); err != nil {
 		return nil, err
@@ -142,13 +144,22 @@ func NewReader(ctx context.Context, src io.Reader, opts Options, columns []strin
 	if err != nil {
 		return nil, err
 	}
-	r := &Reader{columns: slices.Clone(columns), ready: columns != nil}
+	if opts.Format == JSON || opts.Format == NDJSON {
+		seen := make(map[string]bool, len(columns))
+		for i, name := range columns {
+			if seen[name] {
+				return nil, fmt.Errorf("dataformat: duplicate JSON column at position %d", i+1)
+			}
+			seen[name] = true
+		}
+	}
+	r := &Reader{columns: slices.Clone(columns), ready: len(columns) != 0, format: opts.Format}
 	r.maxBytes = opts.MaxBytes
 	if opts.Format == CSV || opts.Format == TSV {
 		d := &delimitedReader{input: in, opts: opts, reader: r, header: opts.Header}
 		r.read, r.readHeader = d.read, d.readHeader
 	} else {
-		r.read = (&objectReader{frames: jsonFrames{input: in, opts: opts}, reader: r}).read
+		r.read = (&objectReader{frames: jsonFrames{input: in, opts: opts}, reader: r, projected: len(columns) != 0}).read
 	}
 	return r, nil
 }

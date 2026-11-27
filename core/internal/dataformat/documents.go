@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"unicode/utf8"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 	"github.com/doubledare704/queravue/core/internal/engine/mongo"
@@ -37,16 +38,17 @@ func NewDocumentReader(ctx context.Context, src io.Reader, opts Options, canonic
 		if trimmed := bytes.Trim(data, " \r\n\t"); len(trimmed) == 0 || trimmed[0] != '{' {
 			return "", 0, start.failure(errors.New("expected EJSON object"))
 		}
-		var checked json.RawMessage
-		if err := json.Unmarshal(data, &checked); err != nil {
-			return "", 0, jsonError(start, data, fmt.Errorf("decode EJSON document: %w", err))
-		}
-		text, err := mongo.TranscodeEJSON(string(checked), canonical, true)
+		text, err := mongo.TranscodeEJSON(data, canonical, true)
 		if err != nil {
+			var syntax *json.SyntaxError
+			if errors.As(err, &syntax) {
+				pos := relativePosition(start, data[:min(len(data), max(0, int(syntax.Offset)-1))])
+				return "", 0, pos.failure(errors.New("invalid EJSON syntax"))
+			}
 			return "", 0, start.failure(fmt.Errorf("decode EJSON document: %w", err))
 		}
 		size := max(len(data), len(text)) + 16
-		if size > opts.MaxBytes {
+		if size > opts.MaxRecordBytes {
 			return "", 0, start.failure(errRecordSize)
 		}
 		return text, size, nil
@@ -89,17 +91,21 @@ func (w *DocumentWriter) Batch(ctx context.Context, docs []engine.Document) erro
 		if w.err != nil {
 			return w.err
 		}
-		if len(doc) > w.opts.MaxBytes {
+		if len(doc) > w.opts.MaxRecordBytes {
 			return errRecordSize
 		}
-		if !json.Valid([]byte(doc)) {
-			return errors.New("dataformat: invalid EJSON document")
+		if !utf8.ValidString(doc) {
+			return errEncoding
 		}
-		text, err := mongo.TranscodeEJSON(doc, false, w.canonical)
+		text, err := mongo.TranscodeEJSON([]byte(doc), false, w.canonical)
 		if err != nil {
+			var syntax *json.SyntaxError
+			if errors.As(err, &syntax) {
+				return errors.New("dataformat: invalid EJSON syntax")
+			}
 			return fmt.Errorf("encode EJSON document: %w", err)
 		}
-		if len(text)+16 > w.opts.MaxBytes {
+		if len(text)+16 > w.opts.MaxRecordBytes {
 			return errRecordSize
 		}
 		if w.opts.Format == JSON {

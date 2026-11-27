@@ -56,7 +56,7 @@ func (f *jsonFrames) frame() ([]byte, position, error) {
 	} else {
 		b, err = f.readByte()
 		if err != nil {
-			return nil, start, frameReadError(start, err)
+			return nil, start, frameReadError(err)
 		}
 	}
 	depth := 0
@@ -80,7 +80,7 @@ func (f *jsonFrames) frame() ([]byte, position, error) {
 				depth--
 			}
 		}
-		if len(f.data) < f.opts.MaxBytes {
+		if len(f.data) < f.opts.MaxRecordBytes {
 			f.data = append(f.data, b)
 		} else {
 			tooLarge = true
@@ -93,10 +93,11 @@ func (f *jsonFrames) frame() ([]byte, position, error) {
 			if f.opts.Format == NDJSON {
 				break
 			}
-			err = io.ErrUnexpectedEOF
+			f.done = true
+			return nil, start, f.pos.failure(io.ErrUnexpectedEOF)
 		}
 		f.done = true
-		return nil, start, frameReadError(f.pos, err)
+		return nil, start, frameReadError(err)
 	}
 	if tooLarge {
 		return nil, start, start.failure(errRecordSize)
@@ -109,13 +110,14 @@ func (f *jsonFrames) arrayStart() (byte, position, error) {
 	if f.closed {
 		f.done = true
 		if err == nil {
-			err = errors.New("unexpected data after JSON array")
+			return 0, pos, pos.failure(errors.New("unexpected data after JSON array"))
 		}
-		return 0, pos, frameReadError(pos, err)
+		return 0, pos, frameReadError(err)
 	}
 	if !f.started {
 		if err == nil && b != '[' {
-			err = errors.New("expected JSON array")
+			f.done = true
+			return 0, pos, pos.failure(errors.New("expected JSON array"))
 		}
 		if err == nil {
 			f.started = true
@@ -125,9 +127,9 @@ func (f *jsonFrames) arrayStart() (byte, position, error) {
 	if err != nil {
 		f.done = true
 		if errors.Is(err, io.EOF) {
-			err = io.ErrUnexpectedEOF
+			return 0, pos, pos.failure(io.ErrUnexpectedEOF)
 		}
-		return 0, pos, frameReadError(pos, err)
+		return 0, pos, frameReadError(err)
 	}
 	if b == ']' {
 		f.closed = true
@@ -149,11 +151,11 @@ func (f *jsonFrames) nonSpace() (byte, position, error) {
 	}
 }
 
-func frameReadError(pos position, err error) error {
+func frameReadError(err error) error {
 	if errors.Is(err, io.EOF) {
 		return io.EOF
 	}
-	return pos.failure(fmt.Errorf("read JSON record: %w", err))
+	return fmt.Errorf("dataformat: read JSON record: %w", err)
 }
 
 func relativePosition(start position, prefix []byte) position {
@@ -176,8 +178,9 @@ func jsonError(start position, data []byte, err error) error {
 }
 
 type objectReader struct {
-	frames jsonFrames
-	reader *Reader
+	frames    jsonFrames
+	reader    *Reader
+	projected bool
 }
 
 func (r *objectReader) read(ctx context.Context) ([]engine.Value, int, error) {
@@ -185,7 +188,7 @@ func (r *objectReader) read(ctx context.Context) ([]engine.Value, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	obj, err := decodeObject(data, start, r.frames.opts.MaxBytes)
+	obj, err := decodeObject(data, start, r.frames.opts.MaxRecordBytes)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -198,7 +201,7 @@ func (r *objectReader) read(ctx context.Context) ([]engine.Value, int, error) {
 		slices.Sort(columns)
 	}
 	size := len(data) + len(columns)*valueBudget + 1
-	if size > r.frames.opts.MaxBytes {
+	if size > r.frames.opts.MaxRecordBytes {
 		return nil, 0, start.failure(errRecordSize)
 	}
 	row := make([]engine.Value, len(columns))
@@ -211,7 +214,7 @@ func (r *objectReader) read(ctx context.Context) ([]engine.Value, int, error) {
 			delete(obj, name)
 		}
 	}
-	if len(obj) > 0 {
+	if !r.projected && len(obj) > 0 {
 		return nil, 0, start.failure(errors.New("JSON object has fields outside the selected columns"))
 	}
 	r.reader.columns, r.reader.ready = columns, true

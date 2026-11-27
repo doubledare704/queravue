@@ -45,7 +45,7 @@ func (r *Reader) Infer(ctx context.Context, maxRows int) ([]InferredColumn, erro
 		}
 		for _, row := range batch {
 			for i, value := range row {
-				columns[i].observe(value)
+				columns[i].observe(value, r.format == CSV || r.format == TSV)
 			}
 		}
 		maxRows -= len(batch)
@@ -58,7 +58,7 @@ func (r *Reader) Infer(ctx context.Context, maxRows int) ([]InferredColumn, erro
 	return columns, nil
 }
 
-func (c *InferredColumn) observe(v engine.Value) {
+func (c *InferredColumn) observe(v engine.Value, delimited bool) {
 	if v.Kind == engine.VNull {
 		c.Nullable = true
 		return
@@ -68,18 +68,29 @@ func (c *InferredColumn) observe(v engine.Value) {
 	}
 	kind := v.Kind
 	if kind == engine.VText {
-		kind = textKind(v.Str)
+		if delimited {
+			kind = textKind(v.Str)
+		} else {
+			kind = stringKind(v.Str)
+		}
 	}
 	switch {
 	case c.Kind == engine.VNull || c.Kind == kind:
 		c.Kind = kind
-	case c.Kind == engine.VInt && (kind == engine.VFloat || kind == engine.VDecimal):
-		c.Kind = kind
-	case kind == engine.VInt && (c.Kind == engine.VFloat || c.Kind == engine.VDecimal):
+	case isNumeric(c.Kind) && isNumeric(kind):
+		if c.Kind == engine.VFloat || kind == engine.VFloat {
+			c.Kind = engine.VFloat
+		} else {
+			c.Kind = engine.VDecimal
+		}
 	default:
 		c.Kind = engine.VText
 		c.Warning = "mixed value kinds in sample; inferred text"
 	}
+}
+
+func isNumeric(kind engine.ValueKind) bool {
+	return kind == engine.VInt || kind == engine.VFloat || kind == engine.VDecimal
 }
 
 func textKind(s string) engine.ValueKind {
@@ -100,6 +111,10 @@ func textKind(s string) engine.ValueKind {
 			return numberValue(s).Kind
 		}
 	}
+	return stringKind(s)
+}
+
+func stringKind(s string) engine.ValueKind {
 	if len(s) == 36 {
 		if _, err := uuid.Parse(s); err == nil {
 			return engine.VUUID

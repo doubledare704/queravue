@@ -27,6 +27,12 @@ func FormatDumpLiteral(d Dialect, v engine.Value) (string, error) {
 		return strconv.FormatFloat(v.Float, 'g', -1, 64), nil
 	case engine.VDecimal:
 		if !decimalLiteral.MatchString(v.Str) {
+			switch strings.ToLower(v.Str) {
+			case "nan", "infinity", "+infinity", "-infinity", "inf", "+inf", "-inf":
+				if d.Lexer() == sqlsplit.Postgres {
+					return d.FormatLiteral(engine.Text(v.Str)) + "::numeric", nil
+				}
+			}
 			return "", fmt.Errorf("data dump: invalid decimal literal")
 		}
 	case engine.VBytes:
@@ -58,6 +64,9 @@ func dumpArray(d Dialect, values []engine.Value) (string, error) {
 	var out strings.Builder
 	out.WriteString(prefix)
 	for i, value := range values {
+		if d.Lexer() == sqlsplit.Postgres && value.Kind == engine.VArray && len(value.Array) == 0 {
+			return "", fmt.Errorf("data dump: PostgreSQL cannot preserve an empty array inside an array")
+		}
 		part, err := FormatDumpLiteral(d, value)
 		if err != nil {
 			return "", err

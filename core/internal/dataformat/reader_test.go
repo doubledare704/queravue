@@ -20,9 +20,11 @@ func TestSkipBadRecord(t *testing.T) {
 		want                 string
 	}{
 		{"csv", Options{Format: CSV, Header: true}, "a\r\ngood\r\nno\"pe\r\nlast\r\n", 3, 3, 11, "last"},
+		{"csv-later-quoted-field", Options{Format: CSV}, "good\n\"bad\"x,\"hello\nworld\"\nlast", 2, 6, 10, "last"},
+		{"csv-bare-cr", Options{Format: CSV}, "good\nbad\rfield\nlast", 2, 4, 8, "last"},
 		{"csv-field-count", Options{Format: CSV}, "good\nx,y\nlast", 2, 1, 5, "last"},
 		{"csv-utf8", Options{Format: CSV}, "\ufeffgood\n\xff\nlast", 2, 1, 8, "last"},
-		{"csv-wide", Options{Format: CSV, MaxBytes: 110}, "good\n\"" + strings.Repeat("x", 40) + "\ncontinued\"\nlast", 2, 15, 19, "last"},
+		{"csv-wide", Options{Format: CSV, MaxRecordBytes: 110}, "good\n\"" + strings.Repeat("x", 40) + "\ncontinued\"\nlast", 2, 15, 19, "last"},
 		{"ndjson", Options{Format: NDJSON}, "{\"a\":\"good\"}\n{\"a\":!}\n{\"a\":\"last\"}", 2, 6, 18, "last"},
 		{"ndjson-utf8", Options{Format: NDJSON}, "{\"a\":\"good\"}\n{\"a\":\"\xff\"}\n{\"a\":\"last\"}", 2, 7, 19, "last"},
 		{"json-array", Options{Format: JSON}, "[{\"a\":\"good\"},\n{\"a\":!},\n{\"a\":\"last\"}]", 2, 6, 20, "last"},
@@ -155,7 +157,7 @@ func FuzzNDJSONReader(f *testing.F) {
 func fuzzReader(t *testing.T, format Format, data string) {
 	t.Helper()
 	const limit = 2048
-	r, err := NewReader(t.Context(), strings.NewReader(data), Options{Format: format, MaxBytes: limit}, nil)
+	r, err := NewReader(t.Context(), strings.NewReader(data), Options{Format: format, MaxBytes: limit, MaxRecordBytes: limit}, nil)
 	if err != nil {
 		var parse *ParseError
 		if !errors.As(err, &parse) {
@@ -190,4 +192,55 @@ func fuzzReader(t *testing.T, format Format, data string) {
 		}
 	}
 	t.Fatal("reader failed to make progress")
+}
+
+func TestJSONArrayStructure(t *testing.T) {
+	for _, tc := range []struct {
+		data           string
+		rows, failures int
+	}{
+		{`[]`, 0, 0},
+		{`[{"a":1},]`, 1, 1},
+		{`[{"a":1}] extra`, 1, 1},
+		{`[{"a":1}, {"a":2, "a":3}, {"a":4}]`, 2, 1},
+		{`[{"a":1}, {"b":2}, {}]`, 2, 1},
+		{`[{"a":1}, {"a":`, 1, 1},
+	} {
+		t.Run(tc.data, func(t *testing.T) {
+			ctx := t.Context()
+			r, err := NewReader(ctx, strings.NewReader(tc.data), Options{Format: JSON}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows, failures := 0, 0
+			for {
+				batch, err := r.Next(ctx)
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					var parse *ParseError
+					if !errors.As(err, &parse) {
+						t.Fatal(err)
+					}
+					failures++
+				}
+				rows += len(batch)
+				if rows > tc.rows || failures > tc.failures {
+					t.Fatalf("unexpected additional rows or failure: %v, %v", batch, err)
+				}
+			}
+			if rows != tc.rows || failures != tc.failures {
+				t.Fatalf("got %d rows and %d failures, want %d and %d", rows, failures, tc.rows, tc.failures)
+			}
+		})
+	}
+}
+
+func FuzzJSONArrayReader(f *testing.F) {
+	f.Add(`[{"n":1},{"n":{"t":"[],\""}},{"n":null}]`)
+	f.Add(`[{}, {},]`)
+	f.Fuzz(func(t *testing.T, data string) {
+		fuzzReader(t, JSON, data)
+	})
 }

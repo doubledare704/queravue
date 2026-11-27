@@ -59,22 +59,17 @@ func (w *rowWriter) Columns(ctx context.Context, columns []engine.Column) error 
 		size := len(columns) * valueBudget
 		for _, col := range columns {
 			size += len(col.Name)
-			if size > w.opts.MaxBytes {
+			if size > w.opts.MaxRecordBytes {
 				return errRecordSize
 			}
 		}
 	}
 	w.started = true
 	w.names = make([][]byte, len(columns))
-	seen := make(map[string]bool, len(columns))
-	for i, col := range columns {
-		if w.opts.Format == JSON || w.opts.Format == NDJSON {
-			if !w.clipboard && (seen[col.Name] || !utf8.ValidString(col.Name)) {
-				w.err = fmt.Errorf("dataformat: duplicate or invalid JSON column %d", i+1)
-				return w.err
-			}
-			seen[col.Name] = true
-			w.names[i], _ = json.Marshal(strings.ToValidUTF8(col.Name, "\uFFFD"))
+	if w.opts.Format == JSON || w.opts.Format == NDJSON {
+		if err := w.setObjectKeys(columns); err != nil {
+			w.err = err
+			return err
 		}
 	}
 	if w.opts.Format == JSON {
@@ -94,12 +89,42 @@ func (w *rowWriter) Columns(ctx context.Context, columns []engine.Column) error 
 			if w.opts.BOM {
 				bomBytes = 3
 			}
-			if !w.clipboard && w.buf.Len()-bomBytes+len(columns)*valueBudget > w.opts.MaxBytes {
+			if !w.clipboard && w.buf.Len()-bomBytes+len(columns)*valueBudget > w.opts.MaxRecordBytes {
 				w.err = errRecordSize
 			}
 		}
 	}
 	return w.flush()
+}
+
+func (w *rowWriter) setObjectKeys(columns []engine.Column) error {
+	used := make(map[string]bool, len(columns))
+	reserved := make(map[string]bool, len(columns))
+	nextSuffix := make(map[string]int)
+	for _, col := range columns {
+		reserved[col.Name] = true
+	}
+	for i, col := range columns {
+		name := col.Name
+		if !w.clipboard {
+			if !utf8.ValidString(name) {
+				return fmt.Errorf("dataformat: invalid JSON column %d", i+1)
+			}
+			if used[name] {
+				for suffix := max(2, nextSuffix[name]); ; suffix++ {
+					candidate := fmt.Sprintf("%s_%d", name, suffix)
+					if !used[candidate] && !reserved[candidate] {
+						nextSuffix[name] = suffix + 1
+						name = candidate
+						break
+					}
+				}
+			}
+			used[name] = true
+		}
+		w.names[i], _ = json.Marshal(strings.ToValidUTF8(name, "\uFFFD"))
+	}
+	return nil
 }
 
 func (w *rowWriter) Batch(ctx context.Context, rows [][]engine.Value) error {
@@ -117,7 +142,7 @@ func (w *rowWriter) Batch(ctx context.Context, rows [][]engine.Value) error {
 			return fmt.Errorf("dataformat: row has %d values, expected %d", len(row), len(w.names))
 		}
 		if !w.clipboard {
-			remaining := w.opts.MaxBytes - len(row)*valueBudget
+			remaining := w.opts.MaxRecordBytes - len(row)*valueBudget
 			for _, value := range row {
 				if !valueFits(value, &remaining, 0) {
 					return errRecordSize
@@ -141,7 +166,7 @@ func (w *rowWriter) Batch(ctx context.Context, rows [][]engine.Value) error {
 		if w.opts.Format == JSON && !w.hasRows {
 			size++
 		}
-		if !w.clipboard && size > w.opts.MaxBytes && w.err == nil {
+		if !w.clipboard && size > w.opts.MaxRecordBytes && w.err == nil {
 			w.buf.Reset()
 			return errRecordSize
 		}

@@ -14,10 +14,11 @@ import (
 
 // SQLDumpOptions supplies the target dialect and an optional table design.
 type SQLDumpOptions struct {
-	Dialect  sqldialect.Dialect
-	Target   sqldialect.Target
-	Create   *sqldialect.TableDesign
-	MaxBytes int
+	Dialect        sqldialect.Dialect
+	Target         sqldialect.Target
+	Create         *sqldialect.TableDesign
+	MaxBytes       int
+	MaxRecordBytes int
 }
 
 type sqlWriter struct {
@@ -29,7 +30,7 @@ type sqlWriter struct {
 	err                 error
 }
 
-// NewSQLWriter emits INSERT statements bounded by MaxBytes, including the terminator.
+// NewSQLWriter groups rows up to MaxBytes and emits larger rows as single INSERTs.
 func NewSQLWriter(dst io.Writer, opts SQLDumpOptions) (Writer, error) {
 	if opts.Dialect == nil {
 		return nil, errors.New("dataformat: SQL dump requires a dialect")
@@ -37,11 +38,11 @@ func NewSQLWriter(dst io.Writer, opts SQLDumpOptions) (Writer, error) {
 	if opts.Target.Table == "" {
 		opts.Target.Table = "export"
 	}
-	common := Options{Format: SQL, MaxBytes: opts.MaxBytes}
+	common := Options{Format: SQL, MaxBytes: opts.MaxBytes, MaxRecordBytes: opts.MaxRecordBytes}
 	if err := common.normalize(); err != nil {
 		return nil, err
 	}
-	opts.MaxBytes = common.MaxBytes
+	opts.MaxBytes, opts.MaxRecordBytes = common.MaxBytes, common.MaxRecordBytes
 	return &sqlWriter{dst: dst, opts: opts}, nil
 }
 
@@ -65,7 +66,7 @@ func (w *sqlWriter) Columns(ctx context.Context, columns []engine.Column) error 
 		table = d.QualifyTableIn(t.Database, t.Schema, t.Table)
 	}
 	w.prefix = "INSERT INTO " + table + " (" + strings.Join(names, ", ") + ") VALUES\n"
-	if len(w.prefix)+4 > w.opts.MaxBytes {
+	if len(w.prefix)+4 > w.opts.MaxRecordBytes {
 		return errors.New("dataformat: INSERT header exceeds byte limit")
 	}
 	if w.opts.Create != nil {
@@ -126,7 +127,7 @@ func (w *sqlWriter) tuple(row []engine.Value) (string, error) {
 	var out strings.Builder
 	out.WriteByte('(')
 	for i, value := range row {
-		remaining := w.opts.MaxBytes - len(w.prefix) - out.Len() - 3
+		remaining := w.opts.MaxRecordBytes - len(w.prefix) - out.Len() - 3
 		if !valueFits(value, &remaining, 0) {
 			return "", errRecordSize
 		}
@@ -137,8 +138,8 @@ func (w *sqlWriter) tuple(row []engine.Value) (string, error) {
 		if i > 0 {
 			out.WriteString(", ")
 		}
-		if len(w.prefix)+out.Len()+len(literal)+3 > w.opts.MaxBytes {
-			return "", errors.New("dataformat: INSERT row exceeds byte limit")
+		if len(w.prefix)+out.Len()+len(literal)+3 > w.opts.MaxRecordBytes {
+			return "", errRecordSize
 		}
 		out.WriteString(literal)
 	}

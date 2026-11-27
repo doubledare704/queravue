@@ -8,9 +8,10 @@ import (
 	"unicode/utf8"
 )
 
-// MaxBatchBytes bounds decoded batches, including an allowance for each cell.
+// MaxBatchBytes is the decoded batch target; larger records travel alone.
 const MaxBatchBytes = 1 << 20
 
+const defaultMaxRecordBytes = 64 << 20
 const valueBudget = 96
 
 // Format selects a wire representation for rows or documents.
@@ -25,16 +26,17 @@ const (
 	SQL
 )
 
-// Options configures UTF-8 records; zero MaxBytes uses MaxBatchBytes.
+// Options configures UTF-8 records, with separate batch and single-record byte limits.
 type Options struct {
-	Format    Format
-	Delimiter rune
-	Quote     rune
-	NullText  string
-	Header    bool
-	BOM       bool
-	Encoding  string
-	MaxBytes  int
+	Format         Format
+	Delimiter      rune
+	Quote          rune
+	NullText       string
+	Header         bool
+	BOM            bool
+	Encoding       string
+	MaxBytes       int
+	MaxRecordBytes int
 }
 
 func (o *Options) normalize() error {
@@ -46,6 +48,12 @@ func (o *Options) normalize() error {
 	}
 	if o.MaxBytes == 0 {
 		o.MaxBytes = MaxBatchBytes
+	}
+	if o.MaxRecordBytes < 0 {
+		return errors.New("dataformat: negative record byte limit")
+	}
+	if o.MaxRecordBytes == 0 {
+		o.MaxRecordBytes = defaultMaxRecordBytes
 	}
 	if o.Format > SQL {
 		return fmt.Errorf("dataformat: unknown format %d", o.Format)
@@ -72,7 +80,7 @@ func (o *Options) normalize() error {
 }
 
 func validSeparator(r rune) bool {
-	return utf8.ValidRune(r) && !strings.ContainsRune("\x00\r\n", r)
+	return utf8.ValidRune(r) && !strings.ContainsRune("\x00\r\n\ufeff", r)
 }
 
 var errEncoding = errors.New("unsupported encoding or invalid UTF-8")

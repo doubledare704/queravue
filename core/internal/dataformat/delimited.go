@@ -17,11 +17,12 @@ type fieldEnd struct {
 
 type delimitedReader struct {
 	*input
-	opts   Options
-	reader *Reader
-	header bool
-	data   []byte
-	fields []fieldEnd
+	opts      Options
+	reader    *Reader
+	header    bool
+	data      []byte
+	fields    []fieldEnd
+	headerErr error
 }
 
 type fieldState uint8
@@ -35,6 +36,9 @@ const (
 )
 
 func (d *delimitedReader) readHeader(ctx context.Context) error {
+	if d.headerErr != nil {
+		return d.headerErr
+	}
 	if !d.header {
 		return nil
 	}
@@ -42,13 +46,17 @@ func (d *delimitedReader) readHeader(ctx context.Context) error {
 		return fmt.Errorf("dataformat: %w", err)
 	}
 	d.ctx = ctx
-	d.header = false
 	pos := d.pos
 	if _, err := d.scan(); err != nil {
+		if ctx.Err() == nil || pos != d.pos {
+			d.headerErr = err
+		}
 		return err
 	}
+	d.header = false
 	if d.reader.ready && len(d.fields) != len(d.reader.columns) {
-		return pos.failure(fmt.Errorf("header has %d fields, expected %d", len(d.fields), len(d.reader.columns)))
+		d.headerErr = pos.failure(fmt.Errorf("header has %d fields, expected %d", len(d.fields), len(d.reader.columns)))
+		return d.headerErr
 	}
 	if !d.reader.ready {
 		names := make([]string, len(d.fields))
@@ -64,6 +72,9 @@ func (d *delimitedReader) readHeader(ctx context.Context) error {
 
 func (d *delimitedReader) read(ctx context.Context) ([]engine.Value, int, error) {
 	d.ctx = ctx
+	if d.headerErr != nil {
+		return nil, 0, io.EOF
+	}
 	if err := d.readHeader(ctx); err != nil {
 		return nil, 0, err
 	}
@@ -102,7 +113,7 @@ func (d *delimitedReader) scan() (int, error) {
 		pos := d.pos
 		if d.Buffered() < utf8.UTFMax {
 			if err := d.ctx.Err(); err != nil {
-				return 0, pos.failure(err)
+				return 0, fmt.Errorf("dataformat: scan delimited record: %w", err)
 			}
 		}
 		r, n, err := d.ReadRune()
@@ -116,35 +127,41 @@ func (d *delimitedReader) scan() (int, error) {
 			return d.finish(start, quoted, firstErr)
 		}
 		if err != nil {
-			return 0, pos.failure(fmt.Errorf("read delimited record: %w", err))
+			return 0, fmt.Errorf("dataformat: read delimited record: %w", err)
 		}
 		d.advance(r, n)
 		if firstErr == nil {
 			switch {
 			case r == 0 || r == utf8.RuneError && n == 1:
 				firstErr = pos.failure(errEncoding)
-			case d.recordSize(start) > d.opts.MaxBytes:
+			case d.recordSize(start) > d.opts.MaxRecordBytes:
 				firstErr = pos.failure(errRecordSize)
 			}
 		}
 		if state != inQuotedField {
 			if r == '\r' {
-				if next, _ := d.Peek(1); len(next) == 1 && next[0] == '\n' {
+				next, err := d.Peek(1)
+				if err != nil && !errors.Is(err, io.EOF) {
+					return 0, fmt.Errorf("dataformat: read record terminator: %w", err)
+				}
+				if len(next) == 1 && next[0] == '\n' {
 					_, _ = d.readByte()
 					r = '\n'
+				} else if firstErr == nil {
+					firstErr = pos.failure(errors.New("bare carriage return in delimited field"))
 				}
 			}
 			if r == '\n' {
 				return d.finish(start, quoted, firstErr)
-			}
-			if state == badField {
-				continue
 			}
 			if r == d.opts.Delimiter {
 				if firstErr == nil {
 					d.fields = append(d.fields, fieldEnd{len(d.data), quoted})
 				}
 				state, quoted = atFieldStart, false
+				continue
+			}
+			if state == badField {
 				continue
 			}
 		}
@@ -157,7 +174,7 @@ func (d *delimitedReader) scan() (int, error) {
 			continue
 		case r == d.opts.Quote && state == afterQuote:
 			state = inQuotedField
-		case state == afterQuote || r == d.opts.Quote || r == '\r' && state != inQuotedField:
+		case state == afterQuote || r == d.opts.Quote:
 			if firstErr == nil {
 				firstErr = pos.failure(errors.New("invalid quoting in delimited field"))
 			}
@@ -181,7 +198,7 @@ func (d *delimitedReader) finish(start position, quoted bool, err error) (int, e
 	if err != nil {
 		return 0, err
 	}
-	if size > d.opts.MaxBytes {
+	if size > d.opts.MaxRecordBytes {
 		return 0, start.failure(errRecordSize)
 	}
 	d.fields = append(d.fields, fieldEnd{len(d.data), quoted})
