@@ -6,6 +6,7 @@ replace github.com/duckdb/duckdb-go/v2 => github.com/doubledare704/duckdb-go/v2 
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.51.0
+	github.com/brianvoe/gofakeit/v7 v7.18.11
 	github.com/dop251/goja v0.0.0-20261105002551-2413f2132ac8
 	github.com/duckdb/duckdb-go/v2 v2.20000.0
 	github.com/fsnotify/fsnotify v1.10.1
