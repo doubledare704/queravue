@@ -9,6 +9,8 @@ import 'package:queravue/features/gridfs/domain/gridfs_models.dart';
 import 'package:queravue/features/gridfs/presentation/gridfs_file_list.dart';
 import 'package:queravue/features/gridfs/presentation/gridfs_preview_panel.dart';
 
+import '../../support/builder_golden_comparator.dart';
+
 class _PdfViewer implements PdfPreviewer {
   File? opened;
 
@@ -42,6 +44,7 @@ void main() {
   testWidgets(
     'virtual grid displays file columns and supports keyboard selection',
     (tester) async {
+      useBuilderGoldenComparator();
       tester.view.physicalSize = const Size(1080, 360);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -81,6 +84,7 @@ void main() {
   testWidgets('text preview renders metadata and file contents', (
     tester,
   ) async {
+    useBuilderGoldenComparator();
     tester.view.physicalSize = const Size(1080, 360);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
