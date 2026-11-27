@@ -1,6 +1,6 @@
 //go:build integration
 
-package mongo
+package mongo_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 	"github.com/doubledare704/queravue/core/internal/engine/enginetest"
+	"github.com/doubledare704/queravue/core/internal/engine/mongo"
 )
 
 const perfDocsPerBatch = 5_000
@@ -26,22 +27,26 @@ func perfDocumentBatch() []engine.Document {
 // LOAD_PERF=1 go test -tags=integration -run TestIntegrationLoadDocumentsPerf -v ./internal/engine/mongo/
 func TestIntegrationLoadDocumentsPerf(t *testing.T) {
 	enginetest.SkipUnlessLoadPerf(t)
-	c := connect(t)
-	const collection = "qv_perf_load"
-	client, err := c.live("perf")
+	const database, collection = "queravue", "qv_perf_load"
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	conn, err := mongo.New(mongo.VariantMongoDB).Connect(ctx, localConfig(), engine.Secret{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	coll := client.Database("queravue").Collection(collection)
-	_ = coll.Drop(context.Background())
-	t.Cleanup(func() { _ = coll.Drop(context.Background()) })
+	t.Cleanup(func() { _ = conn.Close() })
+	drop := func() {
+		if err := dropCollection(context.Background(), conn, database, collection); err != nil {
+			t.Errorf("drop: %v", err)
+		}
+	}
+	drop()
+	t.Cleanup(drop)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
 	src := enginetest.NewRepeatingDocumentSource(perfDocumentBatch(), enginetest.LoadPerfRows)
 	sampler := enginetest.StartRSSSampler(t)
 	start := time.Now()
-	stats, err := c.LoadDocuments(ctx, "queravue", collection, src)
+	stats, err := conn.(engine.DocumentLoader).LoadDocuments(ctx, database, collection, src)
 	elapsed := time.Since(start)
 	baseline, peak := sampler.Stop()
 	if err != nil {
@@ -51,9 +56,9 @@ func TestIntegrationLoadDocumentsPerf(t *testing.T) {
 	t.Logf("mongo: %d documents in %d inserts, %.2fs, %.0f docs/s, RSS baseline %.1f MiB, peak %.1f MiB (+%.1f)",
 		stats.Rows, stats.Batches, elapsed.Seconds(), rate, baseline, peak, peak-baseline)
 
-	n, err := coll.CountDocuments(ctx, struct{}{})
-	if err != nil || n != enginetest.LoadPerfRows {
-		t.Errorf("%d documents stored (%v), want %d", n, err, enginetest.LoadPerfRows)
+	n, err := conn.(engine.DocumentStore).Count(ctx, database, collection, `{"_id":{"$exists":true}}`, 0)
+	if err != nil || n.N != enginetest.LoadPerfRows {
+		t.Errorf("%d documents stored (%v), want %d", n.N, err, enginetest.LoadPerfRows)
 	}
 	if rate < enginetest.LoadMongoMinRate {
 		t.Errorf("%.0f docs/s is below the %d docs/s gate", rate, enginetest.LoadMongoMinRate)
