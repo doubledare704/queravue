@@ -12,6 +12,8 @@ import 'gen/queravue/v1/core.pbgrpc.dart';
 import 'gen/queravue/v1/design.pbgrpc.dart';
 import 'gen/queravue/v1/document.pbgrpc.dart';
 import 'gen/queravue/v1/gridfs.pbgrpc.dart';
+import 'gen/queravue/v1/mockdata.pbgrpc.dart';
+import 'gen/queravue/v1/transfer.pbgrpc.dart';
 import 'gen/queravue/v1/history.pbgrpc.dart';
 import 'gen/queravue/v1/index.pbgrpc.dart';
 import 'gen/queravue/v1/keyvalue.pbgrpc.dart';
@@ -104,6 +106,10 @@ abstract interface class CoreConnection {
   /// Client for GridFS buckets.
   GridFsServiceClient get gridFsService;
 
+  TransferServiceClient get transferService;
+
+  MockDataServiceClient get mockDataService;
+
   Future<UploadResponse> uploadGridFsFile(
     Stream<UploadRequest> requests,
     CancellationToken cancel,
@@ -143,6 +149,8 @@ class GrpcCoreConnection implements CoreConnection {
     diagramService = DiagramServiceClient(_channel, options: _auth);
     queryBuilderService = QueryBuilderServiceClient(_channel, options: _auth);
     gridFsService = GridFsServiceClient(_channel, options: _auth);
+    transferService = TransferServiceClient(_channel, options: _auth);
+    mockDataService = MockDataServiceClient(_channel, options: _auth);
   }
 
   /// Connects to [handle]'s socket. The connection is lazy; the first RPC
@@ -272,6 +280,12 @@ class GrpcCoreConnection implements CoreConnection {
 
   @override
   late final GridFsServiceClient gridFsService;
+
+  @override
+  late final TransferServiceClient transferService;
+
+  @override
+  late final MockDataServiceClient mockDataService;
 
   @override
   Future<UploadResponse> uploadGridFsFile(

@@ -1,0 +1,425 @@
+syntax = "proto3";
+
+package queravue.v1;
+
+import "queravue/v1/query.proto";
+import "queravue/v1/schema.proto";
+import "queravue/v1/table.proto";
+
+// TransferService imports files into tables and collections and exports
+// results, tables and collections to files (ADR 0024).
+//
+// File bytes always stream in chunks of at most 1 MiB; neither side holds a
+// whole file. The app reads and writes the files; the core never opens a path
+// sent by the UI. Failures the user can act on are returned in-band as
+// TransferError. Unknown sessions or results are NOT_FOUND and sessions
+// without the needed capability are FAILED_PRECONDITION.
+service TransferService {
+  // ListFormats returns the formats this core build can import and export.
+  // Parquet is listed only when the core is built with DuckDB.
+  rpc ListFormats(ListFormatsRequest) returns (ListFormatsResponse);
+
+  // ExportResult encodes a spooled query result. Cancelling the call stops
+  // the export.
+  rpc ExportResult(ExportResultRequest) returns (stream ExportResultResponse);
+
+  // ExportTable encodes a table, optionally filtered and sorted, without
+  // spooling it. Needs the "execute" capability.
+  rpc ExportTable(ExportTableRequest) returns (stream ExportTableResponse);
+
+  // ExportCollection encodes a collection's documents. Needs the
+  // "document_store" capability.
+  rpc ExportCollection(ExportCollectionRequest) returns (stream ExportCollectionResponse);
+
+  // InferImport reads the first bytes of a file and proposes its format,
+  // columns, types and a preview. The first message carries the header,
+  // every later one a chunk; the app sends at most a few MiB and closes.
+  rpc InferImport(stream InferImportRequest) returns (InferImportResponse);
+
+  // Import loads a file into a table or collection. The first message carries
+  // the header, every later one a chunk. Progress and the summary stream back.
+  // Cancelling the call stops after the current batch; committed batches stay.
+  rpc Import(stream ImportRequest) returns (stream ImportResponse);
+}
+
+// TransferFormat is a file format.
+enum TransferFormat {
+  // Not set. Rejected where a format is required.
+  TRANSFER_FORMAT_UNSPECIFIED = 0;
+  // Comma-separated values with RFC 4180 quoting.
+  TRANSFER_FORMAT_CSV = 1;
+  // Tab-separated values.
+  TRANSFER_FORMAT_TSV = 2;
+  // One JSON array of objects or documents.
+  TRANSFER_FORMAT_JSON = 3;
+  // One JSON object or document per line.
+  TRANSFER_FORMAT_NDJSON = 4;
+  // SQL statements: INSERTs on export, a script on import.
+  TRANSFER_FORMAT_SQL = 5;
+  // Apache Parquet, through embedded DuckDB.
+  TRANSFER_FORMAT_PARQUET = 6;
+}
+
+// JsonFlavor selects how documents are written as Extended JSON.
+enum JsonFlavor {
+  // Not set. Treated as RELAXED.
+  JSON_FLAVOR_UNSPECIFIED = 0;
+  // Relaxed Extended JSON v2: plain numbers and ISO dates where lossless.
+  JSON_FLAVOR_RELAXED = 1;
+  // Canonical Extended JSON v2: every type explicit.
+  JSON_FLAVOR_CANONICAL = 2;
+}
+
+// TransferErrorKind classifies an import or export failure.
+enum TransferErrorKind {
+  // Unclassified failure.
+  TRANSFER_ERROR_KIND_UNSPECIFIED = 0;
+  // The file or a filter is malformed for its format.
+  TRANSFER_ERROR_KIND_PARSE = 1;
+  // The mapping names a missing column, or a value cannot be coerced to its
+  // target column.
+  TRANSFER_ERROR_KIND_MAPPING = 2;
+  // The server rejected a row for a constraint (unique, not null, foreign key,
+  // check).
+  TRANSFER_ERROR_KIND_CONSTRAINT = 3;
+  // The connection is flagged production and the request did not set
+  // confirmed. Nothing was changed.
+  TRANSFER_ERROR_KIND_CONFIRMATION_REQUIRED = 4;
+  // Bad credentials or not permitted.
+  TRANSFER_ERROR_KIND_AUTH = 5;
+  // Server unreachable or connection lost.
+  TRANSFER_ERROR_KIND_NETWORK = 6;
+  // The operation exceeded its time limit.
+  TRANSFER_ERROR_KIND_TIMEOUT = 7;
+  // The operation was cancelled.
+  TRANSFER_ERROR_KIND_CANCELED = 8;
+  // The format or target is not supported by this core build or engine.
+  TRANSFER_ERROR_KIND_UNSUPPORTED = 9;
+  // The server rejected the operation.
+  TRANSFER_ERROR_KIND_SERVER = 10;
+}
+
+// TransferError is a typed failure. The message never contains secrets or
+// row data.
+message TransferError {
+  // Failure class.
+  TransferErrorKind kind = 1;
+  // Human-readable detail.
+  string message = 2;
+}
+
+// TransferFormatOptions tunes a format. Fields that do not apply to the
+// chosen format are ignored.
+message TransferFormatOptions {
+  // CSV/TSV field delimiter; empty means "," for CSV and a tab for TSV.
+  string delimiter = 1;
+  // CSV/TSV quote character; empty means a double quote.
+  string quote = 2;
+  // CSV/TSV: the first line holds column names.
+  bool header = 3;
+  // CSV/TSV text that stands for NULL; empty means an empty field is NULL.
+  string null_text = 4;
+  // JSON/NDJSON flavour for documents and typed values.
+  JsonFlavor json_flavor = 5;
+  // SQL export: emit CREATE TABLE before the INSERTs.
+  bool sql_include_ddl = 6;
+  // SQL export: table name used in the statements; empty means the source
+  // table, or "export" for a query result.
+  string sql_target_table = 7;
+}
+
+// ExportOptions selects the output of an export.
+message ExportOptions {
+  // Output format.
+  TransferFormat format = 1;
+  // Format details.
+  TransferFormatOptions format_options = 2;
+}
+
+// CollectionRef names a collection.
+message CollectionRef {
+  // Database name.
+  string database = 1;
+  // Collection name.
+  string collection = 2;
+}
+
+// ListFormatsRequest has no fields.
+message ListFormatsRequest {}
+
+// ListFormatsResponse lists supported formats.
+message ListFormatsResponse {
+  // Formats Import accepts.
+  repeated TransferFormat import_formats = 1;
+  // Formats the export calls produce.
+  repeated TransferFormat export_formats = 2;
+}
+
+// ExportResultRequest selects a spooled result.
+message ExportResultRequest {
+  // Result id from QueryService.Execute.
+  string result_id = 1;
+  // Columns to export, in output order. Empty means all columns.
+  repeated uint32 column_indices = 2;
+  // Output format.
+  ExportOptions options = 3;
+}
+
+// ExportTableRequest selects a table.
+message ExportTableRequest {
+  // Session id.
+  string session_id = 1;
+  // Table to export.
+  TableRef table = 2;
+  // Optional filter, as in TableService.
+  TableFilter filter = 3;
+  // Optional sort, as in TableService.
+  repeated SortClause sort = 4;
+  // Columns to export, in output order. Empty means all columns.
+  repeated string columns = 5;
+  // Output format.
+  ExportOptions options = 6;
+}
+
+// ExportCollectionRequest selects documents.
+message ExportCollectionRequest {
+  // Session id.
+  string session_id = 1;
+  // Collection to export.
+  CollectionRef collection = 2;
+  // Filter as relaxed EJSON; empty means all documents.
+  string filter_ejson = 3;
+  // Projection as relaxed EJSON; empty means whole documents.
+  string projection_ejson = 4;
+  // Sort as relaxed EJSON; empty means natural order.
+  string sort_ejson = 5;
+  // CSV/TSV/Parquet: dotted field paths that become columns, in order.
+  // Ignored for JSON and NDJSON.
+  repeated string field_paths = 6;
+  // Output format.
+  ExportOptions options = 7;
+}
+
+// ExportHeader opens an export stream.
+message ExportHeader {
+  // Format of the bytes that follow.
+  TransferFormat format = 1;
+  // File name the save dialog proposes, with extension.
+  string suggested_filename = 2;
+}
+
+// ExportProgress reports work done so far.
+message ExportProgress {
+  // Rows or documents encoded.
+  uint64 rows = 1;
+  // Bytes sent.
+  uint64 bytes = 2;
+}
+
+// ExportSummary ends a successful export.
+message ExportSummary {
+  // Rows or documents encoded.
+  uint64 rows = 1;
+  // Bytes sent.
+  uint64 bytes = 2;
+}
+
+// ExportEvent is one event of an export stream: the header first, then
+// chunks interleaved with progress, then a summary or an error.
+message ExportEvent {
+  // Event.
+  oneof event {
+    // First event.
+    ExportHeader header = 1;
+    // File bytes to append, at most 1 MiB.
+    bytes chunk = 2;
+    // Throttled progress.
+    ExportProgress progress = 3;
+    // Last event of a successful export.
+    ExportSummary summary = 4;
+    // Last event of a failed export.
+    TransferError error = 5;
+  }
+}
+
+// ExportResultResponse is one event of ExportResult.
+message ExportResultResponse {
+  // Event.
+  ExportEvent event = 1;
+}
+
+// ExportTableResponse is one event of ExportTable.
+message ExportTableResponse {
+  // Event.
+  ExportEvent event = 1;
+}
+
+// ExportCollectionResponse is one event of ExportCollection.
+message ExportCollectionResponse {
+  // Event.
+  ExportEvent event = 1;
+}
+
+// InferImportHeader opens an InferImport stream.
+message InferImportHeader {
+  // Session id; the target engine shapes the suggested column types.
+  string session_id = 1;
+  // File name, used for the format guess by extension.
+  string filename = 2;
+  // Format to assume; unset means detect it.
+  TransferFormat format = 3;
+  // Format details to assume; unset fields are detected.
+  TransferFormatOptions format_options = 4;
+}
+
+// InferImportRequest is one message of an InferImport stream.
+message InferImportRequest {
+  // Message.
+  oneof message {
+    // First message.
+    InferImportHeader header = 1;
+    // File bytes in order, at most 1 MiB each.
+    bytes chunk = 2;
+  }
+}
+
+// ImportColumn is one column found in a file.
+message ImportColumn {
+  // Name from the header, or "column_<n>" (1-based) without one.
+  string name = 1;
+  // Value kind inferred from the sample.
+  ValueKind inferred_kind = 2;
+  // Native type the target engine would use for a new table.
+  string suggested_type_name = 3;
+  // True when the sample had empty or NULL values.
+  bool nullable = 4;
+}
+
+// InferImportResponse describes the file.
+message InferImportResponse {
+  // Detected or assumed format.
+  TransferFormat format = 1;
+  // Detected or assumed format details.
+  TransferFormatOptions format_options = 2;
+  // Columns for tabular formats; empty for JSON and NDJSON documents.
+  repeated ImportColumn columns = 3;
+  // First rows as typed values, for tabular formats.
+  RowBatch preview_rows = 4;
+  // First documents as canonical EJSON, for JSON and NDJSON.
+  repeated string preview_documents_ejson = 5;
+  // Notes on the guess, e.g. mixed types in a column.
+  repeated string warnings = 6;
+  // Set when the bytes could not be read in any supported format.
+  TransferError error = 7;
+}
+
+// NewTable is a table the import creates first.
+message NewTable {
+  // Where to create it.
+  TableRef table = 1;
+  // Columns, in order. type_name is the native type.
+  repeated ColumnDetails columns = 2;
+}
+
+// ColumnMapping sends one source column to one target column.
+message ColumnMapping {
+  // 0-based column index in the file.
+  uint32 source_index = 1;
+  // Target column name.
+  string target_column = 2;
+}
+
+// ImportErrorPolicy says what a bad row does.
+enum ImportErrorPolicy {
+  // Not set. Treated as STOP.
+  IMPORT_ERROR_POLICY_UNSPECIFIED = 0;
+  // Stop at the first bad row; earlier batches stay committed.
+  IMPORT_ERROR_POLICY_STOP = 1;
+  // Skip bad rows and report them, up to max_row_errors.
+  IMPORT_ERROR_POLICY_SKIP = 2;
+}
+
+// ImportHeader opens an Import stream.
+message ImportHeader {
+  // Session id.
+  string session_id = 1;
+  // Where the rows go.
+  oneof target {
+    // An existing table.
+    TableRef existing_table = 2;
+    // A table to create first.
+    NewTable new_table = 3;
+    // A collection, created on first insert if missing.
+    CollectionRef collection = 4;
+  }
+  // File format.
+  TransferFormat format = 5;
+  // Format details.
+  TransferFormatOptions format_options = 6;
+  // Tabular sources: columns to load. Empty means by position into all
+  // target columns.
+  repeated ColumnMapping mappings = 7;
+  // What a bad row does.
+  ImportErrorPolicy error_policy = 8;
+  // SKIP: stop after this many bad rows; 0 means 1000.
+  uint32 max_row_errors = 9;
+  // Load everything in one transaction where the engine supports it.
+  bool single_transaction = 10;
+  // Required on connections flagged production.
+  bool confirmed = 11;
+}
+
+// ImportRequest is one message of an Import stream.
+message ImportRequest {
+  // Message.
+  oneof message {
+    // First message.
+    ImportHeader header = 1;
+    // File bytes in order, at most 1 MiB each.
+    bytes chunk = 2;
+  }
+}
+
+// ImportProgress reports work done so far.
+message ImportProgress {
+  // Rows or documents committed.
+  uint64 rows_committed = 1;
+  // File bytes consumed.
+  uint64 bytes_read = 2;
+}
+
+// ImportRowError is one rejected row.
+message ImportRowError {
+  // 1-based line (CSV, TSV, NDJSON, SQL) or record number (JSON, Parquet).
+  uint64 line = 1;
+  // Column name, when the error belongs to one.
+  string column = 2;
+  // Human-readable detail without the row's values.
+  string message = 3;
+}
+
+// ImportSummary ends an import that ran, completely or until it stopped.
+message ImportSummary {
+  // Rows or documents committed.
+  uint64 rows_committed = 1;
+  // Rows skipped under the SKIP policy.
+  uint64 rows_skipped = 2;
+  // Rejected rows, at most max_row_errors.
+  repeated ImportRowError row_errors = 3;
+  // DDL that ran for a new table, for the history.
+  string ddl = 4;
+}
+
+// ImportResponse is one event of an Import stream: progress, then a summary,
+// or an error. A summary may follow an error to report committed rows.
+message ImportResponse {
+  // Event.
+  oneof event {
+    // Throttled progress.
+    ImportProgress progress = 1;
+    // Last event, or the event after an error.
+    ImportSummary summary = 2;
+    // Failure that stopped the import.
+    TransferError error = 3;
+  }
+}

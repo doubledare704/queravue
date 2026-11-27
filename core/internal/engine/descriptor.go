@@ -42,6 +42,10 @@ const (
 	CapKeyValueStore Capability = "key_value_store"
 	// CapGridFS: GridFS (Iteration 12, ADR 0023).
 	CapGridFS Capability = "gridfs"
+	// CapBulkLoad: RowLoader (Iteration 13, ADR 0024).
+	CapBulkLoad Capability = "bulk_load"
+	// CapDocumentLoad: DocumentLoader (Iteration 13, ADR 0024).
+	CapDocumentLoad Capability = "document_load"
 )
 
 // CapabilitiesWithoutInterface lists capabilities that core implements on its
@@ -63,6 +67,8 @@ var CapabilityInterfaces = map[Capability]reflect.Type{
 	CapSchemaGraph:     reflect.TypeFor[RelationLister](),
 	CapKeyValueStore:   reflect.TypeFor[KeyValueStore](),
 	CapGridFS:          reflect.TypeFor[GridFS](),
+	CapBulkLoad:        reflect.TypeFor[RowLoader](),
+	CapDocumentLoad:    reflect.TypeFor[DocumentLoader](),
 }
 
 // CapabilityAlternatives lists further Conn interfaces that provide a
