@@ -17,7 +17,9 @@ A new package `core/internal/dataformat` holds streaming readers and writers. Re
 - SQL dump (export): `INSERT` statements in the target dialect via `sqldialect`, multi-row where the dialect allows it, with an optional `CREATE TABLE`.
 - Parquet: §3.
 
-`results.Formatter` moves behind the same writer interface, so copy and export share one encoder.
+`results.Formatter` moves behind the same writer interface, so copy and export share one encoder. Clipboard output retains its original line endings, null representation and JSON layout.
+
+Delimited files reserve the unquoted null token for NULL. Quoting that token preserves it as text, including a quoted empty string when the null token is empty. Delimited readers yield text and NULL so the import mapping can apply the destination types after sampling. Inference treats fixed-point numbers as decimals, widens a numeric column to float when the sample contains exponent notation representable as a float, and reports incompatible kinds as text with a warning. JSON strings remain text except when they match UUIDs or timestamps. JSON readers use an explicit column list or the sorted keys of the first object. Missing keys yield NULL. For sparse files with keys that first appear in later objects, supply a column list for the fields to import. JSON file exports suffix duplicate names without taking names already present in the result. Relaxed EJSON readers normalize documents to canonical EJSON for the Mongo loader.
 
 ### 3. Parquet through embedded DuckDB
 Core opens a private in-memory DuckDB instance per Parquet transfer, separate from any user connection. It sets `memory_limit` and a `temp_directory` inside the spool directory (ADR 0006), so large files spill to disk instead of growing RSS. `read_parquet` and `COPY … TO` need paths, so only core-owned temporary files are used, never a path from the UI:
@@ -40,6 +42,8 @@ DuckDB is linked only with the `duckdb` build tag (ADR 0019); release builds hav
 
 ### 6. Batches, errors and cancel
 Rows commit per batch by default. A single transaction is available where the engine supports it. On a bad row the import stops (default) or skips it and reports up to N errors with line and column. Cancel stops after the current batch and reports the committed count; committed batches are never silently rolled back.
+
+Format readers target batches of at most 500 rows and about 1 MiB. A record above the batch target travels alone, including in SQL dumps. The configurable single-record ceiling defaults to 64 MiB. Readers report malformed data after delivering any preceding good rows, so a caller can either stop or request the next batch. Transport and cancellation errors stop the current batch immediately. Recovery follows record boundaries. If an unterminated quoted field or JSON array element makes the rest of the stream ambiguous, the reader reports the incomplete record. Error lines and byte columns start at one, and absolute byte offsets start at zero.
 
 ### 7. SQL script import
 A `.sql` file runs statement by statement through an incremental `sqlsplit` over the stream and stops at the first error with its line. Engine-native dump formats (`pg_dump` `COPY … FROM stdin` blocks, `mysqldump`-specific syntax) are out of scope.

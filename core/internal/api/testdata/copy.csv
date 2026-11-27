@@ -1,0 +1,8 @@
+empty,"unicode, ""雪""",null,bool,int,float,decimal,bytes,time,json,uuid,array,"unicode, ""雪"""
+,"a	, ""雪""
+b",,true,-7,+Inf,1000000000000000000.1234,\x00ff,2026-02-03T02:05:06.000007Z,"{
+  ""key"": true
+}",00000000-0000-0000-0000-000000000000,"[1,""\u003c\u003e\u0026"",null]","a	, ""雪""
+b"
+,last,,false,0,1.25,NaN,\x,,invalid json,,[],last
+,short row,,,,,,,,,,,short row

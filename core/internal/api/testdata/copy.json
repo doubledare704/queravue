@@ -1,0 +1,7 @@
+[
+  {"empty": "", "unicode, \"雪\"": "a\t, \"雪\"\r\nb", "null": null, "bool": true, "int": -7, "float": "+Inf", "decimal": 1000000000000000000.1234, "bytes": "\\x00ff", "time": "2026-02-03T02:05:06.000007Z", "json": {
+  "key": true
+}, "uuid": "00000000-0000-0000-0000-000000000000", "array": [1,"\u003c\u003e\u0026",null], "unicode, \"雪\"": "a\t, \"雪\"\r\nb"},
+  {"empty": null, "unicode, \"雪\"": "last", "null": "", "bool": false, "int": 0, "float": 1.25, "decimal": "NaN", "bytes": "\\x", "time": null, "json": "invalid json", "uuid": null, "array": [], "unicode, \"雪\"": "last"},
+  {"empty": null, "unicode, \"雪\"": "short row", "null": null, "bool": null, "int": null, "float": null, "decimal": null, "bytes": null, "time": null, "json": null, "uuid": null, "array": null, "unicode, \"雪\"": "short row"}
+]

@@ -1,0 +1,1 @@
+[{"_id":{"$oid":"507f1f77bcf86cd799439011"},"count":{"$numberLong":"9007199254740993"},"date":{"$date":{"$numberLong":"0"}},"price":{"$numberDecimal":"12.30"},"a":[null,"雪\n\""],"empty":"","bin":{"$binary":{"base64":"AAE=","subType":"00"}}},{"nested":{"n":{"$numberInt":"1"}},"nullable":null}]

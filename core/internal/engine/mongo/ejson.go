@@ -1,9 +1,12 @@
 package mongo
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"unicode/utf16"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -132,37 +135,44 @@ func utf16Offset(s string, byteOff int) int {
 // rejectBareNumbers fails on a JSON number that is not inside a $-wrapper,
 // i.e. a number whose BSON type would be a guess.
 func rejectBareNumbers(text string, input engine.Input) error {
-	dec := json.NewDecoder(bytesReader(text))
+	if n := firstBareNumber(newNumberDecoder(bytesReader(text)), false); n != "" {
+		return &engine.Error{Kind: engine.KindParse, Engine: ID, Op: "parse", Input: input,
+			Msg: fmt.Sprintf("number %s has no type; use {\"$numberInt\":\"…\"}, {\"$numberLong\":\"…\"} or {\"$numberDouble\":\"…\"}", n)}
+	}
+	return nil
+}
+
+func newNumberDecoder(src io.Reader) *json.Decoder {
+	dec := json.NewDecoder(src)
 	dec.UseNumber()
-	var walk func(v any, inWrapper bool) error
-	walk = func(v any, inWrapper bool) error {
-		switch t := v.(type) {
-		case json.Number:
-			if !inWrapper {
-				return &engine.Error{Kind: engine.KindParse, Engine: ID, Op: "parse", Input: input,
-					Msg: fmt.Sprintf("number %s has no type; use {\"$numberInt\":\"…\"}, {\"$numberLong\":\"…\"} or {\"$numberDouble\":\"…\"}", t.String())}
+	return dec
+}
+
+func firstBareNumber(dec *json.Decoder, wrapped bool) json.Number {
+	token, err := dec.Token()
+	if err != nil {
+		return ""
+	}
+	switch token := token.(type) {
+	case json.Number:
+		if !wrapped {
+			return token
+		}
+	case json.Delim:
+		for dec.More() {
+			childWrapped := wrapped
+			if token == '{' {
+				key, _ := dec.Token()
+				name, _ := key.(string)
+				childWrapped = wrapped || strings.HasPrefix(name, "$")
 			}
-		case map[string]any:
-			for k, e := range t {
-				w := inWrapper || (len(k) > 0 && k[0] == '$')
-				if err := walk(e, w); err != nil {
-					return err
-				}
-			}
-		case []any:
-			for _, e := range t {
-				if err := walk(e, inWrapper); err != nil {
-					return err
-				}
+			if n := firstBareNumber(dec, childWrapped); n != "" {
+				return n
 			}
 		}
-		return nil
+		_, _ = dec.Token()
 	}
-	var v any
-	if err := dec.Decode(&v); err != nil {
-		return nil // syntax already checked
-	}
-	return walk(v, false)
+	return ""
 }
 
 // CanonicalEJSON renders a bson.D, bson.M or other document value as canonical EJSON.
@@ -170,6 +180,26 @@ func CanonicalEJSON(doc any) (string, error) {
 	b, err := bson.MarshalExtJSON(doc, true, false)
 	if err != nil {
 		return "", fmt.Errorf("mongo: encode document: %w", err)
+	}
+	return string(b), nil
+}
+
+// TranscodeEJSON changes the flavor without the editor's UTF-16 offset pass.
+func TranscodeEJSON(data []byte, requireCanonical, emitCanonical bool) (string, error) {
+	if !json.Valid(data) {
+		var unused json.RawMessage
+		return "", fmt.Errorf("mongo: invalid EJSON syntax: %w", json.Unmarshal(data, &unused))
+	}
+	if requireCanonical && firstBareNumber(newNumberDecoder(bytes.NewReader(data)), false) != "" {
+		return "", errors.New("mongo: canonical EJSON requires explicit BSON types for numbers")
+	}
+	var doc bson.D
+	if err := bson.UnmarshalExtJSON(data, requireCanonical, &doc); err != nil {
+		return "", errors.New("mongo: invalid EJSON document or BSON value")
+	}
+	b, err := bson.MarshalExtJSON(doc, emitCanonical, false)
+	if err != nil {
+		return "", errors.New("mongo: could not encode EJSON document")
 	}
 	return string(b), nil
 }
