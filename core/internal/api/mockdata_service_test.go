@@ -758,3 +758,44 @@ func TestMockDataServiceProgressThrottled(t *testing.T) {
 		t.Fatalf("expected throttled progress events (1..4), got %d", progressCount)
 	}
 }
+
+func TestMockDataServiceSuggestAndPreviewFailWhenSessionBusy(t *testing.T) {
+	conn := sampleSQLConn()
+	mgr := session.NewManager(fakeOpener{conn: conn})
+	t.Cleanup(mgr.Shutdown)
+	sess, err := mgr.Open(context.Background(), "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := api.NewMockDataService(mgr, nil, nil)
+
+	_, finish, err := sess.Begin(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer finish()
+
+	_, err = svc.SuggestMockSpec(context.Background(), &queravuev1.SuggestMockSpecRequest{
+		SessionId: sess.ID,
+		Tables:    []*queravuev1.TableRef{{Database: "app", Schema: "public", Table: "orgs"}},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("busy SuggestMockSpec code=%v, want FailedPrecondition", status.Code(err))
+	}
+
+	_, err = svc.PreviewMock(context.Background(), &queravuev1.PreviewMockRequest{
+		SessionId: sess.ID,
+		Spec: &queravuev1.MockSpec{
+			Targets: []*queravuev1.MockTarget{{
+				Target: &queravuev1.MockTargetRef{Target: &queravuev1.MockTargetRef_Table{
+					Table: &queravuev1.TableRef{Database: "app", Schema: "public", Table: "orgs"},
+				}},
+				Rows:  5,
+				Rules: []*queravuev1.MockColumnRule{{ColumnOrPath: "id", Rule: &queravuev1.MockColumnRule_Sequence{Sequence: &queravuev1.SequenceRule{Start: 1}}}},
+			}},
+		},
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("busy PreviewMock code=%v, want FailedPrecondition", status.Code(err))
+	}
+}

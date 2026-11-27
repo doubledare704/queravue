@@ -35,7 +35,7 @@ func newTableBatchSource(
 	seed uint64,
 	spec TargetSpec,
 	referencedCols map[string]bool,
-	keyStore *KeyStore,
+	store *keyStore,
 	onBatch func(uint64),
 ) (*tableBatchSource, error) {
 	cols := make([]compiledColumn, 0, len(spec.Rules))
@@ -55,7 +55,7 @@ func newTableBatchSource(
 		}
 		var pool *KeyPool
 		if referencedCols[strings.ToLower(r.ColumnOrPath)] {
-			pool = keyStore.ensure(targetKey, r.ColumnOrPath)
+			pool = store.ensure(targetKey, r.ColumnOrPath)
 		}
 		cols = append(cols, compiledColumn{name: r.ColumnOrPath, gen: gen, pool: pool})
 		colNames = append(colNames, r.ColumnOrPath)
@@ -65,15 +65,18 @@ func newTableBatchSource(
 		spec:       spec,
 		columns:    colNames,
 		cols:       cols,
-		ctxGen:     &genContext{keys: keyStore},
+		ctxGen:     &genContext{keys: store},
 		batchRows:  defaultBatchRows,
 		batchBytes: defaultBatchBytes,
 		onBatch:    onBatch,
 	}, nil
 }
 
-// Next implements engine.RowBatchSource.
 func (s *tableBatchSource) Next(ctx context.Context) ([][]engine.Value, error) {
+	if s.generated > 0 && s.onBatch != nil {
+		// Loader has committed the previous batch by the time it pulls the next one.
+		s.onBatch(s.generated)
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("mockdata: next row batch: %w", err)
 	}
@@ -106,9 +109,6 @@ func (s *tableBatchSource) Next(ctx context.Context) ([][]engine.Value, error) {
 		if estBytes >= s.batchBytes {
 			break
 		}
-	}
-	if s.onBatch != nil {
-		s.onBatch(s.generated)
 	}
 	return rows, nil
 }
@@ -149,7 +149,7 @@ type docBatchSource struct {
 func newDocBatchSource(
 	seed uint64,
 	spec TargetSpec,
-	keyStore *KeyStore,
+	store *keyStore,
 	onBatch func(uint64),
 ) (*docBatchSource, error) {
 	root, err := compileDocTree(seed, spec.Target, spec.Rules)
@@ -159,15 +159,17 @@ func newDocBatchSource(
 	return &docBatchSource{
 		spec:       spec,
 		root:       root,
-		ctxGen:     &genContext{keys: keyStore},
+		ctxGen:     &genContext{keys: store},
 		batchRows:  defaultBatchRows,
 		batchBytes: defaultBatchBytes,
 		onBatch:    onBatch,
 	}, nil
 }
 
-// Next implements engine.DocumentBatchSource.
 func (s *docBatchSource) Next(ctx context.Context) ([]engine.Document, error) {
+	if s.generated > 0 && s.onBatch != nil {
+		s.onBatch(s.generated)
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("mockdata: next document batch: %w", err)
 	}
@@ -193,9 +195,6 @@ func (s *docBatchSource) Next(ctx context.Context) ([]engine.Document, error) {
 		if estBytes >= s.batchBytes {
 			break
 		}
-	}
-	if s.onBatch != nil {
-		s.onBatch(s.generated)
 	}
 	return docs, nil
 }

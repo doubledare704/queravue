@@ -286,6 +286,33 @@ func TestUniqueSuccessAndExhaustion(t *testing.T) {
 	if !errors.As(err, &me) || me.Kind != ErrUniqueExhausted || me.Column != "code" {
 		t.Fatalf("got err=%v, want ErrUniqueExhausted for column code", err)
 	}
+
+	strGen, err := buildGenerator(5, target, "tag", ColumnRule{
+		ColumnOrPath: "tag",
+		Unique:       true,
+		Kind:         RuleWeightedValues,
+		WeightedValues: WeightedValuesRule{
+			Values: []engine.Value{engine.Text("a"), engine.Text("b")},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seenStr := map[string]bool{}
+	for range 2 {
+		v, err := strGen.next(&genContext{})
+		if err != nil {
+			t.Fatalf("unexpected error for unique string: %v", err)
+		}
+		seenStr[v.val.Str] = true
+	}
+	if len(seenStr) != 2 {
+		t.Fatalf("expected 2 distinct strings, got %+v", seenStr)
+	}
+	_, err = strGen.next(&genContext{})
+	if !errors.As(err, &me) || me.Kind != ErrUniqueExhausted || me.Column != "tag" {
+		t.Fatalf("got err=%v, want ErrUniqueExhausted for column tag", err)
+	}
 }
 
 func TestRuleValidationErrors(t *testing.T) {
@@ -307,6 +334,7 @@ func TestRuleValidationErrors(t *testing.T) {
 		{"pattern trailing escape", ColumnRule{ColumnOrPath: "c", Kind: RulePattern, Pattern: PatternRule{Pattern: `abc\`}}},
 		{"fk missing parent", ColumnRule{ColumnOrPath: "c", Kind: RuleForeignKey}},
 		{"array min > max", ColumnRule{ColumnOrPath: "c", Kind: RuleArray, Array: ArrayRule{MinLength: 5, MaxLength: 2, Element: &ColumnRule{Kind: RuleFaker, FakerKind: "word"}}}},
+		{"array max > cap", ColumnRule{ColumnOrPath: "c", Kind: RuleArray, Array: ArrayRule{MinLength: 1, MaxLength: maxArrayLength + 1, Element: &ColumnRule{Kind: RuleFaker, FakerKind: "word"}}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

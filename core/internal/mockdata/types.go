@@ -15,7 +15,7 @@ type TargetRef struct {
 	Name         string
 }
 
-// Key returns a canonical map key distinguishing tables from collections.
+// Key distinguishes tables from collections in maps.
 func (t TargetRef) Key() string {
 	if t.IsCollection {
 		return "c:" + t.Database + "." + t.Name
@@ -23,8 +23,7 @@ func (t TargetRef) Key() string {
 	return "t:" + t.Database + "." + t.Schema + "." + t.Name
 }
 
-// TableKey returns a canonical key for a relational table reference.
-func TableKey(database, schema, table string) string {
+func tableKey(database, schema, table string) string {
 	return TargetRef{Database: database, Schema: schema, Name: table}.Key()
 }
 

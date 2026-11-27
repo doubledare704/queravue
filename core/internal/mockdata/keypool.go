@@ -21,7 +21,7 @@ type KeyPool struct {
 	vals    []engine.Value
 }
 
-// Len returns the number of keys stored in the pool.
+// Len returns how many keys the pool holds.
 func (p *KeyPool) Len() int {
 	if p == nil {
 		return 0
@@ -29,7 +29,7 @@ func (p *KeyPool) Len() int {
 	return len(p.ints) + len(p.strs) + len(p.vals)
 }
 
-// Add appends a non-null key value into the most compact representation.
+// Add appends a non-null key using the most compact backing slice.
 func (p *KeyPool) Add(v engine.Value) {
 	if v.Kind == engine.VNull {
 		return
@@ -71,7 +71,7 @@ func (p *KeyPool) spillToVals() {
 	}
 }
 
-// Pick returns one key chosen uniformly at random.
+// Pick samples one key uniformly from the pool.
 func (p *KeyPool) Pick(rng *rand.Rand) (engine.Value, bool) {
 	n := p.Len()
 	if n == 0 {
@@ -92,17 +92,15 @@ type keyPoolKey struct {
 	column string
 }
 
-// KeyStore tracks parent key pools across targets in a single run or preview.
-type KeyStore struct {
+type keyStore struct {
 	pools map[keyPoolKey]*KeyPool
 }
 
-// NewKeyStore returns an empty KeyStore.
-func NewKeyStore() *KeyStore {
-	return &KeyStore{pools: map[keyPoolKey]*KeyPool{}}
+func newKeyStore() *keyStore {
+	return &keyStore{pools: map[keyPoolKey]*KeyPool{}}
 }
 
-func (s *KeyStore) ensure(targetKey, col string) *KeyPool {
+func (s *keyStore) ensure(targetKey, col string) *KeyPool {
 	k := keyPoolKey{target: targetKey, column: strings.ToLower(col)}
 	p, ok := s.pools[k]
 	if !ok {
@@ -112,13 +110,11 @@ func (s *KeyStore) ensure(targetKey, col string) *KeyPool {
 	return p
 }
 
-// Get returns the key pool for targetKey and column, or nil if absent.
-func (s *KeyStore) Get(targetKey, col string) *KeyPool {
+func (s *keyStore) get(targetKey, col string) *KeyPool {
 	return s.pools[keyPoolKey{target: targetKey, column: strings.ToLower(col)}]
 }
 
-// Set stores pool under targetKey and column.
-func (s *KeyStore) Set(targetKey, col string, pool *KeyPool) {
+func (s *keyStore) set(targetKey, col string, pool *KeyPool) {
 	s.pools[keyPoolKey{target: targetKey, column: strings.ToLower(col)}] = pool
 }
 
@@ -133,12 +129,12 @@ type SQLExistingKeyLoader struct {
 	dialect sqldialect.Dialect
 }
 
-// NewSQLExistingKeyLoader builds a key loader over ex and dialect.
+// NewSQLExistingKeyLoader wraps ex and dialect to sample existing SQL parent keys.
 func NewSQLExistingKeyLoader(ex engine.Executor, dialect sqldialect.Dialect) *SQLExistingKeyLoader {
 	return &SQLExistingKeyLoader{exec: ex, dialect: dialect}
 }
 
-// LoadKeys streams up to limit non-null keys from parent's column.
+// LoadKeys streams up to limit non-null keys from the parent table.
 func (l *SQLExistingKeyLoader) LoadKeys(ctx context.Context, parent TargetRef, column string, limit int) (*KeyPool, error) {
 	if l == nil || l.exec == nil || l.dialect == nil {
 		return &KeyPool{}, nil

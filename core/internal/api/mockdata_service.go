@@ -75,6 +75,15 @@ func (m *MockDataService) SuggestMockSpec(ctx context.Context, req *queravuev1.S
 	if rows == 0 {
 		rows = defaultSuggestRows
 	}
+	sctx, finish, err := sess.Begin(ctx)
+	switch {
+	case errors.Is(err, session.ErrBusy):
+		return nil, status.Error(codes.FailedPrecondition, "session is busy running another statement")
+	case err != nil:
+		return nil, status.Error(codes.NotFound, "session not found")
+	}
+	defer finish()
+
 	now := time.Now().UTC()
 	fakerKinds := mockdata.SupportedFakerKinds()
 	var warnings []string
@@ -82,7 +91,7 @@ func (m *MockDataService) SuggestMockSpec(ctx context.Context, req *queravuev1.S
 	var cycles []mockdata.Cycle
 
 	if len(req.GetTables()) > 0 {
-		tableTargets, tableCycles, tableWarnings, mockErr := m.suggestTables(ctx, sess.Conn, si, req.GetTables(), rows, now)
+		tableTargets, tableCycles, tableWarnings, mockErr := m.suggestTables(sctx, sess.Conn, si, req.GetTables(), rows, now)
 		if mockErr != nil {
 			return &queravuev1.SuggestMockSpecResponse{
 				FakerKinds: fakerKinds,
@@ -100,7 +109,7 @@ func (m *MockDataService) SuggestMockSpec(ctx context.Context, req *queravuev1.S
 			Database:     c.GetDatabase(),
 			Name:         c.GetCollection(),
 		}
-		sample, err := ds.SampleFieldPaths(ctx, c.GetDatabase(), c.GetCollection(), engine.PathSampleOptions{})
+		sample, err := ds.SampleFieldPaths(sctx, c.GetDatabase(), c.GetCollection(), engine.PathSampleOptions{})
 		if err != nil {
 			return &queravuev1.SuggestMockSpecResponse{
 				FakerKinds: fakerKinds,
@@ -182,7 +191,7 @@ func (m *MockDataService) suggestTables(
 			// Without schema_graph, FK columns get no default foreign_key rule (ADR 0025).
 			td.ForeignKeys = nil
 		}
-		rules, tw := mockdata.SuggestTableRules(td, extraFKsByTable[ref.Key()], selected, referencedColsByTable[ref.Key()], now)
+		rules, tw := mockdata.SuggestTableRules(td, extraFKsByTable[ref.Key()], selected, referencedColsByTable[ref.Key()], rows, now)
 		warnings = append(warnings, tw...)
 		targets = append(targets, mockdata.TargetSpec{
 			Target: ref,
@@ -280,7 +289,16 @@ func (m *MockDataService) PreviewMock(ctx context.Context, req *queravuev1.Previ
 		return nil, err
 	}
 
-	previews, err := mockdata.Preview(ctx, spec, req.GetRows(), existingKeyLoader(sess))
+	sctx, finish, err := sess.Begin(ctx)
+	switch {
+	case errors.Is(err, session.ErrBusy):
+		return nil, status.Error(codes.FailedPrecondition, "session is busy running another statement")
+	case err != nil:
+		return nil, status.Error(codes.NotFound, "session not found")
+	}
+	defer finish()
+
+	previews, err := mockdata.Preview(sctx, spec, req.GetRows(), existingKeyLoader(sess))
 	if err != nil {
 		return &queravuev1.PreviewMockResponse{Error: toMockError(err, nil, "")}, nil
 	}

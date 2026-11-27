@@ -95,3 +95,53 @@ func TestSeedDeterminismPreviewEqualsRunAndColumnIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestFKDeterminismAcrossRunsAndBoundedPreview(t *testing.T) {
+	orgs := TargetRef{Database: "app", Schema: "public", Name: "orgs"}
+	users := TargetRef{Database: "app", Schema: "public", Name: "users"}
+
+	spec := Spec{
+		Seed: 555,
+		Targets: []TargetSpec{
+			{
+				Target: orgs,
+				Rows:   10,
+				Rules: []ColumnRule{
+					{ColumnOrPath: "id", Unique: true, Kind: RuleSequence, Sequence: SequenceRule{Start: 100, Step: 1}},
+				},
+			},
+			{
+				Target: users,
+				Rows:   10,
+				Rules: []ColumnRule{
+					{ColumnOrPath: "id", Unique: true, Kind: RuleSequence, Sequence: SequenceRule{Start: 1, Step: 1}},
+					{
+						ColumnOrPath: "org_id",
+						Kind:         RuleForeignKey,
+						ForeignKey:   ForeignKeyRule{Parent: orgs, ParentColumn: "id"},
+					},
+				},
+			},
+		},
+	}
+
+	prev, err := Preview(context.Background(), spec, 10, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l1 := &captureRowLoader{}
+	if _, err := Run(context.Background(), spec, l1, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	l2 := &captureRowLoader{}
+	if _, err := Run(context.Background(), spec, l2, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(l1.rows, l2.rows) {
+		t.Fatal("two FK runs with the same seed produced different rows")
+	}
+	// When parent rows <= preview rows, preview FK values match the run's first rows.
+	if !reflect.DeepEqual(prev[1].Rows, l1.rows[10:]) {
+		t.Fatalf("FK preview differs from run:\npreview=%+v\nrun=%+v", prev[1].Rows, l1.rows[10:])
+	}
+}

@@ -22,7 +22,6 @@ type Error struct {
 	Err     error
 }
 
-// Error implements error.
 func (e *Error) Error() string {
 	switch {
 	case e.Target != nil && e.Column != "":
@@ -36,7 +35,6 @@ func (e *Error) Error() string {
 	}
 }
 
-// Unwrap returns the underlying error if any.
 func (e *Error) Unwrap() error { return e.Err }
 
 func parseErr(target *TargetRef, col, msg string) *Error {

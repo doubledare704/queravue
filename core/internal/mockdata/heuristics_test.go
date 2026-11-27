@@ -1,6 +1,7 @@
 package mockdata
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -41,13 +42,13 @@ func TestSuggestTableRulesHeuristics(t *testing.T) {
 	}
 
 	selected := map[string]bool{
-		TableKey("app", "public", "users"): true,
-		TableKey("app", "public", "orgs"):  true,
+		tableKey("app", "public", "users"): true,
+		tableKey("app", "public", "orgs"):  true,
 	}
 	// Users.id is referenced by a child table in the same run, so it uses sequence instead of skip.
 	refCols := map[string]bool{"id": true}
 
-	rules, warnings := SuggestTableRules(td, nil, selected, refCols, now)
+	rules, warnings := SuggestTableRules(td, nil, selected, refCols, 1000, now)
 	byName := map[string]ColumnRule{}
 	for _, r := range rules {
 		byName[r.ColumnOrPath] = r
@@ -149,5 +150,51 @@ func TestSuggestCollectionRulesNestedAndArrays(t *testing.T) {
 	if items.Kind != RuleArray || items.Array.Element == nil || items.Array.Element.Kind != RuleDocument ||
 		len(items.Array.Element.Document.Fields) != 1 || items.Array.Element.Document.Fields[0].Kind != RuleIntRange {
 		t.Fatalf("items = %+v", items)
+	}
+}
+
+func TestSuggestTableRulesCompositeFKAndUniqueCeilingWarnings(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	td := engine.TableDetails{
+		Database: "app",
+		Schema:   "public",
+		Table:    "order_items",
+		Columns: []engine.ColumnDef{
+			{Name: "tenant_id", TypeName: "int4", Kind: engine.VInt},
+			{Name: "order_id", TypeName: "int4", Kind: engine.VInt},
+			{Name: "email", TypeName: "text", Kind: engine.VText},
+		},
+		ForeignKeys: []engine.ForeignKeyDef{
+			{
+				Name:              "fk_order_tenant",
+				Columns:           []string{"tenant_id", "order_id"},
+				ReferencedTable:   "orders",
+				ReferencedColumns: []string{"tenant_id", "id"},
+			},
+		},
+		Indexes: []engine.IndexDef{
+			{Name: "uq_email", Columns: []string{"email"}, IsUnique: true},
+		},
+	}
+
+	rules, warnings := SuggestTableRules(td, nil, nil, nil, 100_000, now)
+	byName := map[string]ColumnRule{}
+	for _, r := range rules {
+		byName[r.ColumnOrPath] = r
+	}
+	if byName["tenant_id"].Kind != RuleSkip || byName["order_id"].Kind != RuleSkip {
+		t.Fatalf("expected composite FK columns to be skipped, got tenant_id=%+v order_id=%+v", byName["tenant_id"], byName["order_id"])
+	}
+	var hasCompositeWarn, hasCeilingWarn bool
+	for _, w := range warnings {
+		if strings.Contains(w, "composite foreign key") {
+			hasCompositeWarn = true
+		}
+		if strings.Contains(w, "safe ceiling") {
+			hasCeilingWarn = true
+		}
+	}
+	if !hasCompositeWarn || !hasCeilingWarn {
+		t.Fatalf("expected composite FK and unique ceiling warnings, got %v", warnings)
 	}
 }

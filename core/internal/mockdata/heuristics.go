@@ -16,16 +16,16 @@ func SuggestTableRules(
 	extraFKs []engine.ForeignKeyDef,
 	selectedTables map[string]bool,
 	referencedCols map[string]bool,
+	rows uint64,
 	now time.Time,
 ) ([]ColumnRule, []string) {
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
-	fkByCol := collectSingleColFKs(td.ForeignKeys, extraFKs)
+	fkByCol, compositeFKCols, warnings := collectForeignKeys(td.ForeignKeys, extraFKs)
 	uniqueCols := collectSingleColUniques(td)
 
 	rules := make([]ColumnRule, 0, len(td.Columns))
-	var warnings []string
 
 	for _, col := range td.Columns {
 		lowerCol := strings.ToLower(col.Name)
@@ -55,6 +55,11 @@ func SuggestTableRules(
 			continue
 		}
 
+		if compositeFKCols[lowerCol] {
+			rules = append(rules, ColumnRule{ColumnOrPath: col.Name, Kind: RuleSkip})
+			continue
+		}
+
 		isAuto := col.Identity || isSerialType(col.TypeName) || col.DefaultValue != nil
 		if isAuto && !isReferenced {
 			rules = append(rules, ColumnRule{ColumnOrPath: col.Name, Kind: RuleSkip})
@@ -69,24 +74,62 @@ func SuggestTableRules(
 		if warn != "" {
 			warnings = append(warnings, warn)
 		}
+		if rule.Unique && rule.Kind == RuleFaker {
+			if capLimit, ok := fakerUniqueCeiling[rule.FakerKind]; ok && rows > capLimit {
+				warnings = append(warnings, fmt.Sprintf("column %q is unique with faker %q (safe ceiling ~%d), which may exhaust for %d rows; consider uuid or pattern", col.Name, rule.FakerKind, capLimit, rows))
+			}
+		}
 	}
 	return rules, warnings
 }
 
-func collectSingleColFKs(primary, extra []engine.ForeignKeyDef) map[string]engine.ForeignKeyDef {
-	out := map[string]engine.ForeignKeyDef{}
+var fakerUniqueCeiling = map[string]uint64{
+	"bool":          2,
+	"color":         50,
+	"country_code":  50,
+	"currency_code": 50,
+	"state":         50,
+	"city":          500,
+	"company":       500,
+	"country":       200,
+	"first_name":    500,
+	"job_title":     500,
+	"last_name":     500,
+	"product_name":  500,
+	"word":          500,
+	"email":         50_000,
+	"name":          50_000,
+	"username":      50_000,
+}
+
+func collectForeignKeys(primary, extra []engine.ForeignKeyDef) (map[string]engine.ForeignKeyDef, map[string]bool, []string) {
+	single := map[string]engine.ForeignKeyDef{}
+	compositeCols := map[string]bool{}
+	seenComposite := map[string]bool{}
+	var warnings []string
+
 	for _, list := range [][]engine.ForeignKeyDef{primary, extra} {
 		for _, fk := range list {
-			if len(fk.Columns) != 1 || len(fk.ReferencedColumns) != 1 {
+			if len(fk.Columns) == 1 && len(fk.ReferencedColumns) == 1 {
+				key := strings.ToLower(fk.Columns[0])
+				if _, exists := single[key]; !exists {
+					single[key] = fk
+				}
 				continue
 			}
-			key := strings.ToLower(fk.Columns[0])
-			if _, exists := out[key]; !exists {
-				out[key] = fk
+			if len(fk.Columns) > 1 {
+				for _, col := range fk.Columns {
+					compositeCols[strings.ToLower(col)] = true
+				}
+				sig := fk.Name + ":" + strings.Join(fk.Columns, ",")
+				if !seenComposite[sig] {
+					seenComposite[sig] = true
+					warnings = append(warnings, fmt.Sprintf("composite foreign key %q (%s) has no default rule and its columns were skipped", fk.Name, strings.Join(fk.Columns, ", ")))
+				}
 			}
 		}
 	}
-	return out
+	return single, compositeCols, warnings
 }
 
 func collectSingleColUniques(td engine.TableDetails) map[string]bool {

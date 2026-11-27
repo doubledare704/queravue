@@ -1,6 +1,8 @@
 package mockdata
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
@@ -89,5 +91,59 @@ func TestPlanTablesSelfCycleAndSpecCycleBreaking(t *testing.T) {
 	}
 	if got := CheckSpecCycles(spec); len(got) != 0 {
 		t.Fatalf("expected null_ratio=1.0 to break cycle, got %+v", got)
+	}
+}
+
+func TestValidateSpecRejectsChildBeforeParentAndBadRowCounts(t *testing.T) {
+	orgs := TargetRef{Database: "app", Schema: "public", Name: "orgs"}
+	users := TargetRef{Database: "app", Schema: "public", Name: "users"}
+
+	reordered := Spec{
+		Seed: 1,
+		Targets: []TargetSpec{
+			{
+				Target: users,
+				Rows:   5,
+				Rules: []ColumnRule{{
+					ColumnOrPath: "org_id",
+					Kind:         RuleForeignKey,
+					ForeignKey:   ForeignKeyRule{Parent: orgs, ParentColumn: "id"},
+				}},
+			},
+			{
+				Target: orgs,
+				Rows:   5,
+				Rules:  []ColumnRule{{ColumnOrPath: "id", Kind: RuleSequence, Sequence: SequenceRule{Start: 1}}},
+			},
+		},
+	}
+	loader := &captureRowLoader{}
+	_, err := Run(context.Background(), reordered, loader, nil, nil, nil)
+	var me *Error
+	if !errors.As(err, &me) || me.Kind != ErrParse {
+		t.Fatalf("child before parent err=%v, want ErrParse", err)
+	}
+	if len(loader.rows) != 0 {
+		t.Fatalf("expected 0 rows written on validation failure, got %d", len(loader.rows))
+	}
+
+	zeroRows := Spec{
+		Seed: 1,
+		Targets: []TargetSpec{{
+			Target: orgs,
+			Rows:   0,
+			Rules:  []ColumnRule{{ColumnOrPath: "id", Kind: RuleSequence, Sequence: SequenceRule{Start: 1}}},
+		}},
+	}
+	_, err = Run(context.Background(), zeroRows, loader, nil, nil, nil)
+	if !errors.As(err, &me) || me.Kind != ErrParse {
+		t.Fatalf("zero rows err=%v, want ErrParse", err)
+	}
+
+	tooMany := zeroRows
+	tooMany.Targets[0].Rows = maxTargetRows + 1
+	_, err = Run(context.Background(), tooMany, loader, nil, nil, nil)
+	if !errors.As(err, &me) || me.Kind != ErrParse {
+		t.Fatalf("excessive rows err=%v, want ErrParse", err)
 	}
 }

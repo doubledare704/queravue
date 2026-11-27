@@ -14,6 +14,7 @@ import (
 const (
 	defaultPreviewRows = 20
 	maxPreviewRows     = 200
+	maxTargetRows      = 100_000_000
 	progressInterval   = 250 * time.Millisecond
 )
 
@@ -31,13 +32,13 @@ func Preview(ctx context.Context, spec Spec, rows uint32, keyLoader ExistingKeyL
 		rows = maxPreviewRows
 	}
 
-	if err := validateSpec(spec); err != nil {
+	if err := validateSpec(spec, false); err != nil {
 		return nil, err
 	}
 
 	refColsByTarget, existingFKs := collectForeignKeyNeeds(spec)
-	keyStore := NewKeyStore()
-	if err := preloadExistingKeys(ctx, existingFKs, keyStore, keyLoader); err != nil {
+	store := newKeyStore()
+	if err := preloadExistingKeys(ctx, existingFKs, store, keyLoader); err != nil {
 		return nil, err
 	}
 
@@ -53,7 +54,7 @@ func Preview(ctx context.Context, spec Spec, rows uint32, keyLoader ExistingKeyL
 		}
 
 		if ts.Target.IsCollection {
-			src, err := newDocBatchSource(spec.Seed, previewSpec, keyStore, nil)
+			src, err := newDocBatchSource(spec.Seed, previewSpec, store, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -75,10 +76,10 @@ func Preview(ctx context.Context, spec Spec, rows uint32, keyLoader ExistingKeyL
 			continue
 		}
 
-		if err := ensureParentKeysAvailable(ctx, ts, keyStore, keyLoader); err != nil {
+		if err := ensureParentKeysAvailable(ctx, ts, store, keyLoader); err != nil {
 			return nil, err
 		}
-		src, err := newTableBatchSource(spec.Seed, previewSpec, refColsByTarget[ts.Target.Key()], keyStore, nil)
+		src, err := newTableBatchSource(spec.Seed, previewSpec, refColsByTarget[ts.Target.Key()], store, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -114,13 +115,13 @@ func Run(
 	runStart := time.Now()
 	summary := Summary{}
 
-	if err := validateSpec(spec); err != nil {
+	if err := validateSpec(spec, true); err != nil {
 		return summary, err
 	}
 
 	refColsByTarget, existingFKs := collectForeignKeyNeeds(spec)
-	keyStore := NewKeyStore()
-	if err := preloadExistingKeys(ctx, existingFKs, keyStore, keyLoader); err != nil {
+	store := newKeyStore()
+	if err := preloadExistingKeys(ctx, existingFKs, store, keyLoader); err != nil {
 		summary.ElapsedMs = elapsedMs(runStart)
 		return summary, err
 	}
@@ -130,18 +131,16 @@ func Run(
 			summary.ElapsedMs = elapsedMs(runStart)
 			return summary, fmt.Errorf("mockdata: run: %w", err)
 		}
-		if err := ensureParentKeysAvailable(ctx, ts, keyStore, keyLoader); err != nil {
+		if err := ensureParentKeysAvailable(ctx, ts, store, keyLoader); err != nil {
 			summary.ElapsedMs = elapsedMs(runStart)
 			return summary, err
 		}
 
 		tStart := time.Now()
 		lastProgress := tStart
-		var committedSoFar uint64
 		var emitErr error
 
-		onBatch := func(generated uint64) {
-			committedSoFar = generated
+		onBatch := func(committed uint64) {
 			if emit == nil || time.Since(lastProgress) < progressInterval {
 				return
 			}
@@ -149,11 +148,11 @@ func Run(
 			secs := lastProgress.Sub(tStart).Seconds()
 			var rps float64
 			if secs > 0 {
-				rps = float64(generated) / secs
+				rps = float64(committed) / secs
 			}
 			if err := emit(RunEvent{Progress: &Progress{
 				Target:        ts.Target,
-				Rows:          generated,
+				Rows:          committed,
 				RowsPerSecond: rps,
 			}}); err != nil && emitErr == nil {
 				emitErr = err
@@ -172,7 +171,7 @@ func Run(
 					Target:  &ts.Target,
 				}
 			}
-			src, err := newDocBatchSource(spec.Seed, ts, keyStore, onBatch)
+			src, err := newDocBatchSource(spec.Seed, ts, store, onBatch)
 			if err != nil {
 				summary.ElapsedMs = elapsedMs(runStart)
 				return summary, err
@@ -187,7 +186,7 @@ func Run(
 					Target:  &ts.Target,
 				}
 			}
-			src, err := newTableBatchSource(spec.Seed, ts, refColsByTarget[ts.Target.Key()], keyStore, onBatch)
+			src, err := newTableBatchSource(spec.Seed, ts, refColsByTarget[ts.Target.Key()], store, onBatch)
 			if err != nil {
 				summary.ElapsedMs = elapsedMs(runStart)
 				return summary, err
@@ -200,7 +199,6 @@ func Run(
 			stats, loadErr = rowLoader.LoadRows(ctx, target, src.columns, src)
 		}
 
-		_ = committedSoFar
 		summary.Rows += stats.Rows
 		if loadErr != nil {
 			summary.ElapsedMs = elapsedMs(runStart)
@@ -229,14 +227,22 @@ func Run(
 	return summary, nil
 }
 
-func validateSpec(spec Spec) error {
+func validateSpec(spec Spec, requireRows bool) error {
 	if len(spec.Targets) == 0 {
 		return parseErr(nil, "", "mock spec requires at least one target")
 	}
-	for _, ts := range spec.Targets {
+	idxByKey := make(map[string]int, len(spec.Targets))
+	for i, ts := range spec.Targets {
 		if ts.Target.Name == "" {
 			return parseErr(&ts.Target, "", "target requires a table or collection name")
 		}
+		if requireRows && ts.Rows == 0 {
+			return parseErr(&ts.Target, "", "target rows must be at least 1")
+		}
+		if ts.Rows > maxTargetRows {
+			return parseErr(&ts.Target, "", fmt.Sprintf("target rows (%d) exceeds max %d", ts.Rows, maxTargetRows))
+		}
+		idxByKey[ts.Target.Key()] = i
 		if ts.Target.IsCollection {
 			if _, err := compileDocTree(spec.Seed, ts.Target, ts.Rules); err != nil {
 				return err
@@ -259,6 +265,16 @@ func validateSpec(spec Spec) error {
 			Message: fmt.Sprintf("foreign-key cycle involving %s -> %s (%s)", e.Child.Name, e.Parent.Name, e.ConstraintName),
 			Target:  &e.Child,
 			Column:  e.ConstraintName,
+		}
+	}
+	for childIdx, ts := range spec.Targets {
+		for _, r := range ts.Rules {
+			if r.Kind != RuleForeignKey || r.ForeignKey.FromExistingRows || r.NullRatio >= 1.0 {
+				continue
+			}
+			if parentIdx, ok := idxByKey[r.ForeignKey.Parent.Key()]; ok && parentIdx > childIdx {
+				return parseErr(&ts.Target, r.ColumnOrPath, fmt.Sprintf("parent %s must appear before child %s", r.ForeignKey.Parent.Name, ts.Target.Name))
+			}
 		}
 	}
 	return nil
@@ -304,7 +320,7 @@ func collectForeignKeyNeeds(spec Spec) (map[string]map[string]bool, map[fkParent
 	return refColsByTarget, existingFKs
 }
 
-func preloadExistingKeys(ctx context.Context, needed map[fkParentKey]TargetRef, store *KeyStore, loader ExistingKeyLoader) error {
+func preloadExistingKeys(ctx context.Context, needed map[fkParentKey]TargetRef, store *keyStore, loader ExistingKeyLoader) error {
 	for k, parent := range needed {
 		if loader == nil {
 			continue
@@ -313,12 +329,12 @@ func preloadExistingKeys(ctx context.Context, needed map[fkParentKey]TargetRef, 
 		if err != nil {
 			return err
 		}
-		store.Set(k.targetKey, k.column, pool)
+		store.set(k.targetKey, k.column, pool)
 	}
 	return nil
 }
 
-func ensureParentKeysAvailable(ctx context.Context, ts TargetSpec, store *KeyStore, loader ExistingKeyLoader) error {
+func ensureParentKeysAvailable(ctx context.Context, ts TargetSpec, store *keyStore, loader ExistingKeyLoader) error {
 	if loader == nil {
 		return nil
 	}
@@ -327,7 +343,7 @@ func ensureParentKeysAvailable(ctx context.Context, ts TargetSpec, store *KeySto
 			continue
 		}
 		pKey := r.ForeignKey.Parent.Key()
-		if store.Get(pKey, r.ForeignKey.ParentColumn).Len() > 0 {
+		if store.get(pKey, r.ForeignKey.ParentColumn).Len() > 0 {
 			continue
 		}
 		pool, err := loader.LoadKeys(ctx, r.ForeignKey.Parent, r.ForeignKey.ParentColumn, DefaultExistingKeySampleCap)
@@ -335,7 +351,7 @@ func ensureParentKeysAvailable(ctx context.Context, ts TargetSpec, store *KeySto
 			return err
 		}
 		if pool.Len() > 0 {
-			store.Set(pKey, r.ForeignKey.ParentColumn, pool)
+			store.set(pKey, r.ForeignKey.ParentColumn, pool)
 		}
 	}
 	return nil

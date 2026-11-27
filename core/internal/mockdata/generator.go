@@ -1,6 +1,7 @@
 package mockdata
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -19,6 +20,7 @@ import (
 const (
 	maxUniqueRetries = 64
 	maxDecimalScale  = 38
+	maxArrayLength   = 10_000
 )
 
 type colGenerator interface {
@@ -26,7 +28,7 @@ type colGenerator interface {
 }
 
 type genContext struct {
-	keys *KeyStore
+	keys *keyStore
 }
 
 type generatedValue struct {
@@ -155,6 +157,9 @@ func buildBaseGenerator(seed uint64, target TargetRef, targetKey, colPath string
 	case RuleArray:
 		if rule.Array.MinLength > rule.Array.MaxLength {
 			return nil, false, parseErr(&target, colPath, fmt.Sprintf("array min_length (%d) > max_length (%d)", rule.Array.MinLength, rule.Array.MaxLength))
+		}
+		if rule.Array.MaxLength > maxArrayLength {
+			return nil, false, parseErr(&target, colPath, fmt.Sprintf("array max_length (%d) exceeds max %d", rule.Array.MaxLength, maxArrayLength))
 		}
 		if rule.Array.Element == nil {
 			return nil, false, parseErr(&target, colPath, "array rule requires an element rule")
@@ -467,7 +472,7 @@ func (g *fkGenerator) next(ctxGen *genContext) (generatedValue, error) {
 	if ctxGen == nil || ctxGen.keys == nil {
 		return generatedValue{}, parseErr(&g.target, g.col, fmt.Sprintf("no parent keys available for %s.%s", g.parentKey, g.parentCol))
 	}
-	pool := ctxGen.keys.Get(g.parentKey, g.parentCol)
+	pool := ctxGen.keys.get(g.parentKey, g.parentCol)
 	v, ok := pool.Pick(g.rng)
 	if !ok {
 		return generatedValue{}, parseErr(&g.target, g.col, fmt.Sprintf("parent %s has no non-null keys in %s", g.parentKey, g.parentCol))
@@ -542,8 +547,9 @@ type uniqueGenerator struct {
 	target TargetRef
 	col    string
 	inner  colGenerator
-	seen   map[string]struct{}
-	ints   map[int64]struct{}
+	// Store 128-bit digests instead of raw strings so 1M unique rows stay within the RSS budget.
+	seen map[[2]uint64]struct{}
+	ints map[int64]struct{}
 }
 
 func newUniqueGenerator(target TargetRef, col string, inner colGenerator) *uniqueGenerator {
@@ -569,9 +575,9 @@ func (g *uniqueGenerator) next(ctxGen *genContext) (generatedValue, error) {
 			g.ints[v.val.Int] = struct{}{}
 			return v, nil
 		}
-		key := uniqueValueKey(v)
+		key := uniqueValueHash(v)
 		if g.seen == nil {
-			g.seen = map[string]struct{}{}
+			g.seen = map[[2]uint64]struct{}{}
 		}
 		if _, dup := g.seen[key]; dup {
 			continue
@@ -584,6 +590,14 @@ func (g *uniqueGenerator) next(ctxGen *genContext) (generatedValue, error) {
 		Message: fmt.Sprintf("exhausted unique values after %d attempts", maxUniqueRetries),
 		Target:  &g.target,
 		Column:  g.col,
+	}
+}
+
+func uniqueValueHash(v generatedValue) [2]uint64 {
+	sum := sha256.Sum256([]byte(uniqueValueKey(v)))
+	return [2]uint64{
+		binary.LittleEndian.Uint64(sum[:8]),
+		binary.LittleEndian.Uint64(sum[8:16]),
 	}
 }
 
