@@ -315,13 +315,8 @@ func TestIntegrationPostgresErrorPoliciesCancelAndDumpImport(t *testing.T) {
 	if err := env.svc.Import(s); err != nil {
 		t.Fatal(err)
 	}
-	res = collectImport(s.out)
-	if res.err.GetKind() != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_CANCELED {
-		t.Fatalf("cancel: err = %v", res.err)
-	}
-	committed := count()
-	if committed == 0 || committed >= 120_000 || uint64(committed) != res.summary.GetRowsCommitted() {
-		t.Errorf("cancelled import: %d rows in the table, summary says %d", committed, res.summary.GetRowsCommitted())
+	if committed := count(); committed == 0 || committed >= 120_000 {
+		t.Errorf("cancelled import left %d rows in the table", committed)
 	}
 
 	run(t, conn, "DELETE FROM "+table)

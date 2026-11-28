@@ -90,7 +90,7 @@ func SplitPrefix(d Dialect, text, delim string, atEOF bool) (done []Range, consu
 	if delim == "" {
 		delim = ";"
 	}
-	s := scanner{d: d, text: text, delim: delim}
+	s := scanner{d: d, text: text, delim: delim, partial: !atEOF}
 	ranges := s.run()
 	nextDelim = delim
 	for i, r := range ranges {
@@ -146,6 +146,7 @@ type scanner struct {
 	pos       int
 	delim     string   // statement terminator; ";" unless a DELIMITER command changed it
 	endDelims []string // terminator in effect where each returned range ended
+	partial   bool     // the text may continue: a separator line is not final until its line break arrives
 }
 
 // atDelim reports whether the terminator starts at s.pos.
@@ -587,6 +588,9 @@ func (s *scanner) mssqlGoLine() bool {
 	if i < len(t) && t[i] != '\n' && t[i] != '\r' {
 		return false
 	}
+	if i >= len(t) && s.partial {
+		return false
+	}
 	s.pos = i
 	return true
 }
@@ -600,12 +604,13 @@ func (s *scanner) oracleSlashLine() bool {
 			return false
 		}
 	}
-	for i := s.pos + 1; i < len(t) && t[i] != '\n'; i++ {
+	i := s.pos + 1
+	for ; i < len(t) && t[i] != '\n'; i++ {
 		if t[i] != ' ' && t[i] != '\t' && t[i] != '\r' {
 			return false
 		}
 	}
-	return true
+	return i < len(t) || !s.partial
 }
 
 var oracleQuoteClosers = map[byte]byte{'[': ']', '{': '}', '(': ')', '<': '>'}

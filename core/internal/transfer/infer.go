@@ -104,9 +104,14 @@ func previewOf(ctx context.Context, sample []byte, opts dataformat.Options, colu
 	if err != nil {
 		return nil
 	}
-	rows, err := rd.Next(ctx)
-	if err != nil && len(rows) == 0 {
-		return nil
+	var rows [][]engine.Value
+	for attempt := 0; attempt <= inferSampleRows && len(rows) == 0; attempt++ {
+		var err error
+		rows, err = rd.Next(ctx)
+		var parse *dataformat.ParseError
+		if err != nil && !errors.As(err, &parse) {
+			return nil
+		}
 	}
 	rows = rows[:min(len(rows), previewRows)]
 	for _, row := range rows {

@@ -242,3 +242,44 @@ func TestExportCollectionFormats(t *testing.T) {
 		t.Errorf("sql: %v", sql.err)
 	}
 }
+
+func TestExportTableWithAnInvalidOptionSendsNoHeader(t *testing.T) {
+	env := newXferEnv(t, peopleConn(1), false)
+	out := env.exportTable(t, &queravuev1.ExportTableRequest{
+		Table: &queravuev1.TableRef{Table: "people"},
+		Options: &queravuev1.ExportOptions{
+			Format: queravuev1.TransferFormat_TRANSFER_FORMAT_CSV, FormatOptions: &queravuev1.TransferFormatOptions{Delimiter: "ab"},
+		},
+	})
+	if out.header != nil || out.err.GetKind() != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_PARSE {
+		t.Errorf("header = %v, err = %v", out.header, out.err)
+	}
+}
+
+func TestExportResultWaitsForTheColumnsOfAStartingQuery(t *testing.T) {
+	env := newXferEnv(t, peopleConn(0), false)
+	id, spool, err := env.results.Create(env.session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan exported, 1)
+	go func() {
+		rec := &exportRecorder[*queravuev1.ExportResultResponse]{}
+		_ = env.svc.ExportResult(&queravuev1.ExportResultRequest{
+			ResultId: id, Options: &queravuev1.ExportOptions{Format: queravuev1.TransferFormat_TRANSFER_FORMAT_CSV, FormatOptions: csvOptions(true)},
+		}, rec)
+		done <- collectExport(rec.events)
+	}()
+	time.Sleep(100 * time.Millisecond)
+	spool.SetColumns([]*queravuev1.Column{{Name: "id", Kind: queravuev1.ValueKind_VALUE_KIND_INT}})
+	if err := spool.Append(rowsOf([][]engine.Value{{engine.Int(1)}})); err != nil {
+		t.Fatal(err)
+	}
+	if err := spool.Finish(); err != nil {
+		t.Fatal(err)
+	}
+	out := <-done
+	if out.err != nil || string(out.body) != "id\r\n1\r\n" {
+		t.Errorf("err = %v, body = %q", out.err, out.body)
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
@@ -163,11 +164,11 @@ func TestImportCancelStopsAfterTheCurrentBatchAndReportsCommittedRows(t *testing
 		t.Fatal(err)
 	}
 	res := collectImport(s.out)
-	if res.err.GetKind() != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_CANCELED {
-		t.Fatalf("err = %v", res.err)
+	if res.err != nil || res.summary != nil {
+		t.Errorf("a cancelled stream cannot receive events, got err = %v, summary = %v", res.err, res.summary)
 	}
-	if committed := len(conn.committedRows()); committed != 1000 || res.summary.GetRowsCommitted() != 1000 {
-		t.Errorf("committed %d rows, summary = %v", committed, res.summary)
+	if committed := len(conn.committedRows()); committed != 1000 {
+		t.Errorf("committed %d rows, want the two batches that finished", committed)
 	}
 }
 
@@ -386,3 +387,91 @@ func TestInferImportForADocumentConnectionPreviewsDocuments(t *testing.T) {
 }
 
 func same(a, b engine.Value) bool { return reflect.DeepEqual(a, b) }
+
+func TestImportStopPolicyReportsAnEarlierConstraintFailureBeforeALaterBadRow(t *testing.T) {
+	conn := peopleConn(0)
+	env := newXferEnv(t, conn, false)
+	res := env.runImport(t, csvHeader("people"), "id,name\n1,a\n1,b\nx,c\n", 1<<10)
+	if res.err.GetKind() != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_CONSTRAINT || len(conn.committedRows()) != 0 {
+		t.Errorf("err = %v, rows = %d", res.err, len(conn.committedRows()))
+	}
+}
+
+func TestImportSkipPolicyRetriesTheBatchBeforeStoppingAtTheErrorLimit(t *testing.T) {
+	conn := peopleConn(0)
+	env := newXferEnv(t, conn, false)
+	hdr := csvHeader("people")
+	hdr.ErrorPolicy = queravuev1.ImportErrorPolicy_IMPORT_ERROR_POLICY_SKIP
+	hdr.MaxRowErrors = 1
+	res := env.runImport(t, hdr, "id,name\n1,a\n2,b\n2,dup\nx,c\ny,d\n", 1<<10)
+	if res.err == nil || len(conn.committedRows()) != 2 || res.summary.GetRowsCommitted() != 2 {
+		t.Errorf("err = %v, rows = %d, summary = %v", res.err, len(conn.committedRows()), res.summary)
+	}
+}
+
+func TestImportOfAFileWithoutColumnsChangesNothing(t *testing.T) {
+	conn := peopleConn(0)
+	env := newXferEnv(t, conn, false)
+	newTable := &queravuev1.ImportHeader{
+		Target: &queravuev1.ImportHeader_NewTable{NewTable: &queravuev1.NewTable{
+			Table:   &queravuev1.TableRef{Table: "fresh"},
+			Columns: []*queravuev1.ColumnDetails{{Name: "id", TypeName: "bigint", Kind: queravuev1.ValueKind_VALUE_KIND_INT}},
+		}},
+		Format: queravuev1.TransferFormat_TRANSFER_FORMAT_CSV,
+	}
+	files := []struct {
+		format queravuev1.TransferFormat
+		data   string
+	}{
+		{queravuev1.TransferFormat_TRANSFER_FORMAT_CSV, ""},
+		{queravuev1.TransferFormat_TRANSFER_FORMAT_NDJSON, ""},
+		{queravuev1.TransferFormat_TRANSFER_FORMAT_JSON, "[]"},
+	}
+	for name, hdr := range map[string]*queravuev1.ImportHeader{"existing table": csvHeader("people"), "new table": newTable} {
+		for _, f := range files {
+			h := proto.Clone(hdr).(*queravuev1.ImportHeader)
+			h.Format = f.format
+			res := env.runImport(t, h, f.data, 8)
+			if k := res.err.GetKind(); k != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_MAPPING && k != queravuev1.TransferErrorKind_TRANSFER_ERROR_KIND_PARSE {
+				t.Errorf("%s with %s %q: err = %v", name, f.format, f.data, res.err)
+			}
+		}
+	}
+	if len(conn.statements) != 0 {
+		t.Errorf("statements ran: %q", conn.statements)
+	}
+}
+
+func TestImportRefreshesTheSchemaCacheAfterDDL(t *testing.T) {
+	conn := peopleConn(0)
+	env := newXferEnv(t, conn, false)
+	var refreshed int
+	env.svc.SetSchemaChangeHook(func(id string) {
+		if id == env.session.ID {
+			refreshed++
+		}
+	})
+	env.runImport(t, &queravuev1.ImportHeader{Format: queravuev1.TransferFormat_TRANSFER_FORMAT_SQL}, "INSERT INTO t VALUES (1);\nCREATE TABLE x (a int);\nDROP TABLE y;", 7)
+	if refreshed != 2 {
+		t.Errorf("hook ran %d times for a script with two DDL statements", refreshed)
+	}
+	hdr := &queravuev1.ImportHeader{
+		Target: &queravuev1.ImportHeader_NewTable{NewTable: &queravuev1.NewTable{
+			Table:   &queravuev1.TableRef{Table: "fresh"},
+			Columns: []*queravuev1.ColumnDetails{{Name: "id", TypeName: "bigint", Kind: queravuev1.ValueKind_VALUE_KIND_INT}},
+		}},
+		Format: queravuev1.TransferFormat_TRANSFER_FORMAT_CSV,
+	}
+	env.runImport(t, hdr, "1\n", 8)
+	if refreshed != 3 {
+		t.Errorf("hook ran %d times after a new-table import", refreshed)
+	}
+}
+
+func TestInferImportPreviewSkipsAMalformedFirstRow(t *testing.T) {
+	env := newXferEnv(t, peopleConn(0), false)
+	resp := env.infer(t, &queravuev1.InferImportHeader{Filename: "a.csv"}, "a,b\n1\n2,x\n3,y\n")
+	if len(resp.GetPreviewRows().GetRows()) != 2 {
+		t.Errorf("preview rows = %v", resp.GetPreviewRows())
+	}
+}

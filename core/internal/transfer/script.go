@@ -31,6 +31,7 @@ type ScriptRunner struct {
 	MaxStatementBytes int
 	BytesRead         func() uint64
 	Progress          func(committed, bytesRead uint64) error
+	AfterStatement    func(sql string)
 }
 
 type discardRows struct{}
@@ -71,6 +72,9 @@ func (s *ScriptRunner) Run(ctx context.Context, src io.Reader) ScriptResult {
 				return res
 			}
 			res.Statements++
+			if s.AfterStatement != nil {
+				s.AfterStatement(r.Text(pending))
+			}
 			res.Committed += uint64(max(sum.RowsAffected, 0))
 			if time.Since(lastReport) >= progressInterval {
 				lastReport = time.Now()

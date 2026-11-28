@@ -47,10 +47,17 @@ func (p *PathExtractor) Row(doc engine.Document) ([]engine.Value, error) {
 		}
 		text = relaxed
 	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(text), &fields); err != nil {
+		return nil, newError(KindParse, "a document is not valid EJSON")
+	}
 	row := make([]engine.Value, len(p.paths))
 	for i, segments := range p.paths {
-		raw, ok := lookup(json.RawMessage(text), segments)
-		if ok {
+		child, ok := fields[segments[0]]
+		if !ok {
+			continue
+		}
+		if raw, ok := lookup(child, segments[1:]); ok {
 			row[i] = scalarOf(raw)
 		}
 	}
@@ -109,6 +116,9 @@ func collect(items []json.RawMessage, rest []string) (json.RawMessage, bool) {
 
 func scalarOf(raw json.RawMessage) engine.Value {
 	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return engine.Null()
+	}
 	switch raw[0] {
 	case '"':
 		var s string

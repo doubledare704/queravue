@@ -3,6 +3,7 @@
 package api_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql/driver"
 	"os"
@@ -13,8 +14,10 @@ import (
 
 	duckdbdriver "github.com/duckdb/duckdb-go/v2"
 
+	"github.com/doubledare704/queravue/core/internal/api"
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
+	"github.com/doubledare704/queravue/core/internal/transfer"
 )
 
 func parquetExportOf(t *testing.T, env *xferEnv) []byte {
@@ -207,5 +210,40 @@ func TestParquetImportConvertsDecimalsDatesAndWideIntegers(t *testing.T) {
 		if !same(row[i], want) {
 			t.Errorf("column %d = %+v, want %+v", i, row[i], want)
 		}
+	}
+}
+
+func TestParquetExportAcceptsNamesDuckDBWouldReject(t *testing.T) {
+	conn := &xferConn{table: peopleTable(), selectCols: []engine.Column{
+		{Name: "id", Kind: engine.VInt}, {Name: "ID", Kind: engine.VInt}, {Name: "", Kind: engine.VText},
+		{Name: "a", Kind: engine.VText}, {Name: "a", Kind: engine.VText}, {Name: "a_2", Kind: engine.VText},
+	}}
+	conn.selectRows = [][]engine.Value{{engine.Int(1), engine.Int(2), engine.Text("x"), engine.Text("p"), engine.Text("q"), engine.Text("r")}}
+	env := newXferEnv(t, conn, false)
+	file := parquetExportOf(t, env)
+
+	dst := &xferConn{}
+	hdr := &queravuev1.ImportHeader{
+		Target: existingTable("t"), Format: queravuev1.TransferFormat_TRANSFER_FORMAT_PARQUET,
+		Mappings: []*queravuev1.ColumnMapping{{SourceIndex: 0, TargetColumn: "id"}, {SourceIndex: 5, TargetColumn: "z"}},
+	}
+	res := newXferEnv(t, dst, false).runImport(t, hdr, string(file), 1<<10)
+	if res.err != nil || res.summary.GetRowsCommitted() != 1 {
+		t.Fatalf("err = %v, summary = %v", res.err, res.summary)
+	}
+	if got := dst.committedRows()[0][1]; !same(got, engine.Text("r")) {
+		t.Errorf("a_2 = %+v: the renamed copies must not overwrite the original", got)
+	}
+	assertNoTemporaryFiles(t, env)
+}
+
+func TestInferImportOfACancelledParquetUploadIsNotAWarning(t *testing.T) {
+	env := newXferEnv(t, peopleConn(0), false)
+	file := parquetExportOf(t, newXferEnv(t, parquetFixtureConn(), false))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	cfg := transfer.ParquetConfig{Dir: env.results.Dir(), MemoryLimit: api.ParquetMemoryLimit}
+	if _, err := transfer.InferParquet(ctx, bytes.NewReader(file), cfg); err == nil {
+		t.Error("a cancelled inference returned no error")
 	}
 }

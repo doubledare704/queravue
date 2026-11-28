@@ -226,6 +226,20 @@ func TestIntegrationPerfExport1MRowsToEveryFormat(t *testing.T) {
 			if peak-baseline > budget {
 				t.Errorf("RSS peak grew %.1f MiB, budget %.0f MiB", peak-baseline, budget)
 			}
+			if name == "parquet" {
+				second := enginetest.StartRSSSampler(t)
+				if err := env.svc.ExportTable(&queravuev1.ExportTableRequest{
+					SessionId: env.session.ID, Table: &queravuev1.TableRef{Schema: "public", Table: "qv_xfer_perf_export"},
+					Options: &queravuev1.ExportOptions{Format: formats[name]},
+				}, &discardExport{}); err != nil {
+					t.Fatal(err)
+				}
+				again, againPeak := second.Stop()
+				t.Logf("second parquet export: RSS baseline %.1f MiB, peak %.1f MiB (+%.1f)", again, againPeak, againPeak-again)
+				if againPeak-again > budget {
+					t.Errorf("the second Parquet export grew RSS by %.1f MiB: DuckDB did not release its buffers", againPeak-again)
+				}
+			}
 		})
 	}
 }

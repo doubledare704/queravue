@@ -167,6 +167,9 @@ func (r *exportRecorder[T]) Context() context.Context {
 }
 
 func (r *exportRecorder[T]) Send(m T) error {
+	if err := r.Context().Err(); err != nil {
+		return err
+	}
 	ev := eventOf(m)
 	if chunk, ok := ev.GetEvent().(*queravuev1.ExportEvent_Chunk); ok {
 		ev = &queravuev1.ExportEvent{Event: &queravuev1.ExportEvent_Chunk{Chunk: bytes.Clone(chunk.Chunk)}}
@@ -260,6 +263,9 @@ func (s *importStream) Recv() (*queravuev1.ImportRequest, error) {
 }
 
 func (s *importStream) Send(m *queravuev1.ImportResponse) error {
+	if err := s.Context().Err(); err != nil {
+		return err
+	}
 	s.out = append(s.out, proto.Clone(m).(*queravuev1.ImportResponse))
 	return nil
 }

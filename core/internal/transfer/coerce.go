@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,16 @@ import (
 )
 
 var errCoerce = errors.New("value does not fit the column type")
+
+var plainNumber = regexp.MustCompile(`^[+-]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][+-]?[0-9]+)?$`)
+
+func parseFloatText(s string) (float64, bool) {
+	if !plainNumber.MatchString(s) {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	return f, err == nil
+}
 
 // Coerce converts v to the kind of its target column. Values the server parses
 // itself (dates, enums, arrays) pass through as text.
@@ -70,7 +81,7 @@ func coerceInt(v engine.Value) (engine.Value, error) {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
 			return engine.Int(i), nil
 		}
-		if f, err := strconv.ParseFloat(s, 64); err == nil && f == math.Trunc(f) && math.Abs(f) < 1<<53 {
+		if f, ok := parseFloatText(s); ok && f == math.Trunc(f) && math.Abs(f) < 1<<53 {
 			return engine.Int(int64(f)), nil
 		}
 	case engine.VFloat:
@@ -86,7 +97,7 @@ func coerceFloat(v engine.Value) (engine.Value, error) {
 	case engine.VInt:
 		return engine.Float(float64(v.Int)), nil
 	case engine.VText, engine.VDecimal:
-		if f, err := strconv.ParseFloat(strings.TrimSpace(v.Str), 64); err == nil {
+		if f, ok := parseFloatText(strings.TrimSpace(v.Str)); ok {
 			return engine.Float(f), nil
 		}
 	}
@@ -98,10 +109,12 @@ func coerceDecimal(v engine.Value) (engine.Value, error) {
 	case engine.VInt:
 		return engine.Decimal(strconv.FormatInt(v.Int, 10)), nil
 	case engine.VFloat:
+		if math.IsNaN(v.Float) || math.IsInf(v.Float, 0) {
+			return v, errCoerce
+		}
 		return engine.Decimal(strconv.FormatFloat(v.Float, 'f', -1, 64)), nil
 	case engine.VText:
-		s := strings.TrimSpace(v.Str)
-		if _, err := strconv.ParseFloat(s, 64); err == nil && !strings.ContainsAny(s, "xXpP_nNiI") {
+		if s := strings.TrimSpace(v.Str); plainNumber.MatchString(s) {
 			return engine.Decimal(s), nil
 		}
 	}

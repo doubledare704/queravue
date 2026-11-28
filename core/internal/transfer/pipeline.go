@@ -139,15 +139,15 @@ func (p *pipeline[In, Out]) result(committed uint64, loadErr error) Result {
 		slices.SortStableFunc(res.RowErrors, func(a, b RowError) int { return cmp.Compare(a.Line, b.Line) })
 	}()
 	switch {
-	case p.failure != nil:
-		res.Err = p.failure
-	case loadErr != nil:
+	case loadErr != nil && !errors.Is(loadErr, errSourceStopped):
 		res.Err = Classify(loadErr)
 		if res.Err.Kind == KindConstraint && len(p.inflightLines) > 0 {
 			first, last := p.inflightLines[0], p.inflightLines[len(p.inflightLines)-1]
 			res.RowErrors = append(res.RowErrors, RowError{Line: uint64(max(first, 0)), Message: res.Err.Message})
 			res.Err = newError(KindConstraint, "a row between lines %d and %d was rejected: %s", first, last, res.Err.Message)
 		}
+	case p.failure != nil:
+		res.Err = p.failure
 	}
 	return res
 }

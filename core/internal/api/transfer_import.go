@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/doubledare704/queravue/core/internal/completion"
 	"github.com/doubledare704/queravue/core/internal/dataformat"
 	"github.com/doubledare704/queravue/core/internal/engine"
 	queravuev1 "github.com/doubledare704/queravue/core/internal/gen/queravue/v1"
@@ -224,7 +225,7 @@ func (r *importRun) run(ctx context.Context) error {
 		res.Err = &transfer.Error{Kind: transfer.KindCanceled, Message: "the import was cancelled"}
 	}
 	if res.Err != nil {
-		if err := r.sendError(res.Err); err != nil {
+		if err := r.sendError(res.Err); err != nil && ctx.Err() == nil {
 			return err
 		}
 	}
@@ -336,6 +337,7 @@ func (r *importRun) createTable(ctx context.Context) error {
 			return fmt.Errorf("create table: %w", err)
 		}
 		r.ddl += stmt.SQL + "\n"
+		r.schemaChanged()
 	}
 	return nil
 }
@@ -372,13 +374,27 @@ func (r *importRun) runCollection(ctx context.Context) transfer.Result {
 
 func (r *importRun) runScript(ctx context.Context) transfer.Result {
 	ex, _ := engine.As[engine.Executor](r.sess.Conn)
-	runner := &transfer.ScriptRunner{Executor: ex, Dialect: r.sess.Dialect.Lexer(), BytesRead: r.chunks.Bytes, Progress: r.progress}
+	lexer := r.sess.Dialect.Lexer()
+	runner := &transfer.ScriptRunner{
+		Executor: ex, Dialect: lexer, BytesRead: r.chunks.Bytes, Progress: r.progress,
+		AfterStatement: func(sql string) {
+			if completion.IsSchemaChange(lexer, sql) {
+				r.schemaChanged()
+			}
+		},
+	}
 	res := runner.Run(ctx, r.chunks)
 	out := transfer.Result{Committed: res.Committed, Err: res.Err}
 	if res.Err != nil && res.Line > 0 {
 		out.RowErrors = []transfer.RowError{{Line: res.Line, Message: res.Err.Message}}
 	}
 	return out
+}
+
+func (r *importRun) schemaChanged() {
+	if r.svc.schemaChanged != nil {
+		r.svc.schemaChanged(r.sess.ID)
+	}
 }
 
 type discardRows struct{}

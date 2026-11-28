@@ -80,4 +80,5 @@ Gate: an RSS peak at most 60 MiB above the baseline. The import, CSV, NDJSON and
 - **What helped**, in the order found: a DuckDB file in the temp directory instead of `:memory:` (+105 MiB, flat after the first rows), flushing the appender every 8,192 and then 2,048 rows (DuckDB buffers about 200,000 rows natively otherwise; +105 → +78 MiB), one thread and no insertion order.
 - **Tried and dropped:** staging the rows as NDJSON and running `COPY (SELECT * FROM read_ndjson(...)) TO ... (FORMAT parquet)`. `read_ndjson` allocates a 32 MiB buffer, so it cannot run inside a 12 MiB limit.
 - Peak disk is the DuckDB file plus the Parquet file, 1.6 times the Parquet size for this table. Wide rows of long text compress differently, so the ratio varies.
+- A second Parquet export right after the first grew RSS by another 20.5 MiB (105.7 → 126.3 MiB): macOS keeps the freed pages resident, so the peak does not return to the baseline between transfers, but it does not double either. The test asserts it stays inside the same allowance.
 - The default build shows the same CSV, NDJSON and SQL numbers; those formats never load DuckDB.

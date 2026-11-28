@@ -69,8 +69,8 @@ func (im *Importer) ImportRows(ctx context.Context, rd RowReader, mapper *Mapper
 
 // canRetryRowByRow holds only when the failed batch is known to have committed nothing.
 func (im *Importer) canRetryRowByRow(p *pipeline[[]engine.Value, []engine.Value], err error, stats engine.LoadStats, callStart uint64) bool {
-	return im.Policy == PolicySkip && p.failure == nil && engine.KindOf(err) == engine.KindConstraint &&
-		len(p.inflight) > 0 && stats.Rows == p.deliveredBefore-callStart
+	return im.Policy == PolicySkip && engine.KindOf(err) == engine.KindConstraint &&
+		p.inflight != nil && stats.Rows == p.deliveredBefore-callStart
 }
 
 func (im *Importer) retryRowByRow(ctx context.Context, p *pipeline[[]engine.Value, []engine.Value], target engine.LoadTarget, columns []string) (uint64, error) {
@@ -85,6 +85,7 @@ func (im *Importer) retryRowByRow(ctx context.Context, p *pipeline[[]engine.Valu
 		if engine.KindOf(err) != engine.KindConstraint {
 			return committed, err
 		}
+		p.delivered--
 		if p.reject(lines[i], problem{KindConstraint, "", Classify(err).Message}) {
 			return committed, errSourceStopped
 		}

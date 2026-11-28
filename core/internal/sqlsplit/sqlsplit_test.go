@@ -172,6 +172,10 @@ func TestSplitPrefixKeepsTheOpenStatement(t *testing.T) {
 		{"dollar body", Postgres, []string{"DO $$ BEGIN PERFORM 1; ", "END $$; SELECT 3;"}, []string{"DO $$ BEGIN PERFORM 1; END $$", "SELECT 3"}, ""},
 		{"mysql delimiter survives pieces", MySQL, []string{"DELIMITER $$\nCREATE PROCEDURE p() BEGIN SELECT 1; ", "END$$\nDELIMITER ;\nSELECT 2;"}, []string{"CREATE PROCEDURE p() BEGIN SELECT 1; END", "SELECT 2"}, ""},
 		{"mssql go", MSSQL, []string{"SELECT 1\nG", "O\nSELECT 2\nGO\n"}, []string{"SELECT 1", "SELECT 2"}, "\n"},
+		{"mssql go is not a word start", MSSQL, []string{"SELECT 1\nGO", "NE FROM t;"}, []string{"SELECT 1\nGONE FROM t"}, ""},
+		{"mssql go count arrives later", MSSQL, []string{"SELECT 1\nGO ", "5\nSELECT 2\nGO\n"}, []string{"SELECT 1", "SELECT 2"}, "\n"},
+		{"oracle slash continues the line", Oracle, []string{"SELECT 1\n/", " 2 FROM dual;"}, []string{"SELECT 1\n/ 2 FROM dual"}, ""},
+		{"oracle slash ends a block", Oracle, []string{"BEGIN NULL; END;\n/", "\nSELECT 2 FROM dual;"}, []string{"BEGIN NULL; END;", "SELECT 2 FROM dual"}, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

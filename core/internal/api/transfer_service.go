@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,7 +32,13 @@ type TransferService struct {
 	results     *results.Manager
 	connections *connections.Service
 	log         *slog.Logger
+
+	schemaChanged func(sessionID string)
 }
+
+// SetSchemaChangeHook registers f to run after an import creates a table or runs a
+// script statement that changes the schema, so the schema cache is refreshed.
+func (t *TransferService) SetSchemaChangeHook(f func(sessionID string)) { t.schemaChanged = f }
 
 // NewTransferService returns a TransferService backed by s, r and c. connections may be
 // nil, in which case no connection counts as production.
@@ -80,11 +87,15 @@ func (t *TransferService) ListFormats(context.Context, *queravuev1.ListFormatsRe
 
 type exportJob struct {
 	format   transfer.Format
+	options  transfer.Options
 	filename string
 	write    func(ctx context.Context, run *transfer.ExportRun) error
 }
 
 func (t *TransferService) export(ctx context.Context, send func(*queravuev1.ExportEvent) error, job exportJob) error {
+	if bad := checkExportFormat(job.format, job.options); bad != nil {
+		return send(&queravuev1.ExportEvent{Event: &queravuev1.ExportEvent_Error{Error: transferErrorToProto(bad)}})
+	}
 	if err := send(&queravuev1.ExportEvent{Event: &queravuev1.ExportEvent_Header{Header: &queravuev1.ExportHeader{
 		Format: formatToProto(job.format), SuggestedFilename: job.filename,
 	}}}); err != nil {
@@ -112,15 +123,25 @@ func (t *TransferService) export(ctx context.Context, send func(*queravuev1.Expo
 		rows, bytes, err = run.Finish()
 	}
 	switch {
-	case sendErr != nil:
-		return fmt.Errorf("transfer: send: %w", sendErr)
 	case ctx.Err() != nil:
 		return status.FromContextError(ctx.Err()).Err()
+	case sendErr != nil:
+		return fmt.Errorf("transfer: send: %w", sendErr)
 	case err != nil:
 		t.log.Warn("export failed", "kind", transfer.Classify(err).Kind, "cause", fmt.Sprintf("%T", errors.Unwrap(err)))
 		return send(&queravuev1.ExportEvent{Event: &queravuev1.ExportEvent_Error{Error: transferErrorToProto(err)}})
 	}
 	return send(&queravuev1.ExportEvent{Event: &queravuev1.ExportEvent_Summary{Summary: &queravuev1.ExportSummary{Rows: rows, Bytes: bytes}}})
+}
+
+func checkExportFormat(format transfer.Format, opts transfer.Options) *transfer.Error {
+	if format == transfer.Parquet && !transfer.ParquetAvailable {
+		return &transfer.Error{Kind: transfer.KindUnsupported, Message: "Parquet needs a core built with DuckDB"}
+	}
+	if _, err := opts.DataformatOptions(format); err != nil {
+		return transfer.Classify(err)
+	}
+	return nil
 }
 
 func exportFormat(options *queravuev1.ExportOptions) (transfer.Format, transfer.Options, error) {
@@ -129,6 +150,21 @@ func exportFormat(options *queravuev1.ExportOptions) (transfer.Format, transfer.
 		return 0, transfer.Options{}, status.Error(codes.InvalidArgument, "an export format is required")
 	}
 	return format, optionsFromProto(options.GetFormatOptions()), nil
+}
+
+// waitForColumns holds back an export of a result whose query has started but not yet reported its columns.
+func waitForColumns(ctx context.Context, spool *results.Spool) error {
+	for len(spool.Columns()) == 0 {
+		if _, done, _ := spool.State(); done {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("transfer: %w", ctx.Err())
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	return nil
 }
 
 type spoolRows struct{ spool *results.Spool }
@@ -169,13 +205,16 @@ func (t *TransferService) ExportResult(req *queravuev1.ExportResultRequest, stre
 			dialect = sess.Dialect
 		}
 	}
-	cols := engineColumnsOfProto(spool.Columns())
 	picks := make([]int, len(req.GetColumnIndices()))
 	for i, p := range req.GetColumnIndices() {
 		picks[i] = int(p)
 	}
-	job := exportJob{format: format, filename: transfer.SuggestedFilename("result", format)}
+	job := exportJob{format: format, options: opts, filename: transfer.SuggestedFilename("result", format)}
 	job.write = func(ctx context.Context, run *transfer.ExportRun) error {
+		if err := waitForColumns(ctx, spool); err != nil {
+			return err
+		}
+		cols := engineColumnsOfProto(spool.Columns())
 		chosen := cols
 		if len(picks) > 0 {
 			chosen = make([]engine.Column, 0, len(picks))
@@ -229,7 +268,7 @@ func (t *TransferService) ExportTable(req *queravuev1.ExportTableRequest, stream
 		return err
 	}
 	defer finish()
-	job := exportJob{format: format, filename: filename}
+	job := exportJob{format: format, options: opts, filename: filename}
 	job.write = func(ctx context.Context, run *transfer.ExportRun) error {
 		target := sqldialect.Target{Database: ref.GetDatabase(), Schema: ref.GetSchema(), Table: ref.GetTable()}
 		var design *sqldialect.TableDesign
@@ -291,7 +330,7 @@ func (t *TransferService) ExportCollection(req *queravuev1.ExportCollectionReque
 	}
 	defer finish()
 	ref := req.GetCollection()
-	job := exportJob{format: format, filename: transfer.SuggestedFilename(ref.GetCollection(), format)}
+	job := exportJob{format: format, options: opts, filename: transfer.SuggestedFilename(ref.GetCollection(), format)}
 	job.write = func(ctx context.Context, run *transfer.ExportRun) error {
 		find := engine.FindOptions{
 			Database: ref.GetDatabase(), Collection: ref.GetCollection(),

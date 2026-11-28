@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -32,6 +33,11 @@ func TestCoerce(t *testing.T) {
 		{"bad bool", engine.Text("maybe"), engine.VBool, engine.Value{}, true},
 		{"text to float", engine.Text("1e3"), engine.VFloat, engine.Float(1000), false},
 		{"text to decimal keeps digits", engine.Text("12345678901234567890.123456789"), engine.VDecimal, engine.Decimal("12345678901234567890.123456789"), false},
+		{"huge exponent is still a decimal", engine.Text("1e400"), engine.VDecimal, engine.Decimal("1e400"), false},
+		{"go underscores are not numbers", engine.Text("1_000"), engine.VInt, engine.Value{}, true},
+		{"go hex floats are not numbers", engine.Text("0x1p4"), engine.VFloat, engine.Value{}, true},
+		{"inf is not a float", engine.Text("inf"), engine.VFloat, engine.Value{}, true},
+		{"nan float is not a decimal", engine.Float(math.NaN()), engine.VDecimal, engine.Value{}, true},
 		{"hex is not a decimal", engine.Text("0x10"), engine.VDecimal, engine.Value{}, true},
 		{"rfc3339", engine.Text("2024-02-29T12:00:00Z"), engine.VTimestamptz, engine.Timestamptz(stamp), false},
 		{"naive timestamp is UTC", engine.Text("2024-02-29 12:00:00"), engine.VTimestamptz, engine.Timestamptz(stamp), false},
@@ -244,5 +250,20 @@ func TestInferWarnsAboutMixedColumnsAndTruncation(t *testing.T) {
 	}
 	if got.Columns[0].Kind != engine.VText || got.Columns[0].Name != "a" {
 		t.Errorf("columns = %+v", got.Columns)
+	}
+}
+
+func TestDesignOfTableKeepsAPrimaryKeyOnlyWhenEveryColumnOfItIsThere(t *testing.T) {
+	td := engine.TableDetails{Columns: []engine.ColumnDef{
+		{Name: "a", TypeName: "int", IsPrimaryKey: true, PrimaryKeyOrder: 1},
+		{Name: "b", TypeName: "int", IsPrimaryKey: true, PrimaryKeyOrder: 2},
+		{Name: "c", TypeName: "text"},
+	}}
+	if got := transfer.DesignOfTable(td, nil).PrimaryKey; !reflect.DeepEqual(got, []string{"a", "b"}) {
+		t.Errorf("full design key = %v", got)
+	}
+	subset := transfer.DesignOfTable(td, []string{"a", "c"})
+	if len(subset.PrimaryKey) != 0 || len(subset.Columns) != 2 {
+		t.Errorf("subset design = %+v", subset)
 	}
 }

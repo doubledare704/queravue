@@ -11,7 +11,11 @@ import (
 func DesignOfTable(td engine.TableDetails, only []string) *sqldialect.TableDesign {
 	design := &sqldialect.TableDesign{}
 	keyed := map[int]string{}
+	keyColumns := 0
 	for _, col := range td.Columns {
+		if col.IsPrimaryKey {
+			keyColumns++
+		}
 		if len(only) > 0 && !slices.Contains(only, col.Name) {
 			continue
 		}
@@ -28,6 +32,9 @@ func DesignOfTable(td engine.TableDetails, only []string) *sqldialect.TableDesig
 		orders = append(orders, order)
 	}
 	slices.Sort(orders)
+	if len(keyed) != keyColumns {
+		return design
+	}
 	for _, order := range orders {
 		design.PrimaryKey = append(design.PrimaryKey, keyed[order])
 	}

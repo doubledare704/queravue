@@ -45,6 +45,14 @@ func (m *Mapper) convert(row []engine.Value) ([]engine.Value, *problem) {
 // the file's column names are keys (JSON, Parquet). Unknown target columns
 // (target nil) allow only explicit mappings and no coercion.
 func BuildMapper(fileColumns []string, mappings []Mapping, target []engine.ColumnDef, byName bool) (*Mapper, *Error) {
+	m, err := buildMapper(fileColumns, mappings, target, byName)
+	if err == nil && len(m.names) == 0 {
+		return nil, newError(KindMapping, "no file columns are mapped")
+	}
+	return m, err
+}
+
+func buildMapper(fileColumns []string, mappings []Mapping, target []engine.ColumnDef, byName bool) (*Mapper, *Error) {
 	m := &Mapper{}
 	if len(mappings) == 0 {
 		if target == nil {

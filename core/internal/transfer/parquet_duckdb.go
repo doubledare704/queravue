@@ -126,21 +126,24 @@ func (w *parquetWriter) Columns(ctx context.Context, columns []engine.Column) er
 		return err
 	}
 	w.scratch = s
-	conn, err := s.connector.Connect(ctx)
+	if err := w.createTable(ctx, columns); err != nil {
+		w.Abort()
+		return err
+	}
+	return nil
+}
+
+func (w *parquetWriter) createTable(ctx context.Context, columns []engine.Column) error {
+	conn, err := w.scratch.connector.Connect(ctx)
 	if err != nil {
 		return fmt.Errorf("transfer: connect DuckDB: %w", err)
 	}
 	w.conn = conn
+	names := uniqueColumnNames(columns)
 	defs := make([]string, len(columns))
-	used := map[string]bool{}
 	for i, c := range columns {
-		name := c.Name
-		for n := 2; used[name]; n++ {
-			name = fmt.Sprintf("%s_%d", c.Name, n)
-		}
-		used[name] = true
 		w.kinds = append(w.kinds, c.Kind)
-		defs[i] = quoteIdent(strings.ToValidUTF8(name, "�")) + " " + duckType(c.Kind)
+		defs[i] = quoteIdent(names[i]) + " " + duckType(c.Kind)
 	}
 	if err := w.exec(ctx, "CREATE TABLE "+parquetTable+" ("+strings.Join(defs, ", ")+")"); err != nil {
 		return err
@@ -150,6 +153,32 @@ func (w *parquetWriter) Columns(ctx context.Context, columns []engine.Column) er
 		return fmt.Errorf("transfer: open appender: %w", err)
 	}
 	return nil
+}
+
+// uniqueColumnNames makes names DuckDB accepts: not empty and distinct ignoring case.
+// Names the result already has keep their spelling; the second and later copies get a suffix.
+func uniqueColumnNames(columns []engine.Column) []string {
+	taken := map[string]bool{}
+	for _, c := range columns {
+		taken[strings.ToLower(c.Name)] = true
+	}
+	seen := map[string]bool{}
+	names := make([]string, len(columns))
+	for i, c := range columns {
+		name := strings.ToValidUTF8(c.Name, "\xef\xbf\xbd")
+		if name == "" {
+			name = fmt.Sprintf("column_%d", i+1)
+		}
+		if seen[strings.ToLower(name)] {
+			base := name
+			for n := 2; seen[strings.ToLower(name)] || taken[strings.ToLower(name)]; n++ {
+				name = fmt.Sprintf("%s_%d", base, n)
+			}
+		}
+		seen[strings.ToLower(name)] = true
+		names[i] = name
+	}
+	return names
 }
 
 func (w *parquetWriter) exec(ctx context.Context, statement string) error {
@@ -362,11 +391,15 @@ func OpenParquetReader(ctx context.Context, src io.Reader, cfg ParquetConfig) (P
 
 func (r *parquetReader) describe(ctx context.Context) error {
 	r.db = sql.OpenDB(r.scratch.connector)
+	r.db.SetMaxOpenConns(1)
 	if _, err := r.db.ExecContext(ctx, "SET TimeZone='UTC'"); err != nil {
 		return fmt.Errorf("transfer: DuckDB: %w", err)
 	}
 	rows, err := r.db.QueryContext(ctx, "DESCRIBE SELECT * FROM read_parquet("+quoteLiteral(r.scratch.path())+")") //nolint:gosec // the path is a core-made temp file, quoted
 	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("transfer: %w", ctx.Err())
+		}
 		slog.Debug("transfer: describe parquet", "err", err)
 		return newError(KindParse, "the file is not a readable Parquet file")
 	}
@@ -400,6 +433,9 @@ func (r *parquetReader) Columns(context.Context) ([]string, error) {
 func (r *parquetReader) Lines() []int64 { return r.lines }
 
 func (r *parquetReader) Next(ctx context.Context) ([][]engine.Value, error) {
+	if len(r.columns) == 0 {
+		return nil, io.EOF
+	}
 	if r.rows == nil {
 		exprs := make([]string, len(r.columns))
 		for i, c := range r.columns {
