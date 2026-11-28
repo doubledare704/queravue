@@ -90,6 +90,20 @@ func (m *Manager) Create(sessionID string) (string, *Spool, error) {
 	return id, s, nil
 }
 
+// Dir is the process's spool directory, where transfers keep their temporary files.
+func (m *Manager) Dir() string { return m.dir }
+
+// SessionOf returns the session a result belongs to.
+func (m *Manager) SessionOf(id string) (string, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	e, ok := m.byID[id]
+	if !ok {
+		return "", false
+	}
+	return e.session, true
+}
+
 // Get returns the spool of a result.
 func (m *Manager) Get(id string) (*Spool, error) {
 	m.mu.Lock()

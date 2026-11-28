@@ -244,3 +244,40 @@ func FuzzJSONArrayReader(f *testing.F) {
 		fuzzReader(t, JSON, data)
 	})
 }
+
+func TestReaderReportsTheStartLineOfEveryRecord(t *testing.T) {
+	src := "id,note\n1,\"two\nlines\"\n2,plain\n3,x\n"
+	r, err := NewReader(t.Context(), strings.NewReader(src), Options{Format: CSV, Header: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Columns(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := r.Next(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 3 || !reflect.DeepEqual(r.Lines(), []int64{2, 4, 5}) {
+		t.Errorf("%d rows on lines %v", len(rows), r.Lines())
+	}
+
+	nd, err := NewReader(t.Context(), strings.NewReader("{\"a\":1}\n\n{\"a\":2}\n"), Options{Format: NDJSON}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := nd.Next(t.Context()); err != nil || !reflect.DeepEqual(nd.Lines(), []int64{1, 3}) {
+		t.Errorf("ndjson lines = %v, %v", nd.Lines(), err)
+	}
+}
+
+func TestInferLenientSkipsMalformedRecords(t *testing.T) {
+	r, err := NewReader(t.Context(), strings.NewReader("a,b\n1,x\n2\n3,y\n"), Options{Format: CSV, Header: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	columns, skipped, err := r.InferLenient(t.Context(), 10)
+	if err != nil || skipped != 1 || columns[0].Kind != engine.VInt {
+		t.Errorf("columns = %+v, skipped = %d, err = %v", columns, skipped, err)
+	}
+}

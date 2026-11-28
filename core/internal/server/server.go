@@ -116,7 +116,9 @@ func Serve(ctx context.Context, cfg Config) error {
 		}
 		queravuev1.RegisterDocumentServiceServer(srv, docSvc)
 		queravuev1.RegisterGridFsServiceServer(srv, api.NewGridFsService(cfg.Sessions, cfg.Connections, log))
-		queravuev1.RegisterTransferServiceServer(srv, api.NewTransferService(cfg.Sessions, cfg.Connections, log))
+		transferSvc := api.NewTransferService(cfg.Sessions, cfg.Results, cfg.Connections, log)
+		transferSvc.SetSchemaChangeHook(func(sessionID string) { schemaCache.Invalidate(sessionID, nil) })
+		queravuev1.RegisterTransferServiceServer(srv, transferSvc)
 		queravuev1.RegisterMockDataServiceServer(srv, api.NewMockDataService(cfg.Sessions, cfg.Connections, log))
 		queravuev1.RegisterKeyValueServiceServer(srv, api.NewKeyValueService(cfg.Sessions, cfg.Connections, log))
 		shellSvc := cfg.Shells

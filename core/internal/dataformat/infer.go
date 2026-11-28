@@ -14,6 +14,11 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
 
+const maxSkippedSample = 1000
+
+// TimestampLayouts are the text forms read as timestamps; zone-less ones are UTC.
+var TimestampLayouts = []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999Z07:00", "2006-01-02T15:04:05.999999999", "2006-01-02 15:04:05.999999999", "2006-01-02"}
+
 // InferredColumn describes the kinds and nulls observed in the sample.
 type InferredColumn struct {
 	Name     string
@@ -24,13 +29,24 @@ type InferredColumn struct {
 
 // Infer consumes up to maxRows from the reader; a fresh reader can replay the sample.
 func (r *Reader) Infer(ctx context.Context, maxRows int) ([]InferredColumn, error) {
+	columns, _, err := r.infer(ctx, maxRows, false)
+	return columns, err
+}
+
+// InferLenient is Infer that skips malformed records and reports how many it skipped.
+func (r *Reader) InferLenient(ctx context.Context, maxRows int) (columns []InferredColumn, skipped int, err error) {
+	return r.infer(ctx, maxRows, true)
+}
+
+func (r *Reader) infer(ctx context.Context, maxRows int, lenient bool) ([]InferredColumn, int, error) {
 	if maxRows < 0 {
-		return nil, errors.New("dataformat: negative sample row limit")
+		return nil, 0, errors.New("dataformat: negative sample row limit")
 	}
 	names, err := r.Columns(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	skipped := 0
 	columns := make([]InferredColumn, len(names))
 	for i, name := range names {
 		columns[i].Name = name
@@ -40,8 +56,16 @@ func (r *Reader) Infer(ctx context.Context, maxRows int) ([]InferredColumn, erro
 		if errors.Is(err, io.EOF) {
 			break
 		}
+		var parse *ParseError
+		if lenient && errors.As(err, &parse) {
+			skipped++
+			if skipped > maxSkippedSample {
+				break
+			}
+			continue
+		}
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		for _, row := range batch {
 			for i, value := range row {
@@ -55,7 +79,7 @@ func (r *Reader) Infer(ctx context.Context, maxRows int) ([]InferredColumn, erro
 			columns[i].Kind = engine.VText
 		}
 	}
-	return columns, nil
+	return columns, skipped, nil
 }
 
 func (c *InferredColumn) observe(v engine.Value, delimited bool) {
@@ -120,8 +144,12 @@ func stringKind(s string) engine.ValueKind {
 			return engine.VUUID
 		}
 	}
-	if _, err := time.Parse(time.RFC3339Nano, s); err == nil {
-		return engine.VTimestamptz
+	if len(s) >= len("2006-01-02") && s[4] == '-' {
+		for _, layout := range TimestampLayouts {
+			if _, err := time.Parse(layout, s); err == nil {
+				return engine.VTimestamptz
+			}
+		}
 	}
 	return engine.VText
 }
@@ -137,3 +165,6 @@ func numberValue(s string) engine.Value {
 	}
 	return engine.Decimal(s)
 }
+
+// SniffKind is the kind a delimited text cell reads as.
+func SniffKind(s string) engine.ValueKind { return textKind(s) }

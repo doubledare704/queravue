@@ -188,6 +188,7 @@ func (r *objectReader) read(ctx context.Context) ([]engine.Value, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	r.reader.line = start.line
 	obj, err := decodeObject(data, start, r.frames.opts.MaxRecordBytes)
 	if err != nil {
 		return nil, 0, err

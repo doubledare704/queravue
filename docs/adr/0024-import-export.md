@@ -26,6 +26,8 @@ Core opens a private in-memory DuckDB instance per Parquet transfer, separate fr
 - Import: core spools the uploaded bytes to a temp file, streams `SELECT * FROM read_parquet(<temp>)` with the bounded DuckDB streaming from iteration 10, feeds the target's loader, and deletes the file.
 - Export: core appends source rows into a DuckDB temp table, runs `COPY … TO <temp> (FORMAT parquet)`, streams the file, and deletes it.
 
+PR 4 measured the export memory (docs/perf/iteration-13.md, Lane F) and changed three details. The instance is backed by a file in the temporary directory instead of `:memory:`, which keeps table data out of resident memory. The appender is flushed every 2,048 rows, because it otherwise buffers about 200,000 rows natively. DuckDB runs on one thread. Even so, its resident memory is about 25 MiB beyond the 60 MiB budget of the other formats.
+
 DuckDB is linked only with the `duckdb` build tag (ADR 0019); release builds have it. `TransferService.ListFormats` reports the formats of this build, and the UI hides Parquet when it is missing. A C++ crash takes core down and core restarts, as ADR 0019 accepts. Nested Parquet types are rejected in v1.
 
 ### 4. Export sources

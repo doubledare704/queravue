@@ -73,10 +73,23 @@ type recordReader[T any] func(ctx context.Context) (T, int, error)
 
 type batchReader[T any] struct {
 	read         recordReader[T]
+	lineOf       func() int64
 	maxBytes     int
 	pending      T
 	pendingBytes int
+	pendingLine  int64
 	pendingErr   error
+	lines        []int64
+}
+
+// Lines returns the 1-based start line of each record of the last batch.
+func (b *batchReader[T]) Lines() []int64 { return b.lines }
+
+func (b *batchReader[T]) currentLine() int64 {
+	if b.lineOf == nil {
+		return 0
+	}
+	return b.lineOf()
 }
 
 func (b *batchReader[T]) Next(ctx context.Context) ([]T, error) {
@@ -94,8 +107,10 @@ func (b *batchReader[T]) next(ctx context.Context, maxRows int) ([]T, error) {
 	}
 	var batch []T
 	var size int
+	b.lines = b.lines[:0]
 	if b.pendingBytes != 0 {
 		batch = append(batch, b.pending)
+		b.lines = append(b.lines, b.pendingLine)
 		size = b.pendingBytes
 		var zero T
 		b.pending, b.pendingBytes = zero, 0
@@ -113,11 +128,13 @@ func (b *batchReader[T]) next(ctx context.Context, maxRows int) ([]T, error) {
 			b.pendingErr = err
 			break
 		}
+		line := b.currentLine()
 		if size+cost > b.maxBytes && len(batch) != 0 {
-			b.pending, b.pendingBytes = value, cost
+			b.pending, b.pendingBytes, b.pendingLine = value, cost, line
 			break
 		}
 		batch = append(batch, value)
+		b.lines = append(b.lines, line)
 		size += cost
 	}
 	return batch, nil
@@ -130,6 +147,7 @@ type Reader struct {
 	columns    []string
 	ready      bool
 	format     Format
+	line       int64
 }
 
 // NewReader discovers columns when no column names are supplied.
@@ -155,6 +173,7 @@ func NewReader(ctx context.Context, src io.Reader, opts Options, columns []strin
 	}
 	r := &Reader{columns: slices.Clone(columns), ready: len(columns) != 0, format: opts.Format}
 	r.maxBytes = opts.MaxBytes
+	r.lineOf = func() int64 { return r.line }
 	if opts.Format == CSV || opts.Format == TSV {
 		d := &delimitedReader{input: in, opts: opts, reader: r, header: opts.Header}
 		r.read, r.readHeader = d.read, d.readHeader
@@ -180,7 +199,7 @@ func (r *Reader) Columns(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 		if err == nil {
-			r.pending, r.pendingBytes = row, size
+			r.pending, r.pendingBytes, r.pendingLine = row, size, r.line
 		}
 	}
 	return slices.Clone(r.columns), nil

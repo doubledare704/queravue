@@ -30,11 +30,14 @@ func NewDocumentReader(ctx context.Context, src io.Reader, opts Options, canonic
 	frames := jsonFrames{input: in, opts: opts}
 	r := &DocumentReader{}
 	r.maxBytes = opts.MaxBytes
+	var line int64
+	r.lineOf = func() int64 { return line }
 	r.read = func(ctx context.Context) (engine.Document, int, error) {
 		data, start, err := frames.next(ctx)
 		if err != nil {
 			return "", 0, err
 		}
+		line = start.line
 		if trimmed := bytes.Trim(data, " \r\n\t"); len(trimmed) == 0 || trimmed[0] != '{' {
 			return "", 0, start.failure(errors.New("expected EJSON object"))
 		}
