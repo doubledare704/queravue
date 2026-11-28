@@ -60,7 +60,7 @@ func New() *Engine {
 			{Key: ParamPassword, Label: "Password", Kind: engine.FieldPassword},
 			{Key: ParamTLS, Label: "TLS", Kind: engine.FieldSelect, Default: "disable", Options: TLSModes},
 		},
-		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph},
+		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph, engine.CapBulkLoad},
 	}}
 }
 
@@ -109,7 +109,7 @@ func (e *Engine) Connect(ctx context.Context, cfg engine.Config, secret engine.S
 		_ = db.Close()
 		return nil, classify(ID, "connect", err, secret)
 	}
-	return &Conn{secret: secret, db: db, database: cfg.Param(ParamDatabase, "default")}, nil
+	return &Conn{secret: secret, db: db, options: opts, database: cfg.Param(ParamDatabase, "default")}, nil
 }
 
 func tlsConfigFor(cfg engine.Config) (*tls.Config, error) {
@@ -134,6 +134,7 @@ func tlsConfigFor(cfg engine.Config) (*tls.Config, error) {
 type Conn struct {
 	secret   engine.Secret
 	database string
+	options  *chdriver.Options
 
 	mu sync.Mutex
 	db *sql.DB

@@ -29,7 +29,11 @@ const (
 type Engine struct{ desc engine.Descriptor }
 
 // New returns the DuckDB engine.
-func New() *Engine { return &Engine{desc: descriptor()} }
+func New() *Engine {
+	desc := descriptor()
+	desc.Capabilities = append(desc.Capabilities, engine.CapBulkLoad)
+	return &Engine{desc: desc}
+}
 
 // Descriptor implements engine.Engine.
 func (e *Engine) Descriptor() engine.Descriptor { return e.desc }

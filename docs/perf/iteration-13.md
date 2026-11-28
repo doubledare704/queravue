@@ -28,6 +28,35 @@ Gates: Postgres at least 50,000 rows/s, Mongo at least 30,000 docs/s, and an RSS
 - **Mongo parse cost:** parsing canonical Extended JSON costs about 8.7 µs per document (syntax check, bare-number check, decode, encode), about as much as the insert. With one goroutine the same load ran at 40,138 and 58,911 docs/s (24.9 s and 17.0 s; RSS +16.7 MiB). Parsing each batch on up to four goroutines doubled the rate for about 5–10 MiB more RSS.
 - **Not measured here:** MySQL, SQLite and the Mongo variants. They are covered by the conformance suite, not by a perf gate.
 
+### Lane L, second set
+
+Same machine, sampling and source as above (Apple M4 Pro, macOS 27.2.1, Go 1.27.4, 2026-11-28). Databases from `dev/docker-compose.yml`: `mcr.microsoft.com/mssql/server:2022-CU27` (amd64 image under emulation, the compose default on Apple Silicon), `gvenzl/oracle-free:23.26.3-slim-faststart`, `clickhouse/clickhouse-server:26.3.25.2`; DuckDB is the embedded `duckdb` build with a file database. The table has the same six columns as the Postgres run (integer, text, decimal(14,2), timestamp, boolean, text), no indexes, and a batch is 10,000 rows (about 1 MiB). Each run loads 1,000,000 rows and then counts them on the server.
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait mssql clickhouse oracle
+docker compose -f dev/docker-compose.yml --profile seed up mssql-seed
+cd core && LOAD_PERF=1 go test -count=1 -tags=integration -v -run 'TestIntegrationLoadRowsPerf' ./internal/engine/mssql/ ./internal/engine/oracle/ ./internal/engine/clickhouse/
+cd core && LOAD_PERF=1 CGO_ENABLED=1 go test -count=1 -tags=duckdb -v -run 'TestLoadRowsPerf' ./internal/engine/duckdb/
+```
+
+| Engine | Run | Time | Rate | RSS baseline → peak |
+|---|---|---:|---:|---|
+| SQL Server 2022 (bulk copy) | 1 | 4.45 s | 224,769 rows/s | 30.1 → 44.5 MiB (+14.4) |
+| SQL Server 2022 (bulk copy) | 2 | 4.07 s | 245,946 rows/s | 30.5 → 45.1 MiB (+14.6) |
+| Oracle Free 23.26 (array binding) | 1 | 5.04 s | 198,577 rows/s | 30.1 → 54.4 MiB (+24.3) |
+| Oracle Free 23.26 (array binding) | 2 | 5.07 s | 197,291 rows/s | 30.1 → 55.0 MiB (+24.9) |
+| ClickHouse 26.3 (native batch) | 1 | 6.93 s | 144,242 rows/s | 31.0 → 50.5 MiB (+19.5) |
+| ClickHouse 26.3 (native batch) | 2 | 6.94 s | 144,044 rows/s | 30.8 → 48.9 MiB (+18.1) |
+| DuckDB 2.0.0 (appender) | 1 | 0.77 s | 1,306,237 rows/s | 55.9 → 109.2 MiB (+53.3) |
+| DuckDB 2.0.0 (appender) | 2 | 0.73 s | 1,376,636 rows/s | 55.5 → 108.6 MiB (+53.1) |
+
+Recorded, not gated, except that the RSS peak is at most baseline + 60 MiB. All pass.
+
+- **DuckDB's memory is the database's, not the loader's.** DuckDB runs in the core's process and keeps the rows it has loaded until a checkpoint writes them out. With its default checkpoint threshold the peak was +59 to +63 MiB over three runs (one failed the budget), so the perf test sets `checkpoint_threshold` to 4 MB, which gave +51 to +56 MiB. A bigger load into a file database stays bounded by the same checkpoint, but an in-memory DuckDB database grows with its data.
+- **SQL Server** runs under amd64 emulation here, so its rate understates a native server.
+- **ClickHouse** is the slowest of the four: the driver appends row by row into column buffers, and each batch is one network round trip with a server-side insert of a MergeTree part.
+- **Oracle** peaks highest of the three network engines because go-ora encodes each column's array before sending, up to 10,000 rows per call.
+
 ## Lane M: mock data
 
 Same machine, databases and RSS sampling as Lane L. The test runs `mockdata.Run` in process against the real loaders, with one seed.

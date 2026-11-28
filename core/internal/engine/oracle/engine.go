@@ -74,7 +74,7 @@ func New() *Engine {
 			{Key: ParamWallet, Label: "Wallet directory", Kind: engine.FieldFile},
 			{Key: ParamShowSystemSchema, Label: "Show Oracle-maintained schemas", Kind: engine.FieldBoolean, Default: "false"},
 		},
-		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph},
+		Capabilities: []engine.Capability{engine.CapConnect, engine.CapExecute, engine.CapSchemaInspector, engine.CapIndexManager, engine.CapStats, engine.CapCompletion, engine.CapFormat, engine.CapSchemaGraph, engine.CapBulkLoad},
 	}}
 }
 
