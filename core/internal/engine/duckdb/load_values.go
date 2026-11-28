@@ -193,12 +193,21 @@ func decimalConverter(t string) (valueConverter, error) {
 		if !ok {
 			return nil, errors.New("not a decimal number")
 		}
-		scaled := new(big.Int).Quo(new(big.Int).Mul(exact.Num(), unit), exact.Denom())
+		scaled := roundHalfAwayFromZero(new(big.Int).Mul(exact.Num(), unit), exact.Denom())
 		if scaled.CmpAbs(limit) >= 0 {
 			return nil, errors.New("a decimal is outside the column's range")
 		}
 		return duckdbdriver.Decimal{Width: uint8(width), Scale: uint8(scale), Value: scaled}, nil //nolint:gosec // width and scale come from DECIMAL(w,s), at most 38
 	}, nil
+}
+
+// roundHalfAwayFromZero divides as DuckDB's casts to DECIMAL do.
+func roundHalfAwayFromZero(numerator, denominator *big.Int) *big.Int {
+	quotient, remainder := new(big.Int).QuoRem(numerator, denominator, new(big.Int))
+	if new(big.Int).Lsh(remainder.Abs(remainder), 1).Cmp(denominator) >= 0 {
+		quotient.Add(quotient, big.NewInt(int64(numerator.Sign())))
+	}
+	return quotient
 }
 
 func stringValue(v engine.Value) (driver.Value, error) {

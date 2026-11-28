@@ -20,6 +20,7 @@ var _ engine.RowLoader = (*Conn)(nil)
 const (
 	maxRowsPerBind     = 10000
 	maxNumberMagnitude = 1e125
+	minNumberMagnitude = 1e-125
 	rollbackTimeout    = 5 * time.Second
 )
 
@@ -120,13 +121,22 @@ func columnArrays(rows [][]engine.Value, width int) ([]any, error) {
 	for i := range columns {
 		columns[i] = make([]any, len(rows))
 	}
+	textual := make([]bool, width)
 	for r, row := range rows {
 		args, err := toArgs(row)
 		if err != nil {
 			return nil, err
 		}
 		for i, arg := range args {
-			columns[i][r] = bindable(arg)
+			columns[i][r] = arg
+			if f, ok := arg.(float64); ok && !representableAsNumber(f) {
+				textual[i] = true
+			}
+		}
+	}
+	for i, column := range columns {
+		if textual[i] {
+			sendFloatsAsText(column)
 		}
 	}
 	out := make([]any, width)
@@ -136,22 +146,30 @@ func columnArrays(rows [][]engine.Value, width int) ([]any, error) {
 	return out, nil
 }
 
-// bindable sends floats that go-ora's NUMBER encoding cannot carry (NaN,
-// infinities, beyond 1e125) as text, which BINARY_DOUBLE columns convert.
-func bindable(arg any) any {
-	f, ok := arg.(float64)
-	if !ok || (!math.IsNaN(f) && !math.IsInf(f, 0) && math.Abs(f) < maxNumberMagnitude) {
-		return arg
+// sendFloatsAsText converts the floats of one bind array to text. go-ora's
+// NUMBER encoding cannot carry NaN, infinities or magnitudes outside 1e-125 to
+// 1e125, and an array has one type, so the whole column goes as text, which
+// BINARY_DOUBLE columns convert.
+func sendFloatsAsText(column []any) {
+	for i, arg := range column {
+		f, ok := arg.(float64)
+		switch {
+		case !ok:
+		case math.IsNaN(f):
+			column[i] = "NaN"
+		case math.IsInf(f, 1):
+			column[i] = "Inf"
+		case math.IsInf(f, -1):
+			column[i] = "-Inf"
+		default:
+			column[i] = strconv.FormatFloat(f, 'g', -1, 64)
+		}
 	}
-	switch {
-	case math.IsNaN(f):
-		return "NaN"
-	case math.IsInf(f, 1):
-		return "Inf"
-	case math.IsInf(f, -1):
-		return "-Inf"
-	}
-	return strconv.FormatFloat(f, 'g', -1, 64)
+}
+
+func representableAsNumber(f float64) bool {
+	magnitude := math.Abs(f)
+	return f == 0 || (magnitude >= minNumberMagnitude && magnitude < maxNumberMagnitude)
 }
 
 func rollback(tx *sql.Tx) {

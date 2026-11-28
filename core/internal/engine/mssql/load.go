@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	mssqldb "github.com/microsoft/go-mssqldb"
 
@@ -71,11 +72,15 @@ func (r *loadRun) commitBatch(ctx context.Context, rows [][]engine.Value) (engin
 	if err := engine.CheckLoadWidths(ID, rows, len(r.columns)); err != nil {
 		return engine.LoadStats{}, err
 	}
+	converted, err := r.convertRows(rows)
+	if err != nil {
+		return engine.LoadStats{}, err
+	}
 	tx, err := r.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return engine.LoadStats{}, r.c.loadError(ctx, err)
 	}
-	inserted, err := r.copyRows(ctx, tx, rows)
+	inserted, err := r.copyRows(ctx, tx, converted)
 	if err != nil {
 		rollback(tx)
 		return engine.LoadStats{}, err
@@ -90,21 +95,35 @@ func (r *loadRun) commitBatch(ctx context.Context, rows [][]engine.Value) (engin
 	return engine.LoadStats{Rows: inserted, Batches: 1}, nil
 }
 
-func (r *loadRun) copyRows(ctx context.Context, tx *sql.Tx, rows [][]engine.Value) (uint64, error) {
+// convertRows converts the whole batch before the bulk stream starts: the
+// driver cannot abort a stream that is open, and a session that is left in the
+// middle of one loses its connection.
+func (r *loadRun) convertRows(rows [][]engine.Value) ([][]any, error) {
+	out := make([][]any, len(rows))
+	for i, row := range rows {
+		args := make([]any, len(row))
+		for j, v := range row {
+			var err error
+			if args[j], err = r.converters[j](v); err != nil {
+				return nil, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "load rows", Msg: fmt.Sprintf("column %s: %s", r.columns[j], err.Error())}
+			}
+		}
+		out[i] = args
+	}
+	return out, nil
+}
+
+func (r *loadRun) copyRows(ctx context.Context, tx *sql.Tx, rows [][]any) (uint64, error) {
 	options := mssqldb.BulkOptions{CheckConstraints: true, FireTriggers: true, KeepNulls: true}
 	stmt, err := tx.PrepareContext(ctx, mssqldb.CopyIn(r.table, options, r.columns...))
 	if err != nil {
 		return 0, r.c.loadError(ctx, err)
 	}
 	defer func() { _ = stmt.Close() }()
-	args := make([]any, len(r.columns))
-	for _, row := range rows {
-		for i, v := range row {
-			if args[i], err = r.converters[i](v); err != nil {
-				return 0, &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "load rows", Msg: fmt.Sprintf("column %s: %s", r.columns[i], err.Error())}
-			}
-		}
+	for _, args := range rows {
 		if _, err := stmt.ExecContext(ctx, args...); err != nil {
+			// Ending the stream lets the transaction roll back on a session that still works.
+			_, _ = stmt.ExecContext(context.WithoutCancel(ctx))
 			return 0, r.c.loadError(ctx, err)
 		}
 	}
@@ -142,20 +161,21 @@ func (c *Conn) bulkConverters(ctx context.Context, conn *sql.Conn, t engine.Load
 	}
 	//nolint:gosec // the only spliced part is the database name quoted by qdb
 	rows, err := conn.QueryContext(ctx,
-		`SELECT c.name, ty.name FROM `+qdb(db)+`.sys.columns c
+		`SELECT c.name, ty.name, c.collation_name FROM `+qdb(db)+`.sys.columns c
 JOIN `+qdb(db)+`.sys.types ty ON ty.user_type_id = c.user_type_id
 WHERE c.object_id = OBJECT_ID(@p1)`, sqldialect.MSSQL.QualifyTableIn(db, t.Schema, t.Table))
 	if err != nil {
 		return nil, c.loadError(ctx, err)
 	}
 	defer func() { _ = rows.Close() }()
-	types := map[string]string{}
+	types := map[string]columnType{}
 	for rows.Next() {
 		var name, typeName string
-		if err := rows.Scan(&name, &typeName); err != nil {
+		var collation sql.NullString
+		if err := rows.Scan(&name, &typeName, &collation); err != nil {
 			return nil, c.loadError(ctx, err)
 		}
-		types[strings.ToLower(name)] = strings.ToLower(typeName)
+		types[strings.ToLower(name)] = columnType{name: strings.ToLower(typeName), collation: collation.String}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, c.loadError(ctx, err)
@@ -165,19 +185,21 @@ WHERE c.object_id = OBJECT_ID(@p1)`, sqldialect.MSSQL.QualifyTableIn(db, t.Schem
 	}
 	out := make([]valueConverter, len(columns))
 	for i, name := range columns {
-		typeName, ok := types[strings.ToLower(name)]
+		column, ok := types[strings.ToLower(name)]
 		if !ok {
 			return nil, engine.Errorf(engine.KindNotFound, ID, "load rows", "column %s does not exist", name)
 		}
-		if out[i] = converterFor(typeName); out[i] == nil {
-			return nil, engine.Errorf(engine.KindUnsupported, ID, "load rows", "column %s has type %s, which bulk copy cannot write", name, typeName)
+		if out[i] = converterFor(column); out[i] == nil {
+			return nil, engine.Errorf(engine.KindUnsupported, ID, "load rows", "column %s has type %s, which bulk copy cannot write", name, column.name)
 		}
 	}
 	return out, nil
 }
 
-func converterFor(typeName string) valueConverter {
-	switch typeName {
+type columnType struct{ name, collation string }
+
+func converterFor(column columnType) valueConverter {
+	switch column.name {
 	case "tinyint":
 		return integerInRange(0, math.MaxUint8)
 	case "smallint":
@@ -192,7 +214,12 @@ func converterFor(typeName string) valueConverter {
 		return floatValue
 	case "decimal", "numeric", "money", "smallmoney":
 		return decimalValue
-	case "char", "varchar", "nchar", "nvarchar", "text", "ntext", "sysname":
+	case "char", "varchar", "text":
+		if strings.HasSuffix(strings.ToUpper(column.collation), "_UTF8") {
+			return textValue
+		}
+		return asciiTextValue
+	case "nchar", "nvarchar", "ntext", "sysname":
 		return textValue
 	case "binary", "varbinary", "image":
 		return bytesValue
@@ -259,7 +286,7 @@ func decimalValue(v engine.Value) (any, error) {
 	case engine.VDecimal, engine.VText:
 		return v.Str, nil
 	case engine.VInt:
-		return v.Int, nil
+		return strconv.FormatInt(v.Int, 10), nil
 	}
 	return nil, errNotAssignable(v)
 }
@@ -276,6 +303,16 @@ func textValue(v engine.Value) (any, error) {
 		return strconv.FormatFloat(v.Float, 'g', -1, 64), nil
 	}
 	return nil, errNotAssignable(v)
+}
+
+// asciiTextValue refuses what a legacy code page column would store as
+// different characters: bulk copy writes the UTF-8 bytes as they are.
+func asciiTextValue(v engine.Value) (any, error) {
+	out, err := textValue(v)
+	if s, ok := out.(string); ok && strings.ContainsFunc(s, func(r rune) bool { return r > unicode.MaxASCII }) {
+		return nil, errors.New("the column's collation is not UTF-8, so bulk copy can only write ASCII text to it")
+	}
+	return out, err
 }
 
 func bytesValue(v engine.Value) (any, error) {

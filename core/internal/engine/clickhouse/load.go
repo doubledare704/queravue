@@ -88,7 +88,7 @@ func (r *loadRun) commitBatch(ctx context.Context, rows [][]engine.Value) (engin
 		}
 		if err := batch.Append(args...); err != nil {
 			_ = batch.Abort()
-			return engine.LoadStats{}, r.c.loadError(ctx, err)
+			return engine.LoadStats{}, r.appendError(ctx, err)
 		}
 	}
 	if err := batch.Send(); err != nil {
@@ -96,6 +96,15 @@ func (r *loadRun) commitBatch(ctx context.Context, rows [][]engine.Value) (engin
 	}
 	// The native protocol reports no inserted-row count, and ClickHouse drops no rows of a block it accepts.
 	return engine.LoadStats{Rows: uint64(len(rows)), Batches: 1}, nil
+}
+
+// appendError hides the driver's message: it quotes the value it could not
+// convert.
+func (r *loadRun) appendError(ctx context.Context, err error) error {
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) {
+		return r.c.loadError(ctx, err)
+	}
+	return &engine.Error{Kind: engine.KindInvalidConfig, Engine: ID, Op: "load rows", Msg: "a value cannot be stored in its column", Err: err}
 }
 
 func (r *loadRun) rowError(column int, err error) error {

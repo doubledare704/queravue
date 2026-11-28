@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	duckdbdriver "github.com/duckdb/duckdb-go/v2"
+
 	"github.com/doubledare704/queravue/core/internal/engine"
 	"github.com/doubledare704/queravue/core/internal/engine/enginetest"
 )
@@ -55,4 +57,39 @@ func TestRowLoaderSuite(t *testing.T) {
 		},
 		Fixture: rowLoaderFixture(),
 	})
+}
+
+func TestDecimalConverterRoundsLikeSQLCasts(t *testing.T) {
+	cases := []struct {
+		typeName, in string
+		want         string
+		wantErr      bool
+	}{
+		{"DECIMAL(10,2)", "1.239", "124", false},
+		{"DECIMAL(10,2)", "-1.239", "-124", false},
+		{"DECIMAL(10,2)", "1.234", "123", false},
+		{"DECIMAL(10,2)", "-1.235", "-124", false},
+		{"DECIMAL(10,2)", "7", "700", false},
+		{"DECIMAL(4,2)", "99.995", "", true},
+		{"DECIMAL(4,2)", "99.994", "9999", false},
+	}
+	for _, c := range cases {
+		convert, err := converterFor(c.typeName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := convert(engine.Decimal(c.in))
+		if c.wantErr {
+			if err == nil {
+				t.Errorf("%s %s: want an out-of-range error", c.typeName, c.in)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%s %s: %v", c.typeName, c.in, err)
+		}
+		if unscaled := got.(duckdbdriver.Decimal).Value.String(); unscaled != c.want {
+			t.Errorf("%s %s: unscaled %s, want %s", c.typeName, c.in, unscaled, c.want)
+		}
+	}
 }
