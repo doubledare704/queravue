@@ -27,3 +27,26 @@ Gates: Postgres at least 50,000 rows/s, Mongo at least 30,000 docs/s, and an RSS
 - **Postgres and Cockroach:** rows are encoded into `COPY` text as the connection reads, in 64 KiB pieces, so memory does not grow with the batch. One transaction per batch.
 - **Mongo parse cost:** parsing canonical Extended JSON costs about 8.7 µs per document (syntax check, bare-number check, decode, encode), about as much as the insert. With one goroutine the same load ran at 40,138 and 58,911 docs/s (24.9 s and 17.0 s; RSS +16.7 MiB). Parsing each batch on up to four goroutines doubled the rate for about 5–10 MiB more RSS.
 - **Not measured here:** MySQL, SQLite and the Mongo variants. They are covered by the conformance suite, not by a perf gate.
+
+## Lane M: mock data
+
+Same machine, databases and RSS sampling as Lane L. The test runs `mockdata.Run` in process against the real loaders, with one seed.
+
+```bash
+cd core && LOAD_PERF=1 go test -count=1 -tags=integration -v -run 'TestIntegrationMockRun' ./internal/mockdata/
+```
+
+- **Postgres:** `qv_mock_customers` (10,000 rows: sequence id, name, email, city), then `qv_mock_orders` (1,000,000 rows: sequence id, `customer_id` foreign key, weighted status, decimal total, timestamp in the last two years, sentence). The foreign key is a real constraint, and the test checks no order points at a missing customer.
+- **Mongo:** 1,000,000 documents with name, email, weighted status, decimal total, timestamp, a nested `shipping` document (city, street, zip), a `tags` array of 1 to 4 words and a sentence.
+
+| Target | Run | Time | Rate | RSS baseline → peak |
+|---|---|---:|---:|---|
+| PostgreSQL 17.11, 1.01M rows (parent + child) | 1 | 5.41 s | 186,559 rows/s | 25.0 → 37.4 MiB (+12.4) |
+| PostgreSQL 17.11, 1.01M rows (parent + child) | 2 | 5.59 s | 180,731 rows/s | 25.4 → 37.5 MiB (+12.0) |
+| MongoDB 8.0.34, 1M documents | 1 | 15.54 s | 64,348 docs/s | 39.0 → 46.7 MiB (+7.7) |
+| MongoDB 8.0.34, 1M documents | 2 | 15.87 s | 63,028 docs/s | 39.1 → 47.5 MiB (+8.4) |
+
+Gates: Postgres run at most 20 s, Mongo run at most 35 s, RSS peak at most 60 MiB above the baseline. All pass.
+
+- **Postgres:** the 1M-row child table took 5.39 s of the run. Keys of the 10,000 customers sit in a compact key set, so the foreign key costs memory in proportion to the parent only.
+- **Mongo:** generation and the loader's parse together keep the rate at about half of the loader-only rate in Lane L (110,000 to 122,000 docs/s), still twice the gate.
