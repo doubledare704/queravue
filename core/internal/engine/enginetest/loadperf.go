@@ -143,3 +143,64 @@ func (s *RepeatingDocumentSource) Next(context.Context) ([]engine.Document, erro
 	s.batches--
 	return s.Batch, nil
 }
+
+// PerfRowBatch builds the batch the row loader perf tests replay: rows of
+// about 100 bytes with a bigint, text, decimal, timestamp, boolean and text.
+func PerfRowBatch(rows int) [][]engine.Value {
+	stamp := time.Date(2024, 2, 29, 12, 0, 0, 0, time.UTC)
+	out := make([][]engine.Value, rows)
+	for i := range out {
+		out[i] = []engine.Value{
+			engine.Int(int64(i)), engine.Text(fmt.Sprintf("customer %d", i)), engine.Decimal(fmt.Sprintf("%d.%02d", i, i%100)),
+			engine.Timestamptz(stamp.Add(time.Duration(i) * time.Second)), engine.Bool(i%2 == 0),
+			engine.Text("a payload of about forty characters"),
+		}
+	}
+	return out
+}
+
+// PerfColumns names the columns of PerfRowBatch.
+var PerfColumns = []string{"id", "name", "amount", "created", "active", "payload"}
+
+// RowLoadPerf is one 1M-row load measurement.
+type RowLoadPerf struct {
+	Conn   engine.Conn
+	Target engine.LoadTarget
+	// Qualified is the table name as raw SQL; CreateSQL holds {table} for it.
+	Qualified, CreateSQL string
+	Batch                [][]engine.Value
+}
+
+// MeasureRowLoad loads LoadPerfRows rows by replaying Batch, logs time, rate
+// and RSS, checks the row count on the server and the RSS budget.
+func MeasureRowLoad(t *testing.T, p RowLoadPerf) {
+	t.Helper()
+	loader, ok := engine.As[engine.RowLoader](p.Conn)
+	if !ok {
+		t.Fatal("connection is not a RowLoader")
+	}
+	exec(t, p.Conn, "DROP TABLE IF EXISTS "+p.Qualified)
+	exec(t, p.Conn, strings.ReplaceAll(p.CreateSQL, "{table}", p.Qualified))
+	t.Cleanup(func() { exec(t, p.Conn, "DROP TABLE IF EXISTS "+p.Qualified) })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+	src := NewRepeatingRowSource(p.Batch, LoadPerfRows)
+	sampler := StartRSSSampler(t)
+	start := time.Now()
+	stats, err := loader.LoadRows(ctx, p.Target, PerfColumns, src)
+	elapsed := time.Since(start)
+	baseline, peak := sampler.Stop()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%d rows in %d batches, %.2fs, %.0f rows/s, RSS baseline %.1f MiB, peak %.1f MiB (+%.1f)",
+		stats.Rows, stats.Batches, elapsed.Seconds(), float64(stats.Rows)/elapsed.Seconds(), baseline, peak, peak-baseline)
+	col, _ := exec(t, p.Conn, "SELECT COUNT(*) FROM "+p.Qualified)
+	if n := countCell(t, col.rows[0][0]); n != LoadPerfRows {
+		t.Errorf("%d rows stored, want %d", n, LoadPerfRows)
+	}
+	if peak > baseline+LoadRSSBudgetMiB {
+		t.Errorf("RSS peak %.1f MiB exceeds baseline %.1f + %d MiB", peak, baseline, LoadRSSBudgetMiB)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,15 @@ type RowFixture struct {
 type RowLoaderTarget struct {
 	Target
 	Fixture RowFixture
+	// KeyedTableSQL replaces the CREATE TABLE of the table with an integer key
+	// column "id" and a text column "label" that most cases load into.
+	KeyedTableSQL string
+	// ViolatingKey is a key value the server rejects; nil means a repeat of a
+	// key loaded earlier, for engines whose tables enforce a primary key.
+	ViolatingKey *engine.Value
+	// NoTransactions skips the case of a transaction the caller left open, for
+	// engines that have none.
+	NoTransactions bool
 }
 
 const (
@@ -51,7 +61,10 @@ func RunRowLoader(t *testing.T, tg RowLoaderTarget) {
 	t.Run("SourceErrorMidLoad", func(t *testing.T) { rowSourceError(t, tg) })
 	t.Run("ConstraintViolationMidBatch", func(t *testing.T) { rowConstraintViolation(t, tg) })
 	t.Run("ColumnCountMismatch", func(t *testing.T) { rowColumnMismatch(t, tg) })
-	t.Run("CallersOpenTransactionIsNotCommitted", func(t *testing.T) { rowOpenTransaction(t, tg) })
+	t.Run("BatchLargerThanOneInsert", func(t *testing.T) { rowLargeBatch(t, tg) })
+	if !tg.NoTransactions {
+		t.Run("CallersOpenTransactionIsNotCommitted", func(t *testing.T) { rowOpenTransaction(t, tg) })
+	}
 }
 
 type loaderSession struct {
@@ -85,7 +98,11 @@ func (s *loaderSession) table(t *testing.T, name, createSQL string) string {
 }
 
 func (s *loaderSession) keyedTable(t *testing.T, name string) string {
-	return s.table(t, name, "CREATE TABLE {table} (id INT PRIMARY KEY, label VARCHAR(50))")
+	createSQL := s.tg.KeyedTableSQL
+	if createSQL == "" {
+		createSQL = fmt.Sprintf("CREATE TABLE {table} (%s INT PRIMARY KEY, %s VARCHAR(50))", s.dialect.QuoteIdent("id"), s.dialect.QuoteIdent("label"))
+	}
+	return s.table(t, name, createSQL)
 }
 
 func (s *loaderSession) load(ctx context.Context, name string, columns []string, src engine.RowBatchSource) (engine.LoadStats, error) {
@@ -96,7 +113,19 @@ func (s *loaderSession) load(ctx context.Context, name string, columns []string,
 func (s *loaderSession) count(t *testing.T, qualified string) uint64 {
 	t.Helper()
 	col, _ := exec(t, s.conn, "SELECT COUNT(*) FROM "+qualified)
-	return uint64(col.rows[0][0].Int) //nolint:gosec // COUNT(*) is non-negative
+	return countCell(t, col.rows[0][0])
+}
+
+func countCell(t *testing.T, cell engine.Value) uint64 {
+	t.Helper()
+	if cell.Kind == engine.VInt {
+		return uint64(cell.Int) //nolint:gosec // COUNT(*) is non-negative
+	}
+	n, err := strconv.ParseUint(cell.Str, 10, 64)
+	if err != nil {
+		t.Fatalf("COUNT(*) = %s", describe(cell))
+	}
+	return n
 }
 
 var keyedColumns = []string{"id", "label"}
@@ -233,7 +262,11 @@ func rowConstraintViolation(t *testing.T, tg RowLoaderTarget) {
 	const name = "qv_load_constraint"
 	qualified := s.keyedTable(t, name)
 	batches := keyedBatches(5, sequentialKeys)
-	batches[2][50][0] = engine.Int(keyBase + 5)
+	violating := engine.Int(keyBase + 5)
+	if tg.ViolatingKey != nil {
+		violating = *tg.ViolatingKey
+	}
+	batches[2][50][0] = violating
 	stats, err := s.load(context.Background(), name, keyedColumns, &rowSource{batches: batches})
 	if engine.KindOf(err) != engine.KindConstraint {
 		t.Fatalf("err = %v, want a constraint error", err)
@@ -244,7 +277,7 @@ func rowConstraintViolation(t *testing.T, tg RowLoaderTarget) {
 	if n := s.count(t, qualified); n != stats.Rows {
 		t.Errorf("%d rows stored, stats say %d", n, stats.Rows)
 	}
-	if strings.Contains(err.Error(), fmt.Sprint(keyBase+5)) || strings.Contains(err.Error(), "label-") {
+	if strings.Contains(err.Error(), fmt.Sprint(violating.Int)) || strings.Contains(err.Error(), "label-") {
 		t.Errorf("error message quotes row data: %v", err)
 	}
 }
@@ -263,12 +296,33 @@ func rowColumnMismatch(t *testing.T, tg RowLoaderTarget) {
 	}
 }
 
+func rowLargeBatch(t *testing.T, tg RowLoaderTarget) {
+	s := openRowLoader(t, tg)
+	const name = "qv_load_large_batch"
+	const rows = 2500
+	qualified := s.keyedTable(t, name)
+	batch := make([][]engine.Value, rows)
+	for i := range batch {
+		batch[i] = []engine.Value{engine.Int(int64(keyBase + i + 1)), engine.Text(fmt.Sprintf("label-%d", keyBase+i+1))}
+	}
+	stats, err := s.load(context.Background(), name, keyedColumns, &rowSource{batches: [][][]engine.Value{batch}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Rows != rows || stats.Batches != 1 {
+		t.Errorf("stats = %+v, want %d rows in 1 batch", stats, rows)
+	}
+	if n := s.count(t, qualified); n != rows {
+		t.Errorf("%d rows stored, want %d", n, rows)
+	}
+}
+
 func rowOpenTransaction(t *testing.T, tg RowLoaderTarget) {
 	s := openRowLoader(t, tg)
 	const name = "qv_load_open_transaction"
 	qualified := s.keyedTable(t, name)
 	exec(t, s.conn, s.dialect.Begin())
-	exec(t, s.conn, "INSERT INTO "+qualified+" (id, label) VALUES (1, 'caller')")
+	exec(t, s.conn, "INSERT INTO "+qualified+" ("+s.dialect.QuoteIdent("id")+", "+s.dialect.QuoteIdent("label")+") VALUES (1, 'caller')")
 	stats, loadErr := s.load(context.Background(), name, keyedColumns, &rowSource{batches: keyedBatches(1, sequentialKeys)})
 	exec(t, s.conn, "ROLLBACK")
 	if n := s.count(t, qualified); n != stats.Rows {
@@ -343,4 +397,15 @@ func describe(v engine.Value) string {
 		return "[" + strings.Join(parts, ", ") + "]"
 	}
 	return fmt.Sprintf("kind%d", v.Kind)
+}
+
+// FixedBatches is a RowBatchSource that yields the given batches once.
+func FixedBatches(batches ...[][]engine.Value) engine.RowBatchSource {
+	return &rowSource{batches: batches}
+}
+
+// Exec runs a statement that returns no rows and fails the test on error.
+func Exec(t *testing.T, c engine.Conn, sql string) {
+	t.Helper()
+	exec(t, c, sql)
 }
