@@ -80,6 +80,32 @@ func Split(d Dialect, text string) []Range {
 	return s.run()
 }
 
+// SplitPrefix is Split for a script that arrives in pieces. It returns only
+// the statements that end in a terminator, and the offset after the last one;
+// the caller keeps text[consumed:], appends the next piece and scans again.
+// delim is the terminator in effect at the start of text ("" means ";"), and
+// the terminator in effect at consumed is returned. With atEOF the last
+// statement counts even without a terminator and everything is consumed.
+func SplitPrefix(d Dialect, text, delim string, atEOF bool) (done []Range, consumed int, nextDelim string) {
+	if delim == "" {
+		delim = ";"
+	}
+	s := scanner{d: d, text: text, delim: delim}
+	ranges := s.run()
+	nextDelim = delim
+	for i, r := range ranges {
+		if r.TermEnd == r.End && !atEOF {
+			break
+		}
+		done = append(done, r)
+		consumed, nextDelim = r.TermEnd, s.endDelims[i]
+	}
+	if atEOF {
+		consumed = len(text)
+	}
+	return done, consumed, nextDelim
+}
+
 // At returns the index of the statement the cursor (a byte offset) belongs
 // to. A cursor inside a statement or right after its semicolon selects that
 // statement; a cursor in the gap between statements selects the previous one
@@ -115,10 +141,11 @@ func Overlapping(ranges []Range, start, end int) []int {
 }
 
 type scanner struct {
-	d     Dialect
-	text  string
-	pos   int
-	delim string // statement terminator; ";" unless a DELIMITER command changed it
+	d         Dialect
+	text      string
+	pos       int
+	delim     string   // statement terminator; ";" unless a DELIMITER command changed it
+	endDelims []string // terminator in effect where each returned range ended
 }
 
 // atDelim reports whether the terminator starts at s.pos.
@@ -324,6 +351,7 @@ func (s *scanner) run() []Range {
 	endStmt := func(termEnd int) {
 		if start >= 0 {
 			out = append(out, Range{Start: start, End: lastTok, TermEnd: termEnd})
+			s.endDelims = append(s.endDelims, s.delim)
 		}
 		start = -1
 		st = stmtState{}

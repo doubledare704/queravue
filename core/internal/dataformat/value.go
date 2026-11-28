@@ -13,6 +13,9 @@ import (
 	"github.com/doubledare704/queravue/core/internal/engine"
 )
 
+// ValueText is the text form delimited output uses for a non-null value.
+func ValueText(v engine.Value) string { return valueText(v) }
+
 func valueText(v engine.Value) string {
 	switch v.Kind {
 	case engine.VBool:

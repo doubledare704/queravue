@@ -50,3 +50,34 @@ Gates: Postgres run at most 20 s, Mongo run at most 35 s, RSS peak at most 60 Mi
 
 - **Postgres:** the 1M-row child table took 5.39 s of the run. Keys of the 10,000 customers sit in a compact key set, so the foreign key costs memory in proportion to the parent only.
 - **Mongo:** generation and the loader's parse together keep the rate at about half of the loader-only rate in Lane L (110,000 to 122,000 docs/s), still twice the gate.
+
+## Lane F: import and export
+
+Same machine, database and RSS sampling as Lane L. The tests call `TransferService` in process against the real Postgres (`postgres:17.11`), so the RSS is the core's. The source of the 1 GiB import is a generator that produces CSV on demand and hands it over in 1 MiB chunks; the exports discard the chunks they receive. No indexes.
+
+```bash
+docker compose -f dev/docker-compose.yml up -d --wait postgres
+cd core && LOAD_PERF=1 go test -count=1 -tags=integration -v -timeout 40m -run 'TestIntegrationPerfImport1GiB' ./internal/api/
+cd core && LOAD_PERF=1 CGO_ENABLED=1 go test -count=1 -tags=integration,duckdb -v -timeout 40m -run 'TestIntegrationPerfExport1MRows' ./internal/api/
+```
+
+The table has six columns: bigint, text, numeric, timestamptz, boolean, text (about 100 bytes a row).
+
+| Run | Size | Time | Rate | RSS baseline → peak |
+|---|---|---:|---:|---|
+| Import 1 GiB CSV into Postgres (`COPY`) | 11,139,171 rows | 90.3 s | 123,397 rows/s, 11.3 MiB/s | 34.0 → 50.7 MiB (+16.7) |
+| Export 1M rows to CSV | 90.8 MiB | 0.7 s | 1,405,038 rows/s | 35.4 → 47.0 MiB (+11.6) |
+| Export 1M rows to NDJSON | 145.1 MiB | 1.0 s | 1,029,622 rows/s | 47.0 → 47.7 MiB (+0.6) |
+| Export 1M rows to SQL dump | 103.4 MiB | 0.9 s | 1,151,161 rows/s | 47.7 → 48.3 MiB (+0.5) |
+| Export 1M rows to Parquet | 18.9 MiB | 1.3 s | 758,474 rows/s | 48.3 → 114.7 MiB (+66.4) |
+
+Gate: an RSS peak at most 60 MiB above the baseline. The import, CSV, NDJSON and SQL runs pass. **Parquet does not: +63 to +67 MiB over several runs.** The test allows it 25 MiB more than the others (`parquetRSSAllowanceMiB`); the cause and the options are below.
+
+### Parquet
+- Spool disk: the peak size of the transfer's temporary directory (DuckDB file, spill and the Parquet output) was 30.0 MiB for the 18.9 MiB file.
+- DuckDB `memory_limit`: 24 MiB, one thread, insertion order not preserved.
+- **Why it is over.** Loading DuckDB the first time costs about 23 MiB of resident memory (the library and its first database) before any row arrives, measured in a bare test as 15 → 38 MiB. The rest grows by about 40 MiB in the first 250,000 rows and then stays nearly flat. `memory_limit` barely moves the peak: 8, 12, 16 and 24 MiB gave +67, +63, +67 and +66 MiB, and 32 MiB with the appender flushed every 8,192 rows gave +78 MiB. At 16 MiB, before the appender was flushed in small pieces, DuckDB failed to allocate; at 8 MiB the run was slower (1.6 s).
+- **What helped**, in the order found: a DuckDB file in the temp directory instead of `:memory:` (+105 MiB, flat after the first rows), flushing the appender every 8,192 and then 2,048 rows (DuckDB buffers about 200,000 rows natively otherwise; +105 → +78 MiB), one thread and no insertion order.
+- **Tried and dropped:** staging the rows as NDJSON and running `COPY (SELECT * FROM read_ndjson(...)) TO ... (FORMAT parquet)`. `read_ndjson` allocates a 32 MiB buffer, so it cannot run inside a 12 MiB limit.
+- Peak disk is the DuckDB file plus the Parquet file, 1.6 times the Parquet size for this table. Wide rows of long text compress differently, so the ratio varies.
+- The default build shows the same CSV, NDJSON and SQL numbers; those formats never load DuckDB.

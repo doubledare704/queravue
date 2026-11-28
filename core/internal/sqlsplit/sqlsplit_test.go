@@ -158,3 +158,47 @@ func FuzzSplit(f *testing.F) {
 		}
 	})
 }
+
+func TestSplitPrefixKeepsTheOpenStatement(t *testing.T) {
+	cases := []struct {
+		name         string
+		d            Dialect
+		pieces       []string
+		wantTexts    []string
+		wantTailText string
+	}{
+		{"semicolon inside string waits", Postgres, []string{"SELECT 'a;", "b'; SELECT 2;"}, []string{"SELECT 'a;b'", "SELECT 2"}, ""},
+		{"split terminator", Postgres, []string{"SELECT 1", "; SELECT 2"}, []string{"SELECT 1"}, " SELECT 2"},
+		{"dollar body", Postgres, []string{"DO $$ BEGIN PERFORM 1; ", "END $$; SELECT 3;"}, []string{"DO $$ BEGIN PERFORM 1; END $$", "SELECT 3"}, ""},
+		{"mysql delimiter survives pieces", MySQL, []string{"DELIMITER $$\nCREATE PROCEDURE p() BEGIN SELECT 1; ", "END$$\nDELIMITER ;\nSELECT 2;"}, []string{"CREATE PROCEDURE p() BEGIN SELECT 1; END", "SELECT 2"}, ""},
+		{"mssql go", MSSQL, []string{"SELECT 1\nG", "O\nSELECT 2\nGO\n"}, []string{"SELECT 1", "SELECT 2"}, "\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var texts []string
+			var pending, delim string
+			for _, piece := range tc.pieces {
+				pending += piece
+				done, consumed, next := SplitPrefix(tc.d, pending, delim, false)
+				for _, r := range done {
+					texts = append(texts, r.Text(pending))
+				}
+				pending, delim = pending[consumed:], next
+			}
+			if !reflect.DeepEqual(texts, tc.wantTexts) {
+				t.Errorf("statements = %q, want %q", texts, tc.wantTexts)
+			}
+			if pending != tc.wantTailText {
+				t.Errorf("tail = %q, want %q", pending, tc.wantTailText)
+			}
+		})
+	}
+}
+
+func TestSplitPrefixAtEOFTakesTheUnterminatedStatement(t *testing.T) {
+	text := "SELECT 1; SELECT 2"
+	done, consumed, _ := SplitPrefix(Postgres, text, "", true)
+	if len(done) != 2 || consumed != len(text) || done[1].Text(text) != "SELECT 2" {
+		t.Errorf("done = %v, consumed = %d", done, consumed)
+	}
+}
